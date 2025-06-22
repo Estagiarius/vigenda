@@ -1,3 +1,4 @@
-// Package service contains the business logic of the Vigenda application.
-// It acts as an intermediary between the CLI/TUI and the repository layer.
+// Package service contém as interfaces e implementações da lógica de negócio da aplicação.
+// As interfaces definem os contratos para os serviços, enquanto as implementações
+// concretas interagem com a camada de repositório e outras dependências.
 package service
