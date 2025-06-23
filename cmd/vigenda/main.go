@@ -30,8 +30,19 @@ var proofService service.ProofService
 
 var rootCmd = &cobra.Command{
 	Use:   "vigenda",
-	Short: "Vigenda is a CLI tool for teachers with ADHD.",
-	Long:  `Vigenda helps teachers manage tasks, classes, assessments, and more, directly from the command line.`,
+	Short: "Vigenda é uma ferramenta CLI para auxiliar professores na gestão de suas atividades.",
+	Long: `Vigenda é uma aplicação de linha de comando (CLI) projetada para ajudar professores,
+especialmente aqueles com TDAH, a organizar tarefas, aulas, avaliações e outras
+atividades pedagógicas de forma eficiente.
+
+Funcionalidades Principais:
+  - Dashboard: Visão geral da agenda do dia, tarefas urgentes e notificações.
+  - Gestão de Tarefas: Crie, liste e marque tarefas como concluídas.
+  - Gestão de Turmas: Administre turmas, alunos (incluindo importação) e seus status.
+  - Gestão de Avaliações: Crie avaliações, lance notas e calcule médias.
+  - Banco de Questões: Mantenha um banco de questões e gere provas.
+
+Use "vigenda [comando] --help" para mais informações sobre um comando específico.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// This is the main dashboard view
 		// For now, printing a simplified version.
@@ -75,14 +86,21 @@ var rootCmd = &cobra.Command{
 
 var taskCmd = &cobra.Command{
 	Use:   "tarefa",
-	Short: "Manage tasks",
-	Long:  `Commands for creating, listing, and managing tasks.`,
+	Short: "Gerencia tarefas (add, listar, complete)",
+	Long:  `O comando 'tarefa' permite gerenciar todas as suas atividades e pendências. Você pode adicionar novas tarefas, listar tarefas existentes (filtrando por turma) e marcar tarefas como concluídas.`,
+	Example: `  vigenda tarefa add "Preparar aula de Revolução Francesa" --classid 1 --duedate 2024-07-15
+  vigenda tarefa listar --classid 1
+  vigenda tarefa complete 5`,
 }
 
 var taskAddCmd = &cobra.Command{
-	Use:   "add [title]",
-	Short: "Add a new task",
-	Long:  `Adds a new task. You can optionally provide a description, class ID, and due date using flags.`,
+	Use:   "add [título]",
+	Short: "Adiciona uma nova tarefa",
+	Long: `Adiciona uma nova tarefa ao sistema.
+Você pode fornecer uma descrição detalhada, associar a tarefa a uma turma específica
+e definir um prazo de conclusão utilizando as flags correspondentes.`,
+	Example: `  vigenda tarefa add "Corrigir provas bimestrais" --description "Corrigir as provas do 2º bimestre da turma 9A." --classid 1 --duedate 2024-07-20
+  vigenda tarefa add "Planejar próxima unidade" --duedate 2024-08-01`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		title := args[0]
@@ -130,12 +148,15 @@ var taskAddCmd = &cobra.Command{
 
 var taskListCmd = &cobra.Command{
 	Use:   "listar",
-	Short: "List tasks",
-	Long:  `Lists tasks. Can be filtered by class ID.`,
+	Short: "Lista tarefas ativas",
+	Long:  `Lista todas as tarefas ativas. É obrigatório filtrar as tarefas por um ID de turma específico usando a flag --classid.`,
+	Example: `  vigenda tarefa listar --classid 1
+  vigenda tarefa listar --classid 3`,
 	Run: func(cmd *cobra.Command, args []string) {
 		classIDStr, _ := cmd.Flags().GetString("classid")
 		if classIDStr == "" {
-			fmt.Println("Please specify a class ID using --classid to list tasks.")
+			fmt.Println("Erro: É obrigatório especificar o ID da turma usando a flag --classid.")
+			fmt.Println("Exemplo: vigenda tarefa listar --classid 1")
 			return
 		}
 
@@ -236,8 +257,11 @@ var taskListCmd = &cobra.Command{
 }
 
 var taskCompleteCmd = &cobra.Command{
-	Use:   "complete [taskID]",
-	Short: "Mark a task as completed",
+	Use:   "complete [ID_da_tarefa]",
+	Short: "Marca uma tarefa como concluída",
+	Long:  `Marca uma tarefa específica como concluída, utilizando o seu ID numérico.`,
+	Example: `  vigenda tarefa complete 12
+  vigenda tarefa complete 3`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		taskID, err := strconv.ParseInt(args[0], 10, 64)
@@ -279,25 +303,32 @@ func init() {
 	// Cobra command definitions and flag setups remain in init()
 
 	// Setup flags for task add command
-	taskAddCmd.Flags().StringP("description", "d", "", "Description of the task")
-	taskAddCmd.Flags().String("classid", "", "Class ID to associate the task with")
-	taskAddCmd.Flags().String("duedate", "", "Due date of the task (YYYY-MM-DD)")
+	taskAddCmd.Flags().StringP("description", "d", "", "Descrição detalhada da tarefa.")
+	taskAddCmd.Flags().String("classid", "", "ID da turma para associar a tarefa (opcional).")
+	taskAddCmd.Flags().String("duedate", "", "Data de conclusão da tarefa no formato YYYY-MM-DD (opcional).")
 
 	// Setup flags for task list command
-	taskListCmd.Flags().String("classid", "", "Filter tasks by Class ID")
+	taskListCmd.Flags().String("classid", "", "ID da turma para filtrar as tarefas (obrigatório).")
+	_ = taskListCmd.MarkFlagRequired("classid") // Marcar como obrigatório para que apareça no help
 
 	taskCmd.AddCommand(taskAddCmd, taskListCmd, taskCompleteCmd)
 	rootCmd.AddCommand(taskCmd)
 
 	// Class Service Commands
-	classCreateCmd.Flags().String("subjectid", "", "Subject ID for the class") // Flag for class create
+	classCreateCmd.Flags().String("subjectid", "", "ID da disciplina à qual a turma pertence (obrigatório).")
+	_ = classCreateCmd.MarkFlagRequired("subjectid")
+
 	classCmd.AddCommand(classCreateCmd, classImportStudentsCmd, classUpdateStudentStatusCmd)
 	rootCmd.AddCommand(classCmd)
 
 	// Assessment Service Commands
-	assessmentCreateCmd.Flags().String("classid", "", "Class ID for the assessment")
-	assessmentCreateCmd.Flags().String("term", "", "Term for the assessment (e.g., 1, 2)")
-	assessmentCreateCmd.Flags().String("weight", "", "Weight of the assessment (e.g., 4.0)")
+	assessmentCreateCmd.Flags().String("classid", "", "ID da turma para a qual a avaliação será criada (obrigatório).")
+	_ = assessmentCreateCmd.MarkFlagRequired("classid")
+	assessmentCreateCmd.Flags().String("term", "", "Período/bimestre da avaliação (ex: 1, 2) (obrigatório).")
+	_ = assessmentCreateCmd.MarkFlagRequired("term")
+	assessmentCreateCmd.Flags().String("weight", "", "Peso da avaliação na média final (ex: 4.0) (obrigatório).")
+	_ = assessmentCreateCmd.MarkFlagRequired("weight")
+
 	assessmentCmd.AddCommand(assessmentCreateCmd, assessmentEnterGradesCmd, assessmentClassAverageCmd)
 	rootCmd.AddCommand(assessmentCmd)
 
@@ -306,23 +337,34 @@ func init() {
 	rootCmd.AddCommand(questionBankCmd)
 
 	// Proof Service (prova) initialization and commands
-	proofGenerateCmd.Flags().String("subjectid", "", "Subject ID for the proof (required)")
-	proofGenerateCmd.Flags().String("topic", "", "Topic to filter questions by (optional)")
-	proofGenerateCmd.Flags().String("easy", "0", "Number of easy questions")
-	proofGenerateCmd.Flags().String("medium", "0", "Number of medium questions")
-	proofGenerateCmd.Flags().String("hard", "0", "Number of hard questions")
+	proofGenerateCmd.Flags().String("subjectid", "", "ID da disciplina para gerar a prova (obrigatório).")
+	_ = proofGenerateCmd.MarkFlagRequired("subjectid")
+	proofGenerateCmd.Flags().String("topic", "", "Tópico específico para filtrar questões (opcional).")
+	proofGenerateCmd.Flags().String("easy", "0", "Número de questões fáceis.")
+	proofGenerateCmd.Flags().String("medium", "0", "Número de questões médias.")
+	proofGenerateCmd.Flags().String("hard", "0", "Número de questões difíceis.")
 	proofCmd.AddCommand(proofGenerateCmd)
 	rootCmd.AddCommand(proofCmd)
 }
 
 var classCmd = &cobra.Command{
 	Use:   "turma",
-	Short: "Manage classes and students",
+	Short: "Gerencia turmas e alunos (criar, importar-alunos, atualizar-status)",
+	Long: `O comando 'turma' é usado para administrar turmas, incluindo a criação de novas turmas,
+a importação de listas de alunos de ficheiros CSV e a atualização do status de alunos individuais
+(ex: ativo, inativo, transferido).`,
+	Example: `  vigenda turma criar "História 9A" --subjectid 1
+  vigenda turma importar-alunos 1 alunos_9a.csv
+  vigenda turma atualizar-status 15 transferido`,
 }
 
 var classCreateCmd = &cobra.Command{
-	Use:   "criar [name]",
-	Short: "Create a new class",
+	Use:   "criar [nome_da_turma]",
+	Short: "Cria uma nova turma",
+	Long: `Cria uma nova turma no sistema. É necessário fornecer o nome da turma e o ID da disciplina
+à qual ela pertence através da flag --subjectid.`,
+	Example: `  vigenda turma criar "Matemática - Turma 101" --subjectid 2
+  vigenda turma criar "Geografia 8B" --subjectid 3`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
@@ -353,8 +395,13 @@ var classCreateCmd = &cobra.Command{
 }
 
 var classImportStudentsCmd = &cobra.Command{
-	Use:   "importar-alunos [classID] [csvFilePath]",
-	Short: "Import students from a CSV file into a class",
+	Use:   "importar-alunos [ID_da_turma] [caminho_do_ficheiro_csv]",
+	Short: "Importa alunos de um ficheiro CSV para uma turma",
+	Long: `Importa uma lista de alunos de um ficheiro CSV para uma turma existente.
+O ficheiro CSV deve conter as colunas 'numero_chamada', 'nome_completo', e opcionalmente 'situacao'.
+Consulte a documentação (README.md, Artefacto 9.1) para a estrutura detalhada do CSV.`,
+	Example: `  vigenda turma importar-alunos 1 ./lista_alunos_turma_a.csv
+  vigenda turma importar-alunos 3 /documentos/alunos_turma_c.csv`,
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		classID, err := strconv.ParseInt(args[0], 10, 64)
@@ -380,8 +427,13 @@ var classImportStudentsCmd = &cobra.Command{
 }
 
 var classUpdateStudentStatusCmd = &cobra.Command{
-	Use:   "atualizar-status [studentID] [newStatus]",
-	Short: "Update the status of a student",
+	Use:   "atualizar-status [ID_do_aluno] [novo_status]",
+	Short: "Atualiza o status de um aluno",
+	Long: `Atualiza o status de um aluno específico (ex: 'ativo', 'inativo', 'transferido').
+O ID do aluno é o identificador único na base de dados.
+Status permitidos: 'ativo', 'inativo', 'transferido'.`,
+	Example: `  vigenda turma atualizar-status 25 ativo
+  vigenda turma atualizar-status 103 transferido`,
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		studentID, err := strconv.ParseInt(args[0], 10, 64)
@@ -406,12 +458,23 @@ var classUpdateStudentStatusCmd = &cobra.Command{
 
 var assessmentCmd = &cobra.Command{
 	Use:   "avaliacao",
-	Short: "Manage assessments and grades",
+	Short: "Gerencia avaliações e notas (criar, lancar-notas, media-turma)",
+	Long: `O comando 'avaliacao' permite gerenciar todo o ciclo de vida das avaliações,
+desde a sua criação, passando pelo lançamento interativo de notas dos alunos,
+até o cálculo da média final da turma para uma avaliação específica.`,
+	Example: `  vigenda avaliacao criar "Prova Bimestral 1" --classid 1 --term 1 --weight 4.0
+  vigenda avaliacao lancar-notas 1
+  vigenda avaliacao media-turma 1`,
 }
 
 var assessmentCreateCmd = &cobra.Command{
-	Use:   "criar [name]",
-	Short: "Create a new assessment",
+	Use:   "criar [nome_da_avaliacao]",
+	Short: "Cria uma nova avaliação para uma turma",
+	Long: `Cria uma nova avaliação associada a uma turma específica.
+É necessário fornecer o nome da avaliação e, através de flags, o ID da turma,
+o período/bimestre e o peso da avaliação na média final.`,
+	Example: `  vigenda avaliacao criar "Trabalho de História Moderna" --classid 2 --term 3 --weight 3.5
+  vigenda avaliacao criar "Seminário de Literatura" --classid 1 --term 2 --weight 2.0`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
@@ -469,9 +532,14 @@ var assessmentCreateCmd = &cobra.Command{
 }
 
 var assessmentEnterGradesCmd = &cobra.Command{
-	Use:   "lancar-notas [assessmentID]",
-	Short: "Enter grades for an assessment",
-	Long:  "Interactively enter grades for students for a given assessment. Students and their current grades (if any) will be listed.",
+	Use:   "lancar-notas [ID_da_avaliacao]",
+	Short: "Lança notas para os alunos de uma avaliação",
+	Long: `Inicia um processo interativo para lançar ou editar as notas dos alunos
+para uma avaliação específica. A lista de alunos da turma associada à avaliação
+será exibida, permitindo a inserção de cada nota.
+O ID da avaliação é o identificador numérico único da avaliação.`,
+	Example: `  vigenda avaliacao lancar-notas 7
+  vigenda avaliacao lancar-notas 2`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		assessmentID, err := strconv.ParseInt(args[0], 10, 64)
@@ -538,8 +606,13 @@ var assessmentEnterGradesCmd = &cobra.Command{
 }
 
 var assessmentClassAverageCmd = &cobra.Command{
-	Use:   "media-turma [classID]",
-	Short: "Calculate the average grade for a class",
+	Use:   "media-turma [ID_da_turma]",
+	Short: "Calcula a média geral das notas de uma turma",
+	Long: `Calcula e exibe a média geral ponderada das notas para uma turma específica,
+considerando todas as avaliações e seus respectivos pesos.
+O ID da turma é o identificador numérico único da turma.`,
+	Example: `  vigenda avaliacao media-turma 1
+  vigenda avaliacao media-turma 5`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		classID, err := strconv.ParseInt(args[0], 10, 64)
@@ -560,12 +633,23 @@ var assessmentClassAverageCmd = &cobra.Command{
 // --- Question Bank (bancoq) Commands ---
 var questionBankCmd = &cobra.Command{
 	Use:   "bancoq",
-	Short: "Manage the question bank",
+	Short: "Gerencia o banco de questões (add)",
+	Long: `O comando 'bancoq' (Banco de Questões) permite adicionar novas questões ao sistema
+a partir de um ficheiro JSON formatado.
+Consulte a documentação (README.md, Artefacto 9.3) para a estrutura detalhada do JSON.`,
+	Example: `  vigenda bancoq add ./minhas_questoes_historia.json
+  vigenda bancoq add /usr/share/vigenda/questoes_padrao_matematica.json`,
 }
 
 var questionBankAddCmd = &cobra.Command{
-	Use:   "add [jsonFilePath]",
-	Short: "Add questions from a JSON file to the bank",
+	Use:   "add [caminho_do_ficheiro_json]",
+	Short: "Adiciona questões de um ficheiro JSON ao banco",
+	Long: `Adiciona um conjunto de questões de um ficheiro JSON para o banco de questões central.
+O ficheiro JSON deve seguir uma estrutura específica contendo detalhes como disciplina,
+tópico, tipo de questão (múltipla escolha, dissertativa), dificuldade, enunciado,
+opções (para múltipla escolha) e resposta correta.`,
+	Example: `  vigenda bancoq add questoes_bimestre1.json
+  vigenda bancoq add ../shared/questoes_revisao.json`,
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		jsonFilePath := args[0]
@@ -587,12 +671,23 @@ var questionBankAddCmd = &cobra.Command{
 // --- Proof (prova) Commands ---
 var proofCmd = &cobra.Command{
 	Use:   "prova",
-	Short: "Manage and generate proofs (tests)",
+	Short: "Gerencia e gera provas (gerar)",
+	Long: `O comando 'prova' permite gerar provas (avaliações textuais) a partir do banco de questões.
+Você pode especificar critérios como disciplina, tópico e o número desejado de questões
+por nível de dificuldade (fácil, médio, difícil).`,
+	Example: `  vigenda prova gerar --subjectid 1 --easy 5 --medium 3 --hard 2
+  vigenda prova gerar --subjectid 2 --topic "Segunda Guerra Mundial" --medium 10`,
 }
 
 var proofGenerateCmd = &cobra.Command{
 	Use:   "gerar",
-	Short: "Generate a new proof based on criteria",
+	Short: "Gera uma nova prova com base em critérios especificados",
+	Long: `Gera uma prova selecionando questões do banco de questões.
+É obrigatório especificar o ID da disciplina. Opcionalmente, pode-se filtrar por tópico
+e definir o número de questões para cada nível de dificuldade (fácil, médio, difícil).
+A prova gerada será exibida no terminal.`,
+	Example: `  vigenda prova gerar --subjectid 1 --easy 5 --medium 3 --hard 2 --topic "Revolução Industrial"
+  vigenda prova gerar --subjectid 3 --medium 10 --hard 5`,
 	Run: func(cmd *cobra.Command, args []string) {
 		subjectIDStr, _ := cmd.Flags().GetString("subjectid")
 		topic, _ := cmd.Flags().GetString("topic")
