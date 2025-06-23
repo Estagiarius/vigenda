@@ -327,11 +327,26 @@ type QuestionService interface {
 // TestCriteria define os parâmetros para a geração de uma prova.
 type TestCriteria struct {
 	SubjectID   int64
-	Topic       string
+	Topic       *string // Opcional: pode ser nil se não for filtrar por tópico específico
 	EasyCount   int
 	MediumCount int
 	HardCount   int
 }
+
+// ProofService define os métodos para a geração de provas (potencialmente uma visão mais específica ou diferente de Test).
+type ProofService interface {
+	GenerateProof(ctx context.Context, criteria ProofCriteria) ([]models.Question, error)
+}
+
+// ProofCriteria define os parâmetros para a geração de uma prova.
+type ProofCriteria struct {
+	SubjectID   int64
+	Topic       *string // Opcional: pode ser nil se não for filtrar por tópico específico
+	EasyCount   int
+	MediumCount int
+	HardCount   int
+}
+
 // Adicionar outras interfaces de serviço aqui: SubjectService, LessonService, etc.
 
 ```
