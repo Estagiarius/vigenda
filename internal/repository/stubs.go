@@ -51,10 +51,9 @@ type StubTaskRepository struct {
 	DB *sql.DB
 }
 
-func NewStubTaskRepository(db *sql.DB) *StubTaskRepository { // Not implementing an interface yet, direct struct
+func NewStubTaskRepository(db *sql.DB) TaskRepository { // Now implements TaskRepository
 	return &StubTaskRepository{DB: db}
 }
-
 func (r *StubTaskRepository) CreateTask(ctx context.Context, task *models.Task) (int64, error) {
 	fmt.Printf("[StubTaskRepository] CreateTask: %s\n", task.Title)
 	// Basic INSERT for testing if DB connection works
@@ -85,10 +84,16 @@ func (r *StubTaskRepository) CreateTask(ctx context.Context, task *models.Task) 
 	return id, nil
 }
 
+// GetTaskByID implements repository.TaskRepository.
+func (r *StubTaskRepository) GetTaskByID(ctx context.Context, id int64) (*models.Task, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (r *StubTaskRepository) GetTasksByClassID(ctx context.Context, classID int64) ([]models.Task, error) {
 	fmt.Printf("[StubTaskRepository] GetTasksByClassID: %d\n", classID)
 	// Basic SELECT for testing
-	rows, err := r.DB.QueryContext(ctx, "SELECT id, title, description, due_date, is_completed FROM tasks WHERE class_id = ?", classID)
+	rows, err := r.DB.QueryContext(ctx, "SELECT id, user_id, class_id, title, description, due_date, is_completed FROM tasks WHERE class_id = ?", classID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query tasks: %w", err)
 	}
@@ -97,10 +102,52 @@ func (r *StubTaskRepository) GetTasksByClassID(ctx context.Context, classID int6
 	var tasks []models.Task
 	for rows.Next() {
 		var t models.Task
+		var classID sql.NullInt64
 		var dueDate sql.NullTime
-		err := rows.Scan(&t.ID, &t.Title, &t.Description, &dueDate, &t.IsCompleted)
+		var description sql.NullString
+
+		err := rows.Scan(&t.ID, &t.UserID, &classID, &t.Title, &description, &dueDate, &t.IsCompleted)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan task row: %w", err)
+		}
+		if classID.Valid {
+			t.ClassID = &classID.Int64
+		}
+		if description.Valid {
+			t.Description = description.String
+		}
+		if dueDate.Valid {
+			t.DueDate = &dueDate.Time
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks, nil
+}
+
+func (r *StubTaskRepository) GetAllTasks(ctx context.Context) ([]models.Task, error) {
+	fmt.Printf("[StubTaskRepository] GetAllTasks\n")
+	rows, err := r.DB.QueryContext(ctx, "SELECT id, user_id, class_id, title, description, due_date, is_completed FROM tasks")
+	if err != nil {
+		return nil, fmt.Errorf("failed to query all tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var tasks []models.Task
+	for rows.Next() {
+		var t models.Task
+		var classID sql.NullInt64
+		var dueDate sql.NullTime
+		var description sql.NullString
+
+		err := rows.Scan(&t.ID, &t.UserID, &classID, &t.Title, &description, &dueDate, &t.IsCompleted)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan task row for GetAllTasks: %w", err)
+		}
+		if classID.Valid {
+			t.ClassID = &classID.Int64
+		}
+		if description.Valid {
+			t.Description = description.String
 		}
 		if dueDate.Valid {
 			t.DueDate = &dueDate.Time

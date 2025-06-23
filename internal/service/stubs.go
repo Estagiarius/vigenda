@@ -54,6 +54,24 @@ func (s *stubTaskService) MarkTaskAsCompleted(ctx context.Context, taskID int64)
 	return s.taskRepo.MarkTaskCompleted(ctx, taskID) // Assuming stub repo has this
 }
 
+func (s *stubTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task, error) {
+	fmt.Printf("[StubTaskService] ListAllActiveTasks called\n")
+	// In a real stub, you might want to mock this further or provide specific stub data.
+	// For now, just pass through to the repository stub.
+	allTasks, err := s.taskRepo.GetAllTasks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	// The service layer is responsible for filtering active tasks
+	activeTasks := []models.Task{}
+	for _, task := range allTasks {
+		if !task.IsCompleted {
+			activeTasks = append(activeTasks, task)
+		}
+	}
+	return activeTasks, nil
+}
+
 // StubClassService
 type stubClassService struct {
 	classRepo *repository.StubClassRepository

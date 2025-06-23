@@ -37,13 +37,16 @@ type SubjectRepository interface {
 
 // Outras interfaces de repositório (TaskRepository, ClassRepository, etc.) seriam definidas aqui.
 // Por exemplo:
-//
-// type TaskRepository interface {
-//    CreateTask(ctx context.Context, task *models.Task) (int64, error)
-//    GetTaskByID(ctx context.Context, id int64) (*models.Task, error)
-//    // ... outros métodos
-// }
-//
+
+type TaskRepository interface {
+	CreateTask(ctx context.Context, task *models.Task) (int64, error)
+	GetTaskByID(ctx context.Context, id int64) (*models.Task, error)
+	GetTasksByClassID(ctx context.Context, classID int64) ([]models.Task, error) // Added for listing tasks
+	GetAllTasks(ctx context.Context) ([]models.Task, error)                       // New method
+	MarkTaskCompleted(ctx context.Context, taskID int64) error                   // Added for completing tasks
+	// ... outros métodos
+}
+
 // type ClassRepository interface {
 //    CreateClass(ctx context.Context, class *models.Class) (int64, error)
 //    GetClassByID(ctx context.Context, id int64) (*models.Class, error)

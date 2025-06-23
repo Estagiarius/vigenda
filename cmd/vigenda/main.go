@@ -154,41 +154,70 @@ var taskListCmd = &cobra.Command{
   vigenda tarefa listar --classid 3`,
 	Run: func(cmd *cobra.Command, args []string) {
 		classIDStr, _ := cmd.Flags().GetString("classid")
-		if classIDStr == "" {
-			fmt.Println("Erro: É obrigatório especificar o ID da turma usando a flag --classid.")
+		showAllStr, _ := cmd.Flags().GetString("all") // Check for the --all flag
+		showAll := showAllStr == "true" // Convert to boolean
+
+		var tasks []models.Task
+		var err error
+		var headerMsg string
+
+		if classIDStr != "" {
+			classID, parseErr := strconv.ParseInt(classIDStr, 10, 64)
+			if parseErr != nil {
+				fmt.Println("Error parsing class ID:", parseErr)
+				return
+			}
+			tasks, err = taskService.ListActiveTasksByClass(context.Background(), classID)
+			if err != nil {
+				fmt.Println("Error listing tasks:", err)
+				return
+			}
+			class, classErr := classService.GetClassByID(context.Background(), classID)
+			if classErr == nil && class.ID != 0 {
+				headerMsg = fmt.Sprintf("TAREFAS PARA: %s", class.Name)
+			} else {
+				headerMsg = fmt.Sprintf("TAREFAS PARA: Class ID %d", classID)
+			}
+		} else if showAll {
+			// This part needs a new service method: ListAllActiveTasks (or similar)
+			// For now, let's assume such a method exists or we adapt.
+			// taskService.ListAllActiveTasks() would be ideal.
+			// As a placeholder, we'll log that it's not fully supported yet without a classID unless a new service method is added.
+			// However, the goal is to list *all* tasks, including bug tasks (which have nil classID).
+			// So, we need a service method that fetches tasks with classID IS NULL OR classID = ? (if provided).
+			// For now, to list bug tasks, we can simulate by calling ListActiveTasksByClass with a non-existent classID
+			// if the repository's GetTasksByClassID is adapted or a new ListTasks(filter) method is made.
+			// The current ListActiveTasksByClass filters by a *specific* class ID.
+			// To list system/bug tasks (nil ClassID), we need a new service method.
+			// Let's add a conceptual ListAllTasks to TaskService and its stub.
+			// For this step, we'll assume taskService.ListAllTasks() exists and fetches all tasks.
+			// If not, we'll need to add it in a subsequent step.
+			// For now, let's call ListActiveTasksByClass with a dummy ID that might be handled by a more flexible repo.
+			// This is a simplification for now. A proper implementation needs ListAllTasks in service and repo.
+			// tasks, err = taskService.ListActiveTasksByClass(context.Background(), 0) // Assuming 0 or a special value might mean "all" or "no specific class"
+			tasks, err = taskService.ListAllActiveTasks(context.Background()) // Use the new method
+			// A better approach would be a new method: taskService.ListTasks(ctx context.Context, filter TaskFilter)
+			// where filter could specify ClassID (optional) and IsCompleted (optional).
+			// For now, we'll just say "All Tasks"
+			if err != nil { // No longer need to check for "not found" as ListAllActiveTasks doesn't depend on a classID
+				fmt.Println("Error listing all tasks:", err)
+				return
+			}
+			headerMsg = "TODAS AS TAREFAS (INCLUINDO BUGS DO SISTEMA)"
+		} else {
+			fmt.Println("Erro: Especifique --classid OU use --all para listar todas as tarefas (incluindo bugs).")
 			fmt.Println("Exemplo: vigenda tarefa listar --classid 1")
+			fmt.Println("Exemplo: vigenda tarefa listar --all")
 			return
 		}
 
-		classID, err := strconv.ParseInt(classIDStr, 10, 64)
-		if err != nil {
-			fmt.Println("Error parsing class ID:", err)
-			return
-		}
-
-		tasks, err := taskService.ListActiveTasksByClass(context.Background(), classID)
-		if err != nil {
-			fmt.Println("Error listing tasks:", err)
-			return
-		}
 
 		if len(tasks) == 0 {
-			fmt.Println("No active tasks found for this class.")
+			fmt.Println("No active tasks found matching criteria.")
 			return
 		}
 
-		// Fetch class details for the header
-		class, err := classService.GetClassByID(context.Background(), classID)
-		if err != nil {
-			fmt.Printf("Error fetching class details: %v\n", err)
-			// Decide if we should return or print tasks without class name
-		}
-
-		if class.ID != 0 { // Check if class was found
-			fmt.Printf("TAREFAS PARA: %s\n\n", class.Name)
-		} else {
-			fmt.Printf("TAREFAS PARA: Class ID %d (Nome não encontrado)\n\n", classID)
-		}
+		fmt.Printf("%s\n\n", headerMsg)
 
 
 		columns := []table.Column{
@@ -289,7 +318,8 @@ func initializeServices(db *sql.DB) {
 
 	// Initialize services
 	// For Task, Class, Assessment, the main service files are placeholders, so we use stub constructors.
-	taskService = service.NewStubTaskService(stubTaskRepo)
+	// taskService = service.NewStubTaskService(stubTaskRepo) // Replaced by direct instantiation below
+	taskService = service.NewTaskService(stubTaskRepo) // Use the actual constructor
 	classService = service.NewStubClassService(stubClassRepo)
 	assessmentService = service.NewStubAssessmentService(stubAssessmentRepo)
 
@@ -308,8 +338,11 @@ func init() {
 	taskAddCmd.Flags().String("duedate", "", "Data de conclusão da tarefa no formato YYYY-MM-DD (opcional).")
 
 	// Setup flags for task list command
-	taskListCmd.Flags().String("classid", "", "ID da turma para filtrar as tarefas (obrigatório).")
-	_ = taskListCmd.MarkFlagRequired("classid") // Marcar como obrigatório para que apareça no help
+	//taskListCmd.Flags().String("classid", "", "ID da turma para filtrar as tarefas (obrigatório).")
+	//_ = taskListCmd.MarkFlagRequired("classid") // No longer strictly mandatory if --all is used.
+	taskListCmd.Flags().String("classid", "", "ID da turma para filtrar as tarefas.")
+	taskListCmd.Flags().String("all", "false", "Listar todas as tarefas, incluindo tarefas de sistema/bugs (ignora --classid se presente).")
+
 
 	taskCmd.AddCommand(taskAddCmd, taskListCmd, taskCompleteCmd)
 	rootCmd.AddCommand(taskCmd)
