@@ -2,6 +2,8 @@ module vigenda
 
 go 1.23.0
 
+toolchain go1.24.3
+
 // Testing
 require github.com/stretchr/testify v1.10.0
 
