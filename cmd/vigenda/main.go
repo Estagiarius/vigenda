@@ -66,17 +66,72 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// This function will run before any command, ensuring DB is initialized.
-		// It's better than init() for things that can fail or need runtime config.
 		if db == nil { // Initialize only once
-			dbPath := os.Getenv("VIGENDA_DB_PATH")
-			if dbPath == "" {
-				dbPath = database.DefaultDbPath()
+			dbType := os.Getenv("VIGENDA_DB_TYPE")
+			dbDSN := os.Getenv("VIGENDA_DB_DSN") // Generic DSN
+
+			// Specific environment variables for constructing DSN if VIGENDA_DB_DSN is not set
+			dbHost := os.Getenv("VIGENDA_DB_HOST")
+			dbPort := os.Getenv("VIGENDA_DB_PORT")
+			dbUser := os.Getenv("VIGENDA_DB_USER")
+			dbPassword := os.Getenv("VIGENDA_DB_PASSWORD")
+			dbName := os.Getenv("VIGENDA_DB_NAME")
+			dbSSLMode := os.Getenv("VIGENDA_DB_SSLMODE") // Primarily for PostgreSQL
+
+			config := database.DBConfig{}
+
+			if dbType == "" {
+				dbType = "sqlite" // Default to SQLite
+			}
+			config.DBType = dbType
+
+			switch dbType {
+			case "sqlite":
+				if dbDSN != "" {
+					config.DSN = dbDSN
+				} else {
+					// VIGENDA_DB_PATH is specific to SQLite if VIGENDA_DB_DSN is not used
+					sqlitePath := os.Getenv("VIGENDA_DB_PATH")
+					if sqlitePath == "" {
+						sqlitePath = database.DefaultSQLitePath()
+					}
+					config.DSN = sqlitePath
+				}
+			case "postgres":
+				if dbDSN != "" {
+					config.DSN = dbDSN
+				} else {
+					// Construct PostgreSQL DSN from individual parts
+					if dbHost == "" {
+						dbHost = "localhost" // Default host
+					}
+					if dbPort == "" {
+						dbPort = "5432" // Default PostgreSQL port
+					}
+					if dbUser == "" {
+						// User must be provided for PostgreSQL typically
+						return fmt.Errorf("VIGENDA_DB_USER must be set for PostgreSQL connection")
+					}
+					if dbName == "" {
+						// DB Name must be provided
+						return fmt.Errorf("VIGENDA_DB_NAME must be set for PostgreSQL connection")
+					}
+					if dbSSLMode == "" {
+						dbSSLMode = "disable" // Default SSLMode
+					}
+					// Password can be empty if auth method allows (e.g. peer auth)
+					// Note: Real applications should handle password securely (e.g. from secrets manager)
+					config.DSN = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+						dbHost, dbPort, dbUser, dbPassword, dbName, dbSSLMode)
+				}
+			default:
+				return fmt.Errorf("unsupported VIGENDA_DB_TYPE: %s. Supported types are 'sqlite', 'postgres'", dbType)
 			}
 
 			var err error
-			db, err = database.GetDBConnection(dbPath)
+			db, err = database.GetDBConnection(config)
 			if err != nil {
-				return fmt.Errorf("failed to initialize database: %w", err)
+				return fmt.Errorf("failed to initialize database (type: %s): %w", config.DBType, err)
 			}
 			// Initialize services here, after DB is ready
 			initializeServices(db)

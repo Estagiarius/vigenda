@@ -195,9 +195,90 @@ O comando `vigenda bancoq add` espera um ficheiro JSON contendo uma lista (array
 
 ## Configuração da Base de Dados
 
-Por padrão, o Vigenda cria e utiliza um ficheiro de base de dados SQLite chamado `vigenda.db` no diretório onde o executável é executado.
+O Vigenda suporta diferentes tipos de bases de dados, configuráveis através de variáveis de ambiente.
 
-Você pode especificar um caminho diferente para o ficheiro da base de dados definindo a variável de ambiente `VIGENDA_DB_PATH`:
+### Tipos de Base de Dados Suportados
+
+*   **SQLite** (padrão): Leve, baseada em ficheiro, ideal para uso individual.
+*   **PostgreSQL**: Robusta, para cenários com múltiplos utilizadores ou maior volume de dados.
+
+### Variáveis de Ambiente para Configuração
+
+As seguintes variáveis de ambiente podem ser usadas para configurar a conexão com a base de dados:
+
+*   `VIGENDA_DB_TYPE`: Especifica o tipo de base de dados.
+    *   Valores: `sqlite` (padrão), `postgres`.
+*   `VIGENDA_DB_DSN`: Uma string de conexão (Data Source Name) completa. Se esta variável for definida, ela tem precedência sobre as variáveis individuais abaixo.
+    *   **Exemplo SQLite DSN**: `file:/caminho/absoluto/para/meu_vigenda.db?cache=shared&mode=rwc`
+    *   **Exemplo PostgreSQL DSN**: `postgres://utilizador:senha@localhost:5432/nome_da_base?sslmode=disable`
+
+#### Configuração Específica para SQLite
+
+Se `VIGENDA_DB_TYPE` for `sqlite` (ou não estiver definida) e `VIGENDA_DB_DSN` não for fornecida, a seguinte variável é usada:
+
+*   `VIGENDA_DB_PATH`: Caminho para o ficheiro da base de dados SQLite.
+    *   **Padrão**: Um ficheiro `vigenda.db` no diretório de configuração do utilizador (ex: `~/.config/vigenda/vigenda.db` no Linux) ou no diretório atual se o diretório de configuração não for acessível.
+    *   **Exemplo**: `export VIGENDA_DB_PATH="/caminho/para/sua/vigenda.db"`
+
+#### Configuração Específica para PostgreSQL
+
+Se `VIGENDA_DB_TYPE` for `postgres` e `VIGENDA_DB_DSN` não for fornecida, as seguintes variáveis são usadas para construir a DSN:
+
+*   `VIGENDA_DB_HOST`: Endereço do servidor PostgreSQL.
+    *   Padrão: `localhost`
+*   `VIGENDA_DB_PORT`: Porta do servidor PostgreSQL.
+    *   Padrão: `5432`
+*   `VIGENDA_DB_USER`: Nome de utilizador para a conexão. (Obrigatório)
+*   `VIGENDA_DB_PASSWORD`: Senha para o utilizador. (Pode ser vazia se o método de autenticação permitir)
+*   `VIGENDA_DB_NAME`: Nome da base de dados PostgreSQL. (Obrigatório)
+*   `VIGENDA_DB_SSLMODE`: Modo de SSL para a conexão PostgreSQL.
+    *   Padrão: `disable`
+    *   Outros valores comuns: `require`, `verify-ca`, `verify-full`.
+
+### Exemplos de Configuração
+
+#### SQLite (Caminho Personalizado)
+
+Se você quiser usar SQLite mas num local específico:
+```bash
+export VIGENDA_DB_TYPE="sqlite"
+export VIGENDA_DB_PATH="/var/data/vigenda_production.db"
+./vigenda
+```
+Ou, de forma mais concisa, se `VIGENDA_DB_TYPE` for omitido (assume SQLite):
+```bash
+export VIGENDA_DB_PATH="/var/data/vigenda_production.db"
+./vigenda ...
+```
+
+#### PostgreSQL (Usando Variáveis Individuais)
+
+```bash
+export VIGENDA_DB_TYPE="postgres"
+export VIGENDA_DB_HOST="my.postgres.server.com"
+export VIGENDA_DB_PORT="5433"
+export VIGENDA_DB_USER="vigenda_user"
+export VIGENDA_DB_PASSWORD="super_secret_password"
+export VIGENDA_DB_NAME="vigenda_prod_db"
+export VIGENDA_DB_SSLMODE="require"
+./vigenda
+```
+
+#### PostgreSQL (Usando DSN Completa)
+
+```bash
+export VIGENDA_DB_TYPE="postgres" # Ou pode ser inferido pela DSN se o driver souber
+export VIGENDA_DB_DSN="postgresql://vigenda_user:super_secret_password@my.postgres.server.com:5433/vigenda_prod_db?sslmode=require"
+./vigenda
+```
+
+**Nota sobre Migrações de Esquema (Schema Migrations):**
+*   Para **SQLite**, o Vigenda tentará aplicar o esquema inicial (`001_initial_schema.sql`) automaticamente se a base de dados parecer vazia (ex: a tabela `users` não existir).
+*   Para **PostgreSQL**, as migrações de esquema devem ser geridas externamente (ex: usando ferramentas como `goose`, `migrate`, `Flyway`, ou scripts SQL manuais). O Vigenda não tentará criar tabelas ou modificar o esquema numa base de dados PostgreSQL existente. Certifique-se de que o esquema definido em `internal/database/migrations/001_initial_schema.sql` (ou uma versão compatível) já foi aplicado à sua base de dados PostgreSQL antes de executar a aplicação.
+
+Por padrão, o Vigenda cria e utiliza um ficheiro de base de dados SQLite chamado `vigenda.db` no diretório de configuração do utilizador ou no diretório atual.
+
+Você pode especificar um caminho diferente para o ficheiro da base de dados SQLite (se estiver a usar SQLite e não uma DSN completa) definindo a variável de ambiente `VIGENDA_DB_PATH`:
 
 ```bash
 export VIGENDA_DB_PATH="/caminho/para/sua/vigenda.db"
