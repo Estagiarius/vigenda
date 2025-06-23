@@ -69,3 +69,14 @@ type Subject struct {
 	UserID int64  `json:"user_id"`
 	Name   string `json:"name"`
 }
+
+// Custom error for when a class is not found
+type ModelError string
+
+func (e ModelError) Error() string {
+	return string(e)
+}
+
+const (
+	ErrClassNotFound ModelError = "class not found"
+)
