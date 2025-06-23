@@ -5,7 +5,15 @@ package models
 import "time"
 
 // Task represents a task in the system.
-type Task struct{}
+type Task struct {
+	ID          int64      `json:"id"`
+	UserID      int64      `json:"user_id"`
+	ClassID     *int64     `json:"class_id,omitempty"` // Pointer to allow null
+	Title       string     `json:"title"`
+	Description string     `json:"description,omitempty"`
+	DueDate     *time.Time `json:"due_date,omitempty"`   // Pointer to allow null
+	IsCompleted bool       `json:"is_completed"`
+}
 
 // Class represents a class or turma.
 type Class struct {

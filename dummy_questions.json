@@ -1,0 +1,25 @@
+[
+  {
+    "disciplina": "História",
+    "topico": "Revolução Francesa",
+    "tipo": "multipla_escolha",
+    "dificuldade": "media",
+    "enunciado": "Qual destes eventos é considerado o estopim da Revolução Francesa?",
+    "opcoes": [
+      "A Queda da Bastilha",
+      "A convocação dos Estados Gerais",
+      "O Juramento da Quadra de Tênis"
+    ],
+    "resposta_correta": "A Queda da Bastilha",
+    "user_id": 1
+  },
+  {
+    "disciplina": "História",
+    "topico": "Revolução Francesa",
+    "tipo": "dissertativa",
+    "dificuldade": "dificil",
+    "enunciado": "Discorra sobre as principais causas da Revolução Francesa.",
+    "resposta_correta": "Crise econômica, desigualdade social, ideias iluministas.",
+    "user_id": 1
+  }
+]
