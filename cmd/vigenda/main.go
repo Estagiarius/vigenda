@@ -15,6 +15,7 @@ import (
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/spf13/cobra"
 	"vigenda/internal/database"
+	"vigenda/internal/models" // Added import for models package
 	"vigenda/internal/repository"
 	"vigenda/internal/service"
 	"vigenda/internal/tui"

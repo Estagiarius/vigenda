@@ -211,3 +211,7 @@ Este projeto é atualmente mantido para um propósito específico. No entanto, s
 ## Licença
 
 Este projeto não possui uma licença de código aberto definida no momento. Todos os direitos são reservados.
+
+## Reporte de Bugs
+
+Para informações sobre como reportar bugs, como eles são analisados e gerenciados, por favor consulte o arquivo [BUG_REPORTING.md](BUG_REPORTING.md).

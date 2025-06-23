@@ -39,8 +39,8 @@ func (s *taskServiceImpl) handleErrorAndCreateBugTask(ctx context.Context, origi
 	// O UserID para tarefas de sistema/bug pode ser um valor especial (ex: 0 ou um ID de usuário de sistema configurado)
 	// ou podemos omiti-lo se o modelo permitir. Assumindo que UserID 0 é para tarefas do sistema.
 	// ClassID pode ser nil se o bug não for específico de uma turma.
-	bugTitle := fmt.Sprintf("[BUG] %s", bugTitlePrefix)
-	bugDescription := fmt.Sprintf("Error encountered: %v. Details: %s", originalError, fmt.Sprintf(bugDescriptionArgs[0].(string), bugDescriptionArgs[1:]...))
+	bugTitle := fmt.Sprintf("[BUG][AUTO][PRIORITY_PENDING] %s", bugTitlePrefix)
+	bugDescription := fmt.Sprintf("[PRIORITY_PENDING] Error encountered: %v. Details: %s", originalError, fmt.Sprintf(bugDescriptionArgs[0].(string), bugDescriptionArgs[1:]...))
 
 	// O UserID para tarefas de sistema/bug pode ser um valor especial (ex: 0 ou um ID de usuário de sistema configurado)
 	// Usaremos UserID 0 para tarefas do sistema. ClassID pode ser nil.
