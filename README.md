@@ -54,6 +54,28 @@ O Vigenda oferece um conjunto de ferramentas para simplificar o dia a dia do pro
 3.  **(Opcional) Adicione ao PATH:**
     Para usar o `vigenda` de qualquer lugar no seu terminal, mova o executável para um diretório que esteja no seu PATH do sistema (ex: `/usr/local/bin` ou `~/bin` em Linux/macOS) ou adicione o diretório atual ao seu PATH.
 
+### Compilação Cruzada (Cross-Compilation)
+
+O projeto inclui um script `build.sh` para facilitar a compilação cruzada para diferentes sistemas operacionais e arquiteturas.
+
+**Pré-requisitos para Cross-Compilation:**
+
+*   **Para Linux (dentro de um ambiente Linux):** `gcc` (geralmente já instalado).
+*   **Para Windows (compilando de Linux):** `mingw-w64`. Instale com `sudo apt-get install mingw-w64`.
+*   **Para macOS (compilando de Linux):** A compilação cruzada para macOS a partir do Linux para projetos que usam CGo (como este, devido ao `go-sqlite3`) é complexa e requer um SDK do macOS e um compilador Clang configurado para cross-compilation (ex: via `osxcross`). O script `build.sh` atual não suporta totalmente a compilação para macOS a partir do Linux devido a essas dependências. Recomenda-se compilar para macOS diretamente em uma máquina macOS.
+
+**Usando o script de build:**
+
+1.  **Torne o script executável (se ainda não o fez):**
+    ```bash
+    chmod +x build.sh
+    ```
+2.  **Execute o script:**
+    ```bash
+    ./build.sh
+    ```
+    Os binários compilados serão colocados no diretório `dist/`, nomeados de acordo com o sistema operacional e arquitetura (ex: `dist/vigenda-linux-amd64`, `dist/vigenda-windows-amd64.exe`).
+
 ## Guia de Início Rápido
 
 Aqui estão alguns exemplos de como usar os comandos mais comuns do Vigenda:
