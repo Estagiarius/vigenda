@@ -1,8 +1,8 @@
-import "time"
-
 // Package models defines all Go structs used in the Vigenda application.
 // These structs represent entities like Task, Lesson, Student, Class, etc.
 package models
+
+import "time"
 
 // Task represents a task in the system.
 type Task struct{}
@@ -43,4 +43,21 @@ type Grade struct {
 }
 
 // Question represents a question in the question bank.
-type Question struct{}
+type Question struct {
+	ID            int64   `json:"id"`
+	UserID        int64   `json:"user_id"`
+	SubjectID     int64   `json:"subject_id"`
+	Topic         string  `json:"topic"`
+	Type          string  `json:"type"` // 'multipla_escolha' ou 'dissertativa'
+	Difficulty    string  `json:"difficulty"` // 'facil', 'media', 'dificil'
+	Statement     string  `json:"statement"`
+	Options       *string `json:"options"` // JSON array como string para multipla escolha
+	CorrectAnswer string  `json:"correct_answer"`
+}
+
+// Subject represents a subject or discipline.
+type Subject struct {
+	ID     int64  `json:"id"`
+	UserID int64  `json:"user_id"`
+	Name   string `json:"name"`
+}
