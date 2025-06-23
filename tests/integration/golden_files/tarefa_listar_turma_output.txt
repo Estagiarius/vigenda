@@ -1,0 +1,8 @@
+$ vigenda tarefa listar --turma "Turma 9A"
+
+TAREFAS PARA: Turma 9A
+
+ID | TAREFA                            | PRAZO
+-- | --------------------------------- | ----------
+1  | Corrigir provas de Matemática     | 23/06/2025
+5  | Lançar notas do trabalho          | 25/06/2025

@@ -1,0 +1,23 @@
+Lançamento de notas para a avaliação "Prova Bimestral 1" - Turma 9A
+Use as setas para navegar, 'enter' para editar a nota. Digite 'q' para sair.
+
+ALUNO                   NOTA
+-------------------     ----
+› Ana Beatriz Costa     8.5
+  Bruno Dias            7.0
+  Carla Esteves         [Pendente]
+  Daniel Mendes (Transferido) --
+
+---
+(Ao pressionar 'enter' em 'Carla Esteves')
+---
+
+Lançamento de notas para a avaliação "Prova Bimestral 1" - Turma 9A
+Use as setas para navegar, 'enter' para editar a nota. Digite 'q' para sair.
+
+ALUNO                   NOTA
+-------------------     ----
+  Ana Beatriz Costa     8.5
+  Bruno Dias            7.0
+› Carla Esteves         › 9.0_
+  Daniel Mendes (Transferido) --

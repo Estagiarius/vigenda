@@ -1,0 +1,9 @@
+======================================================================
+==                          MODO FOCO                             ==
+======================================================================
+
+TAREFA: Corrigir provas de Matemática (Turma 9A)
+
+TEMPO RESTANTE: 24:59
+
+(Pressione 'espaço' para pausar/retomar, 'q' para sair e concluir o ciclo)
