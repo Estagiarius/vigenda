@@ -29,7 +29,7 @@ O Vigenda oferece um conjunto de ferramentas para simplificar o dia a dia do pro
 
 ### Pré-requisitos
 
-*   **Go**: Versão 1.18 ou superior. Você pode verificar sua versão com `go version`.
+*   **Go**: Versão 1.23 ou superior. Você pode verificar sua versão com `go version`.
 *   **GCC**: Um compilador C como o GCC é necessário para a dependência `go-sqlite3`.
     *   Em sistemas Debian/Ubuntu: `sudo apt-get install gcc`
     *   Em macOS: Xcode Command Line Tools (geralmente já instalado ou solicitado ao tentar compilar).
