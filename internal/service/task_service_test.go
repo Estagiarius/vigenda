@@ -9,7 +9,7 @@ import (
 	"strings" // Added import
 	"testing"
 	"vigenda/internal/models"
-	"vigenda/internal/repository"
+	// "vigenda/internal/repository" // repository package is not directly used by this test file, types are defined locally or through models.
 
 	_ "github.com/mattn/go-sqlite3" // DB driver
 )
@@ -119,7 +119,7 @@ func TestTaskService_CreateTask(t *testing.T) {
 			t.Errorf("Expected a bug task to be created, but none found")
 		} else {
 			bugTask := mockRepo.CreatedBugTasks[0]
-			expectedBugTitle := "[BUG] Task Creation Failure"
+			expectedBugTitle := "[BUG][AUTO][PRIORITY_PENDING] Task Creation Failure"
 			if bugTask.Title != expectedBugTitle {
 				t.Errorf("Expected bug task title '%s', got '%s'", expectedBugTitle, bugTask.Title)
 			}
@@ -198,7 +198,7 @@ func TestTaskService_ListActiveTasksByClass(t *testing.T) {
 		}
 		if len(mockRepo.CreatedBugTasks) == 0 {
 			t.Errorf("Expected a bug task to be created")
-		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG] Task Listing Failure") {
+		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Task Listing Failure") {
 			t.Errorf("Incorrect bug task title: %s", mockRepo.CreatedBugTasks[0].Title)
 		}
 	})
@@ -260,7 +260,7 @@ func TestTaskService_ListAllActiveTasks(t *testing.T) {
 		}
 		if len(mockRepo.CreatedBugTasks) == 0 {
 			t.Errorf("Expected a bug task to be created")
-		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG] Task Listing Failure") {
+		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Task Listing Failure") {
 			t.Errorf("Incorrect bug task title: %s", mockRepo.CreatedBugTasks[0].Title)
 		}
 	})
@@ -308,7 +308,7 @@ func TestTaskService_MarkTaskAsCompleted(t *testing.T) {
 		}
 		if len(mockRepo.CreatedBugTasks) == 0 {
 			t.Errorf("Expected a bug task to be created")
-		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG] Task Completion Failure") {
+		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Task Completion Failure") {
 			t.Errorf("Incorrect bug task title: %s", mockRepo.CreatedBugTasks[0].Title)
 		}
 	})

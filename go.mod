@@ -15,7 +15,10 @@ require (
 	github.com/spf13/cobra v1.9.1
 )
 
-require github.com/mattn/go-isatty v0.0.20
+require (
+	github.com/lib/pq v1.10.9
+	github.com/mattn/go-isatty v0.0.20
+)
 
 require (
 	github.com/atotto/clipboard v0.1.4 // indirect

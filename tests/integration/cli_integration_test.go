@@ -8,6 +8,8 @@ import (
 	"testing"
 	"runtime"
 	"fmt"
+	"context" // Added for CommandContext
+	"time"    // Added for timeout
 	"database/sql" // Added for setupTestDB and seedDB
 	_ "github.com/mattn/go-sqlite3" // SQLite driver for database/sql
 )
@@ -72,8 +74,8 @@ func setupTestDB(t *testing.T, testName string) string {
 	// Remove existing DB file to ensure a clean state
 	os.Remove(dbPath)
 
-	// Set environment variable for the CLI to use this database
-	// This requires the application to be designed to read this env var
+	// Set environment variables for the CLI to use this database
+	t.Setenv("VIGENDA_DB_TYPE", "sqlite")
 	t.Setenv("VIGENDA_DB_PATH", dbPath)
 
 	// Initialize schema
@@ -120,13 +122,28 @@ func seedDB(t *testing.T, dbPath string, statements []string) {
 // It now ensures VIGENDA_DB_PATH is set if a test DB is configured.
 func runCLI(t *testing.T, args ...string) (string, string, error) {
 	t.Helper()
-	cmd := exec.Command(binPath, args...)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second) // 30-second timeout for CLI command
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, binPath, args...)
+	cmd.Stdin = nil // Explicitly set Stdin to nil for non-interactive commands
 
 	var stdout, stderr strings.Builder
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
 	err := cmd.Run()
+
+	if ctx.Err() == context.DeadlineExceeded {
+		// Log more information if the command timed out
+		t.Logf("Command '%s %s' timed out after 30s.", binPath, strings.Join(args, " "))
+		t.Logf("Stdout so far: %s", stdout.String())
+		t.Logf("Stderr so far: %s", stderr.String())
+		// The error from cmd.Run() will likely be "signal: killed" or similar in this case.
+		// We return it as is, but the log provides context.
+	}
+
 	return stdout.String(), stderr.String(), err
 }
 
