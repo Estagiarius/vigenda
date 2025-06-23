@@ -8,6 +8,8 @@ import (
 	"testing"
 	"runtime"
 	"fmt"
+	"database/sql" // Added for setupTestDB and seedDB
+	_ "github.com/mattn/go-sqlite3" // SQLite driver for database/sql
 )
 
 var (
@@ -51,7 +53,71 @@ func TestMain(m *testing.M) {
 	os.Exit(exitCode)
 }
 
+const testDbDir = "test_dbs"
+const testSchemaPath = "../database/migrations/001_initial_schema.sql" // Relative to project root
+
+// setupTestDB creates a new test database, initializes the schema, and returns the path to the db file.
+// It also sets the VIGENDA_DB_PATH environment variable for the CLI to use.
+func setupTestDB(t *testing.T, testName string) string {
+	t.Helper()
+
+	// Create a directory for test databases if it doesn't exist
+	if _, err := os.Stat(testDbDir); os.IsNotExist(err) {
+		if err := os.MkdirAll(testDbDir, 0755); err != nil {
+			t.Fatalf("Failed to create test database directory %s: %v", testDbDir, err)
+		}
+	}
+
+	dbPath := filepath.Join(testDbDir, fmt.Sprintf("vigenda_test_%s.db", testName))
+	// Remove existing DB file to ensure a clean state
+	os.Remove(dbPath)
+
+	// Set environment variable for the CLI to use this database
+	// This requires the application to be designed to read this env var
+	t.Setenv("VIGENDA_DB_PATH", dbPath)
+
+	// Initialize schema
+	// This requires a direct DB connection here, or a CLI command to init schema if available.
+	// For now, let's assume we'll use direct DB access for setup.
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("Failed to open test database %s: %v", dbPath, err)
+	}
+	defer db.Close()
+
+	// Correct path to schema relative to this test file (tests/integration/cli_integration_test.go)
+	schemaFilePath := filepath.Join("..", "..", "internal", "database", "migrations", "001_initial_schema.sql")
+	schemaBytes, err := os.ReadFile(schemaFilePath)
+	if err != nil {
+		t.Fatalf("Failed to read schema file %s: %v", schemaFilePath, err)
+	}
+	_, err = db.Exec(string(schemaBytes))
+	if err != nil {
+		t.Fatalf("Failed to apply schema to %s: %v", dbPath, err)
+	}
+	return dbPath
+}
+
+// seedDB executes SQL statements to seed the database for a test.
+func seedDB(t *testing.T, dbPath string, statements []string) {
+	t.Helper()
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("seedDB: failed to open db %s: %v", dbPath, err)
+	}
+	defer db.Close()
+
+	for i, stmt := range statements {
+		if _, err := db.Exec(stmt); err != nil {
+			t.Fatalf("seedDB: failed to execute statement %d (%s): %v", i, stmt, err)
+		}
+	}
+	t.Logf("Successfully seeded DB %s with %d statements", dbPath, len(statements))
+}
+
+
 // runCLI executes the compiled CLI command with the given arguments.
+// It now ensures VIGENDA_DB_PATH is set if a test DB is configured.
 func runCLI(t *testing.T, args ...string) (string, string, error) {
 	t.Helper()
 	cmd := exec.Command(binPath, args...)
@@ -117,7 +183,20 @@ func TestDashboardOutput(t *testing.T) {
 	// 	t.Logf("Stderr output: %s", stderr) // Log non-fatal stderr
 	// }
 	// assertGoldenFile(t, stdout, "golden_files/dashboard_output.txt")
-	t.Log("TestDashboardOutput: Placeholder - requires database setup for meaningful comparison.")
+	// t.Log("TestDashboardOutput: Placeholder - requires database setup for meaningful comparison.")
+
+	_ = setupTestDB(t, "TestDashboardOutput") // Ensure DB is created and schema applied by app
+
+	// For the dashboard, the command is just `vigenda` (no arguments)
+	stdout, stderr, err := runCLI(t)
+	if err != nil {
+		t.Fatalf("CLI execution failed: %v\nStderr: %s", err, stderr)
+	}
+	if stderr != "" {
+		// For now, allow stderr since services will print "[Stub...]" messages
+		t.Logf("Stderr output (expected with stubs): %s", stderr)
+	}
+	assertGoldenFile(t, stdout, "golden_files/dashboard_output.txt")
 }
 
 
@@ -171,15 +250,36 @@ func TestRelatorioProgressoTurmaOutput(t *testing.T) {
 // TestTarefaListarTurmaOutput - Based on Artefact 7 `golden_files/tarefa_listar_turma_output.txt`
 // This implies a command like `vigenda tarefa listar --turma "Turma 9A"`
 func TestTarefaListarTurmaOutput(t *testing.T) {
-	// stdout, stderr, err := runCLI(t, "tarefa", "listar", "--turma", "Turma 9A")
-	// if err != nil {
-	// 	t.Fatalf("CLI execution failed for 'tarefa listar': %v\nStderr: %s", err, stderr)
-	// }
-	// if stderr != "" {
-	// 	t.Logf("Stderr output for 'tarefa listar': %s", stderr)
-	// }
-	// assertGoldenFile(t, stdout, "golden_files/tarefa_listar_turma_output.txt")
-	t.Log("TestTarefaListarTurmaOutput: Placeholder - requires database setup for meaningful comparison.")
+	dbPath := setupTestDB(t, "TestTarefaListarTurmaOutput")
+
+	// Seed data: user, subject, class "Turma 9A", and two tasks for this class.
+	// Note: IDs are hardcoded here. In a more complex system, you might fetch IDs after insertion.
+	// For tasks, the golden file expects IDs 1 and 5. This implies specific insertion order or auto-increment behavior.
+	// We'll insert them with these IDs.
+	seedStatements := []string{
+		"INSERT INTO users (id, username, password_hash) VALUES (1, 'testuser', 'hash');",
+		"INSERT INTO subjects (id, user_id, name) VALUES (1, 1, 'Matemática');",
+		"INSERT INTO classes (id, user_id, subject_id, name) VALUES (1, 1, 1, 'Turma 9A');",
+		// Task ID 1 (as per golden file)
+		"INSERT INTO tasks (id, user_id, class_id, title, description, due_date, is_completed) VALUES (1, 1, 1, 'Corrigir provas de Matemática', 'Corrigir as provas bimestrais.', '2025-06-23 00:00:00', 0);",
+		// Insert some other tasks to ensure filtering works and IDs are not necessarily sequential if we didn't hardcode task IDs
+		"INSERT INTO tasks (id, user_id, class_id, title, description, due_date, is_completed) VALUES (2, 1, 1, 'Planejar Aula Extra', 'Planejar aula de reforço.', '2025-06-24 00:00:00', 0);",
+		"INSERT INTO tasks (id, user_id, class_id, title, description, due_date, is_completed) VALUES (3, 1, 2, 'Tarefa Outra Turma', 'tarefa.', '2025-06-24 00:00:00', 0);", // Class ID 2 (different class)
+		// Task ID 5 (as per golden file)
+		"INSERT INTO tasks (id, user_id, class_id, title, description, due_date, is_completed) VALUES (5, 1, 1, 'Lançar notas do trabalho', 'Lançar as notas do trabalho de pesquisa.', '2025-06-25 00:00:00', 0);",
+	}
+	seedDB(t, dbPath, seedStatements)
+
+	// The golden file uses "--turma Turma 9A", but the actual flag is "--classid <ID>"
+	// We seeded "Turma 9A" with class_id = 1.
+	stdout, stderr, err := runCLI(t, "tarefa", "listar", "--classid", "1")
+	if err != nil {
+		t.Fatalf("CLI execution failed for 'tarefa listar': %v\nStderr: %s", err, stderr)
+	}
+	if stderr != "" {
+		t.Logf("Stderr output for 'tarefa listar' (expected with stubs): %s", stderr)
+	}
+	assertGoldenFile(t, stdout, "golden_files/tarefa_listar_turma_output.txt")
 }
 
 // TestFocoIniciarOutput - Based on Artefact 7 `golden_files/foco_iniciar_output.txt`
