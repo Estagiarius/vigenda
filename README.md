@@ -512,7 +512,7 @@ type ProofCriteria struct {
 
 -   **Ambiente de Desenvolvimento Go:**
     
-    -   **Instalação Requerida:** O ambiente de execução deve ter a versão **Go 1.18** instalada e configurada corretamente no `PATH` do sistema.
+    -   **Instalação Requerida:** O ambiente de execução deve ter a versão **Go 1.23** instalada e configurada corretamente no `PATH` do sistema.
         
     -   **Verificação:** Antes de iniciar a implementação, executar o comando `go version` para confirmar que a saída corresponde à versão `go1.18`.
         
