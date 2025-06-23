@@ -3,10 +3,13 @@ package tui
 import (
 	"fmt"
 	"io"
+	"os" // Required for isatty.IsTerminal
+	"bufio" // For reading from non-TTY stdin
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-isatty" // For TTY detection
 	"strings"
 )
 
@@ -108,39 +111,68 @@ func (m PromptModel) View() string {
 
 // GetInput runs a prompt and returns the user's input or an error.
 // It blocks until the user submits or quits.
-func GetInput(promptText string, output io.Writer, input io.Reader) (string, error) {
+func GetInput(promptText string, output io.Writer, inputReader io.Reader) (string, error) {
+	// Check if stdin is a TTY. inputReader is typically os.Stdin.
+	// This check is most relevant when inputReader is os.Stdin.
+	// If a different reader is passed, we might assume it's non-TTY or requires interactive handling.
+	// For simplicity, we check specifically for os.Stdin.
+	if f, ok := inputReader.(*os.File); ok && !isatty.IsTerminal(f.Fd()) && !isatty.IsCygwinTerminal(f.Fd()) {
+		// Not a TTY, attempt to read directly.
+		// This is a simplified way to handle piped input for a single-line prompt.
+		// It assumes the entire piped content is the desired input for the prompt.
+		// Print the prompt message to stderr so it doesn't interfere with piped output.
+		fmt.Fprintln(os.Stderr, promptText)
+
+		scanner := bufio.NewScanner(inputReader)
+		if scanner.Scan() {
+			return strings.TrimSpace(scanner.Text()), nil
+		}
+		if err := scanner.Err(); err != nil {
+			return "", fmt.Errorf("error reading from non-TTY input: %w", err)
+		}
+		// If nothing was scanned (e.g., empty pipe), return empty string.
+		// This behavior might need adjustment based on requirements (e.g., error on empty pipe).
+		return "", nil
+	}
+
+	// It's a TTY, or not os.Stdin, run the interactive BubbleTea prompt.
 	model := NewPromptModel(promptText)
 
 	opts := []tea.ProgramOption{tea.WithOutput(output)}
-	if input != nil {
-		opts = append(opts, tea.WithInput(input))
+	// Ensure the input for BubbleTea is correctly set.
+	// If inputReader was os.Stdin and it's a TTY, BubbleTea will use it.
+	// If inputReader was something else, BubbleTea will use that.
+	if inputReader != nil {
+		opts = append(opts, tea.WithInput(inputReader))
 	}
 
 	p := tea.NewProgram(model, opts...)
 
-	// Goroutine to run the program and wait for the result
-	go func() {
-		if _, err := p.Run(); err != nil {
-			// Handle error, perhaps by sending it through a channel if needed
-			// For now, we assume the main function will handle it or it's logged.
-			fmt.Fprintf(output, "Error running prompt program: %v\n", err)
-		}
-	}()
+	// It's generally better to run p.Run() in the same goroutine
+	// and handle its model directly, especially for simple blocking prompts.
+	// The channel communication with a goroutine can be tricky for termination.
 
-	// Block until a value is received from the channel
-	submittedValue := <-model.SubmittedCh
-	close(model.SubmittedCh)
-
-
-	if submittedValue == "" && !model.submitted { // User quit without submitting
-		return "", fmt.Errorf("prompt aborted by user")
+	finalModel, err := p.Run()
+	if err != nil {
+		return "", fmt.Errorf("error running prompt program: %w", err)
 	}
-	return submittedValue, nil
+
+	// Type assert to get the final model state
+	finalPromptModel, ok := finalModel.(PromptModel)
+	if !ok {
+		return "", fmt.Errorf("internal error: prompt model has unexpected type")
+	}
+
+	if finalPromptModel.submitted {
+		return finalPromptModel.textInput.Value(), nil
+	}
+	// If not submitted, it means the user quit (Esc, Ctrl+C)
+	return "", fmt.Errorf("prompt aborted by user")
 }
 
 // Example Usage (can be moved to a main or test file)
-/*
-func main() {
+
+func main_example() { // Renamed to avoid conflict if this file is part of a library build
     // Example: GetInput
     fmt.Println("Starting prompt...")
     userInput, err := GetInput("What is your name?", os.Stdout, os.Stdin)
@@ -153,5 +185,32 @@ func main() {
     } else {
         fmt.Println("\nNo input received.")
     }
+}
+
+/*
+// To run this example:
+// 1. Save this file (e.g., as prompt_example.go or ensure it's in a main package context)
+// 2. Add `import "os"` if not already present at the top level for os.Stdout, os.Stdin
+// 3. Call main_example() from a real main function.
+// Example main.go for testing:
+package main
+import (
+	"fmt"
+	"os"
+	"vigenda/internal/tui" // Adjust import path as necessary
+)
+func main() {
+	fmt.Println("Testing prompt.GetInput with piped data:")
+	// Simulate piped input scenario:
+	// echo "TestName" | go run your_main_test_program.go
+
+	// For direct execution test without pipe, os.Stdin will be the terminal.
+	// To test piped: echo "MyPipedInput" | go run main_test.go
+	input, err := tui.GetInput("Enter data:", os.Stdout, os.Stdin)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error from GetInput: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Received: '%s'\n", input)
 }
 */
