@@ -37,7 +37,8 @@ func TestMain(m *testing.M) {
 	mainGoPath := "cmd/vigenda/main.go"
 	projectRoot := filepath.Join("..", "..") // Relative path to project root from tests/integration
 
-	buildCmd := exec.Command("go", "build", "-o", binPath, mainGoPath)
+	// Use "go build -a" to force rebuilding of all packages
+	buildCmd := exec.Command("go", "build", "-a", "-o", binPath, mainGoPath)
 	buildCmd.Dir = projectRoot // Set working directory for build command to project root
 
 	buildOutput, err := buildCmd.CombinedOutput()

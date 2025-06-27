@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
+	// "time" // Not used anymore
 	"vigenda/internal/models"
 )
 
@@ -17,10 +17,11 @@ func NewClassRepository(db *sql.DB) ClassRepository {
 }
 
 func (r *classRepository) CreateClass(ctx context.Context, class *models.Class) (int64, error) {
-	query := `INSERT INTO classes (user_id, subject_id, name, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?)`
-	now := time.Now()
-	result, err := r.db.ExecContext(ctx, query, class.UserID, class.SubjectID, class.Name, now, now)
+	// Removed created_at, updated_at as they are not in the 'classes' table schema
+	query := `INSERT INTO classes (user_id, subject_id, name)
+              VALUES (?, ?, ?)`
+	// now := time.Now() // Not used
+	result, err := r.db.ExecContext(ctx, query, class.UserID, class.SubjectID, class.Name)
 	if err != nil {
 		return 0, fmt.Errorf("classRepository.CreateClass: %w", err)
 	}
@@ -32,7 +33,8 @@ func (r *classRepository) CreateClass(ctx context.Context, class *models.Class) 
 }
 
 func (r *classRepository) GetClassByID(ctx context.Context, id int64) (*models.Class, error) {
-	query := `SELECT id, user_id, subject_id, name, created_at, updated_at
+	// Removed created_at, updated_at
+	query := `SELECT id, user_id, subject_id, name
               FROM classes WHERE id = ?`
 	row := r.db.QueryRowContext(ctx, query, id)
 	class := &models.Class{}
@@ -41,8 +43,6 @@ func (r *classRepository) GetClassByID(ctx context.Context, id int64) (*models.C
 		&class.UserID,
 		&class.SubjectID,
 		&class.Name,
-		&class.CreatedAt,
-		&class.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -54,17 +54,18 @@ func (r *classRepository) GetClassByID(ctx context.Context, id int64) (*models.C
 }
 
 func (r *classRepository) AddStudent(ctx context.Context, student *models.Student) (int64, error) {
-	query := `INSERT INTO students (class_id, user_id, call_number, full_name, status, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?)`
-	now := time.Now()
+	// Corrected query: call_number -> enrollment_id. Removed user_id, created_at, updated_at.
+	query := `INSERT INTO students (class_id, enrollment_id, full_name, status)
+              VALUES (?, ?, ?, ?)`
+	// now := time.Now() // Not used
 
-	var callNumber sql.NullInt64
-	if student.CallNumber != 0 { // Assuming 0 is not a valid call number, adjust if it can be
-		callNumber.Int64 = int64(student.CallNumber)
-		callNumber.Valid = true
+	var enrollmentID sql.NullString
+	if student.EnrollmentID != "" {
+		enrollmentID.String = student.EnrollmentID
+		enrollmentID.Valid = true
 	}
-
-	result, err := r.db.ExecContext(ctx, query, student.ClassID, student.UserID, callNumber, student.FullName, student.Status, now, now)
+	// student.UserID is not in the 'students' table schema
+	result, err := r.db.ExecContext(ctx, query, student.ClassID, enrollmentID, student.FullName, student.Status)
 	if err != nil {
 		return 0, fmt.Errorf("classRepository.AddStudent: %w", err)
 	}
@@ -76,9 +77,10 @@ func (r *classRepository) AddStudent(ctx context.Context, student *models.Studen
 }
 
 func (r *classRepository) UpdateStudentStatus(ctx context.Context, studentID int64, status string) error {
-	query := `UPDATE students SET status = ?, updated_at = ? WHERE id = ?`
-	now := time.Now()
-	result, err := r.db.ExecContext(ctx, query, status, now, studentID)
+	// Removed updated_at as it's not in the 'students' table schema
+	query := `UPDATE students SET status = ? WHERE id = ?`
+	// now := time.Now() // Not used
+	result, err := r.db.ExecContext(ctx, query, status, studentID)
 	if err != nil {
 		return fmt.Errorf("classRepository.UpdateStudentStatus: %w", err)
 	}

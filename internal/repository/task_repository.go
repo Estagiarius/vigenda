@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
+	// "time" // Not used anymore
 	"vigenda/internal/models"
 )
 
@@ -17,9 +17,10 @@ func NewTaskRepository(db *sql.DB) TaskRepository {
 }
 
 func (r *taskRepository) CreateTask(ctx context.Context, task *models.Task) (int64, error) {
-	query := `INSERT INTO tasks (user_id, class_id, title, description, due_date, is_completed, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-	now := time.Now()
+	// Removed created_at, updated_at from INSERT as they are not in the tasks schema
+	query := `INSERT INTO tasks (user_id, class_id, title, description, due_date, is_completed)
+              VALUES (?, ?, ?, ?, ?, ?)`
+	// now := time.Now() // Not used
 
 	var classID sql.NullInt64
 	if task.ClassID != nil {
@@ -33,7 +34,7 @@ func (r *taskRepository) CreateTask(ctx context.Context, task *models.Task) (int
 		dueDate.Valid = true
 	}
 
-	result, err := r.db.ExecContext(ctx, query, task.UserID, classID, task.Title, task.Description, dueDate, task.IsCompleted, now, now)
+	result, err := r.db.ExecContext(ctx, query, task.UserID, classID, task.Title, task.Description, dueDate, task.IsCompleted)
 	if err != nil {
 		return 0, fmt.Errorf("taskRepository.CreateTask: %w", err)
 	}
@@ -45,7 +46,8 @@ func (r *taskRepository) CreateTask(ctx context.Context, task *models.Task) (int
 }
 
 func (r *taskRepository) GetTaskByID(ctx context.Context, id int64) (*models.Task, error) {
-	query := `SELECT id, user_id, class_id, title, description, due_date, is_completed, created_at, updated_at
+	// Removed created_at, updated_at from SELECT
+	query := `SELECT id, user_id, class_id, title, description, due_date, is_completed
               FROM tasks WHERE id = ?`
 	row := r.db.QueryRowContext(ctx, query, id)
 	task := &models.Task{}
@@ -53,6 +55,7 @@ func (r *taskRepository) GetTaskByID(ctx context.Context, id int64) (*models.Tas
 	var description sql.NullString
 	var dueDate sql.NullTime
 
+	// Removed task.CreatedAt, task.UpdatedAt from Scan
 	err := row.Scan(
 		&task.ID,
 		&task.UserID,
@@ -61,8 +64,6 @@ func (r *taskRepository) GetTaskByID(ctx context.Context, id int64) (*models.Tas
 		&description,
 		&dueDate,
 		&task.IsCompleted,
-		&task.CreatedAt,
-		&task.UpdatedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -84,7 +85,8 @@ func (r *taskRepository) GetTaskByID(ctx context.Context, id int64) (*models.Tas
 }
 
 func (r *taskRepository) GetTasksByClassID(ctx context.Context, classID int64) ([]models.Task, error) {
-	query := `SELECT id, user_id, class_id, title, description, due_date, is_completed, created_at, updated_at
+	// Removed created_at, updated_at from SELECT
+	query := `SELECT id, user_id, class_id, title, description, due_date, is_completed
               FROM tasks WHERE class_id = ?`
 	rows, err := r.db.QueryContext(ctx, query, classID)
 	if err != nil {
@@ -99,6 +101,7 @@ func (r *taskRepository) GetTasksByClassID(ctx context.Context, classID int64) (
 		var description sql.NullString
 		var dueDate sql.NullTime
 
+		// Removed task.CreatedAt, task.UpdatedAt from Scan
 		err := rows.Scan(
 			&task.ID,
 			&task.UserID,
@@ -107,8 +110,6 @@ func (r *taskRepository) GetTasksByClassID(ctx context.Context, classID int64) (
 			&description,
 			&dueDate,
 			&task.IsCompleted,
-			&task.CreatedAt,
-			&task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("taskRepository.GetTasksByClassID: scanning task: %w", err)
@@ -131,7 +132,8 @@ func (r *taskRepository) GetTasksByClassID(ctx context.Context, classID int64) (
 }
 
 func (r *taskRepository) GetAllTasks(ctx context.Context) ([]models.Task, error) {
-	query := `SELECT id, user_id, class_id, title, description, due_date, is_completed, created_at, updated_at FROM tasks`
+	// Removed created_at, updated_at from SELECT
+	query := `SELECT id, user_id, class_id, title, description, due_date, is_completed FROM tasks`
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, fmt.Errorf("taskRepository.GetAllTasks: %w", err)
@@ -145,6 +147,7 @@ func (r *taskRepository) GetAllTasks(ctx context.Context) ([]models.Task, error)
 		var description sql.NullString
 		var dueDate sql.NullTime
 
+		// Removed task.CreatedAt, task.UpdatedAt from Scan
 		err := rows.Scan(
 			&task.ID,
 			&task.UserID,
@@ -153,8 +156,6 @@ func (r *taskRepository) GetAllTasks(ctx context.Context) ([]models.Task, error)
 			&description,
 			&dueDate,
 			&task.IsCompleted,
-			&task.CreatedAt,
-			&task.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("taskRepository.GetAllTasks: scanning task: %w", err)
@@ -177,9 +178,10 @@ func (r *taskRepository) GetAllTasks(ctx context.Context) ([]models.Task, error)
 }
 
 func (r *taskRepository) MarkTaskCompleted(ctx context.Context, taskID int64) error {
-	query := `UPDATE tasks SET is_completed = ?, updated_at = ? WHERE id = ?`
-	now := time.Now()
-	result, err := r.db.ExecContext(ctx, query, true, now, taskID)
+	// Removed updated_at from UPDATE as it's not in the tasks schema
+	query := `UPDATE tasks SET is_completed = ? WHERE id = ?`
+	// now := time.Now() // Not used
+	result, err := r.db.ExecContext(ctx, query, true, taskID)
 	if err != nil {
 		return fmt.Errorf("taskRepository.MarkTaskCompleted: %w", err)
 	}

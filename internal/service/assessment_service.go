@@ -40,10 +40,10 @@ func (s *assessmentServiceImpl) CreateAssessment(ctx context.Context, name strin
 	// TODO: Validate classID exists using s.classRepo.GetClassByID(ctx, classID)
 
 	// Assuming UserID 1 for now
-	userID := int64(1)
+	// userID := int64(1) // UserID is not part of models.Assessment
 
 	assessment := models.Assessment{
-		UserID:  userID,
+		// UserID:  userID, // Removed
 		ClassID: classID,
 		Name:    name,
 		Term:    term,
@@ -80,7 +80,7 @@ func (s *assessmentServiceImpl) EnterGrades(ctx context.Context, assessmentID in
 	// For now, we assume student IDs are valid and belong to the correct class.
 
 	// Assuming UserID 1 for now
-	userID := int64(1)
+	// userID := int64(1) // UserID is not part of models.Grade
 
 	for studentID, gradeVal := range studentGrades {
 		if studentID == 0 {
@@ -95,7 +95,7 @@ func (s *assessmentServiceImpl) EnterGrades(ctx context.Context, assessmentID in
 		grade := models.Grade{
 			AssessmentID: assessmentID,
 			StudentID:    studentID,
-			UserID:       userID, // User who entered the grade
+			// UserID:       userID, // Removed: User who entered the grade is not stored in Grade model
 			Grade:        gradeVal,
 		}
 		if err := s.assessmentRepo.EnterGrade(ctx, &grade); err != nil {

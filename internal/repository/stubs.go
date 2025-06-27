@@ -31,6 +31,12 @@ func (r *StubQuestionRepository) GetQuestionsByCriteria(ctx context.Context, cri
 	return []models.Question{}, nil // Empty list
 }
 
+func (r *StubQuestionRepository) GetQuestionsByCriteriaProofGeneration(ctx context.Context, criteria ProofCriteria) ([]models.Question, error) {
+	fmt.Printf("[StubQuestionRepository] GetQuestionsByCriteriaProofGeneration called with: %+v\n", criteria)
+	// Return a mix of questions based on criteria, or just an empty list for a stub
+	return []models.Question{}, nil
+}
+
 // StubSubjectRepository
 type StubSubjectRepository struct {
 	DB *sql.DB

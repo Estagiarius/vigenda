@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"time"
+	// "time" // Not used anymore
 	"vigenda/internal/models"
 )
 
@@ -18,11 +18,13 @@ func NewSubjectRepository(db *sql.DB) SubjectRepository {
 
 func (r *subjectRepository) GetOrCreateByNameAndUser(ctx context.Context, name string, userID int64) (models.Subject, error) {
 	// Try to find the subject first
-	queryGet := `SELECT id, user_id, name, created_at, updated_at FROM subjects WHERE name = ? AND user_id = ?`
+	// Removed created_at, updated_at from SELECT
+	queryGet := `SELECT id, user_id, name FROM subjects WHERE name = ? AND user_id = ?`
 	row := r.db.QueryRowContext(ctx, queryGet, name, userID)
 
 	var subject models.Subject
-	err := row.Scan(&subject.ID, &subject.UserID, &subject.Name, &subject.CreatedAt, &subject.UpdatedAt)
+	// Removed subject.CreatedAt, subject.UpdatedAt from Scan
+	err := row.Scan(&subject.ID, &subject.UserID, &subject.Name)
 
 	if err == nil {
 		// Subject found
@@ -35,9 +37,10 @@ func (r *subjectRepository) GetOrCreateByNameAndUser(ctx context.Context, name s
 	}
 
 	// Subject not found, create it
-	queryCreate := `INSERT INTO subjects (user_id, name, created_at, updated_at) VALUES (?, ?, ?, ?)`
-	now := time.Now()
-	result, err := r.db.ExecContext(ctx, queryCreate, userID, name, now, now)
+	// Removed created_at, updated_at from INSERT
+	queryCreate := `INSERT INTO subjects (user_id, name) VALUES (?, ?)`
+	// now := time.Now() // Not used
+	result, err := r.db.ExecContext(ctx, queryCreate, userID, name)
 	if err != nil {
 		return models.Subject{}, fmt.Errorf("subjectRepository.GetOrCreateByNameAndUser: creating subject: %w", err)
 	}
@@ -47,11 +50,10 @@ func (r *subjectRepository) GetOrCreateByNameAndUser(ctx context.Context, name s
 		return models.Subject{}, fmt.Errorf("subjectRepository.GetOrCreateByNameAndUser: getting last insert ID: %w", err)
 	}
 
+	// Removed CreatedAt, UpdatedAt from struct literal
 	return models.Subject{
-		ID:        id,
-		UserID:    userID,
-		Name:      name,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:     id,
+		UserID: userID,
+		Name:   name,
 	}, nil
 }

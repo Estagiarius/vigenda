@@ -55,8 +55,8 @@ func (r *questionRepository) AddQuestion(ctx context.Context, question *models.Q
 }
 
 func (r *questionRepository) GetQuestionsByCriteria(ctx context.Context, criteria QuestionQueryCriteria) ([]models.Question, error) {
-	baseQuery := `SELECT id, user_id, subject_id, topic, type, difficulty, statement, options, correct_answer, created_at, updated_at
-                  FROM questions WHERE subject_id = ?`
+	baseQuery := `SELECT id, user_id, subject_id, topic, type, difficulty, statement, options, correct_answer
+                  FROM questions WHERE subject_id = ?` // Removed created_at, updated_at
 	args := []interface{}{criteria.SubjectID}
 
 	if criteria.Topic != nil && *criteria.Topic != "" {
@@ -88,7 +88,7 @@ func (r *questionRepository) GetQuestionsByCriteria(ctx context.Context, criteri
 		var topic sql.NullString
 		var options sql.NullString // This will be a JSON string from the DB
 
-		err := rows.Scan(
+		err := rows.Scan( // Removed q.CreatedAt, q.UpdatedAt
 			&q.ID,
 			&q.UserID,
 			&q.SubjectID,
@@ -98,8 +98,6 @@ func (r *questionRepository) GetQuestionsByCriteria(ctx context.Context, criteri
 			&q.Statement,
 			&options,
 			&q.CorrectAnswer,
-			&q.CreatedAt,
-			&q.UpdatedAt,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("questionRepository.GetQuestionsByCriteria: scanning question: %w", err)
@@ -173,7 +171,8 @@ func unmarshalOptions(jsonString sql.NullString) ([]string, error) {
 
 // GetQuestionsByCriteria_ProofGeneration is a more specialized version for proof generation
 // that fetches a specific number of questions for each difficulty level.
-func (r *questionRepository) GetQuestionsByCriteriaProofGeneration(ctx context.Context, criteria service.ProofCriteria) ([]models.Question, error) {
+// It now uses repository.ProofCriteria.
+func (r *questionRepository) GetQuestionsByCriteriaProofGeneration(ctx context.Context, criteria ProofCriteria) ([]models.Question, error) {
 	var allQuestions []models.Question
 
 	difficulties := []struct {
@@ -197,7 +196,8 @@ func (r *questionRepository) GetQuestionsByCriteriaProofGeneration(ctx context.C
 		}
 
 		queryBuilder := strings.Builder{}
-		queryBuilder.WriteString(`SELECT id, user_id, subject_id, topic, type, difficulty, statement, options, correct_answer, created_at, updated_at
+		// Removed created_at, updated_at from SELECT
+		queryBuilder.WriteString(`SELECT id, user_id, subject_id, topic, type, difficulty, statement, options, correct_answer
                                  FROM questions WHERE subject_id = ? AND difficulty = ?`)
 		args := []interface{}{criteria.SubjectID, diff.Level}
 
@@ -219,9 +219,10 @@ func (r *questionRepository) GetQuestionsByCriteriaProofGeneration(ctx context.C
 			var topic sql.NullString
 			var options sql.NullString
 
+			// Removed q.CreatedAt, q.UpdatedAt from Scan
 			errScan := rows.Scan(
 				&q.ID, &q.UserID, &q.SubjectID, &topic, &q.Type, &q.Difficulty,
-				&q.Statement, &options, &q.CorrectAnswer, &q.CreatedAt, &q.UpdatedAt,
+				&q.Statement, &options, &q.CorrectAnswer,
 			)
 			if errScan != nil {
 				rows.Close() // Important to close rows before returning from loop

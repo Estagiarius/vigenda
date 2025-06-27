@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/table" // Reativado para columns e rows
 	"github.com/spf13/cobra"
 	"vigenda/internal/database"
 	"vigenda/internal/models" // Added import for models package
@@ -230,9 +230,9 @@ var taskListCmd = &cobra.Command{
 			}
 			class, classErr := classService.GetClassByID(context.Background(), classID)
 			if classErr == nil && class.ID != 0 {
-				headerMsg = fmt.Sprintf("TAREFAS PARA: %s", class.Name)
+				headerMsg = fmt.Sprintf("TAREFAS PARA: %s", class.Name) // Restaurado
 			} else {
-				headerMsg = fmt.Sprintf("TAREFAS PARA: Class ID %d", classID)
+				headerMsg = fmt.Sprintf("TAREFAS PARA: Class ID %d", classID) // Restaurado
 			}
 		} else if showAll {
 			// This part needs a new service method: ListAllActiveTasks (or similar)
@@ -259,7 +259,7 @@ var taskListCmd = &cobra.Command{
 				fmt.Println("Error listing all tasks:", err)
 				return
 			}
-			headerMsg = "TODAS AS TAREFAS (INCLUINDO BUGS DO SISTEMA)"
+			headerMsg = "TODAS AS TAREFAS (INCLUINDO BUGS DO SISTEMA)" // Restaurado
 		} else {
 			fmt.Println("Erro: Especifique --classid OU use --all para listar todas as tarefas (incluindo bugs).")
 			fmt.Println("Exemplo: vigenda tarefa listar --classid 1")
@@ -273,71 +273,33 @@ var taskListCmd = &cobra.Command{
 			return
 		}
 
-		fmt.Printf("%s\n\n", headerMsg)
+		fmt.Printf("%s\n\n", headerMsg) // Restaurado \n\n para espaço antes da tabela
 
-
+		// Reativar a definição de colunas e o preenchimento de rows
 		columns := []table.Column{
-			{Title: "ID", Width: 3}, // Adjusted width
-			{Title: "TAREFA", Width: 35}, // Adjusted width and name
-			{Title: "PRAZO", Width: 10}, // Adjusted width and name
+			{Title: "ID", Width: 3},
+			{Title: "TAREFA", Width: 35},
+			{Title: "PRAZO", Width: 10},
 		}
 		var rows []table.Row
 		for _, task := range tasks {
 			dueDateStr := "N/A"
 			if task.DueDate != nil {
-				dueDateStr = task.DueDate.Format("02/01/2006") // DD/MM/YYYY format
+				dueDateStr = task.DueDate.Format("02/01/2006")
 			}
 			rows = append(rows, table.Row{
 				fmt.Sprintf("%d", task.ID),
 				task.Title,
-				// task.Description, // Description removed as per golden file
 				dueDateStr,
 			})
 		}
-		// Use a simpler table rendering for now if tui.ShowTable is too complex or adds extra lines
-		// For exact match with golden file, which seems to be simple text:
-		// Print header
-		header := "| "
-		separator := "|-"
-		for _, col := range columns {
-			header += fmt.Sprintf("%-*s | ", col.Width, col.Title)
-			separator += strings.Repeat("-", col.Width+1) + "-|"
+
+		// Reativar impressão manual da tabela
+		fmt.Printf("%-*s | %-*s | %s\n", columns[0].Width, columns[0].Title, columns[1].Width, columns[1].Title, columns[2].Title)
+		fmt.Printf("%s | %s | %s\n", strings.Repeat("-", columns[0].Width), strings.Repeat("-", columns[1].Width), strings.Repeat("-", columns[2].Width))
+		for _, row := range rows {
+			fmt.Printf("%-*s | %-*s | %s\n", columns[0].Width, row[0], columns[1].Width, row[1], row[2])
 		}
-        // The golden file does not have | at the start/end of headers/rows
-        // It has:
-        // ID | TAREFA                            | PRAZO
-        // -- | --------------------------------- | ----------
-        // So, let's adjust the custom printing logic or tui.ShowTable if possible.
-
-		// Let's try to make tui.ShowTable match, or fall back to manual print.
-		// tui.ShowTable might add its own styling.
-		// For now, let's assume tui.ShowTable can be made to match or is acceptable.
-		// If not, we'll use manual print.
-
-        // Manual print to match golden file structure:
-        fmt.Printf("%-*s | %-*s | %s\n", columns[0].Width, columns[0].Title, columns[1].Width, columns[1].Title, columns[2].Title)
-        fmt.Printf("%s | %s | %s\n", strings.Repeat("-", columns[0].Width), strings.Repeat("-", columns[1].Width), strings.Repeat("-", columns[2].Width))
-        for _, row := range rows {
-            fmt.Printf("%-*s | %-*s | %s\n", columns[0].Width, row[0], columns[1].Width, row[1], row[2])
-        }
-        // The above manual print needs careful alignment.
-        // The golden file seems to have:
-        // ID | TAREFA                            | PRAZO
-        // -- | --------------------------------- | ----------
-        //  1 | Corrigir provas de Matemática     | 23/06/2025
-        //  5 | Lançar notas do trabalho          | 25/06/2025
-        // Notice the space before ID 1 and 5.
-
-        // Let's try to use the tui.ShowTable and see.
-        // If it fails, we'll implement a more precise custom printer.
-        // The existing tui.ShowTable uses github.com/charmbracelet/bubbles/table which is powerful.
-        // We need to ensure its default style matches or can be configured.
-        // The default bubble table style might be different.
-        // The golden file format is quite basic.
-
-        // Reverting to tui.ShowTable and will adjust if output is not matching.
-        // The key is the data and column titles/formats.
-		tui.ShowTable(columns, rows, os.Stdout)
 	},
 }
 

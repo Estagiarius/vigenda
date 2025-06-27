@@ -74,7 +74,7 @@ func (s *classServiceImpl) ImportStudentsFromCSV(ctx context.Context, classID in
 
 	var importedCount int
 	// Assuming UserID 1 for now, this should come from context or auth
-	userID := int64(1)
+	// userID := int64(1) // Removed as it's not used
 
 	for {
 		record, err := reader.Read()
@@ -114,11 +114,11 @@ func (s *classServiceImpl) ImportStudentsFromCSV(ctx context.Context, classID in
 		}
 
 		student := models.Student{
-			ClassID:    classID,
-			UserID:     userID, // Associate student with the user creating them (e.g. teacher)
-			CallNumber: callNumber,
-			FullName:   fullName,
-			Status:     status,
+			ClassID:      classID,
+			// UserID:     userID, // Removed: UserID is not part of models.Student
+			EnrollmentID: strconv.Itoa(callNumber), // Converted callNumber to string for EnrollmentID
+			FullName:     fullName,
+			Status:       status,
 		}
 
 		_, err = s.classRepo.AddStudent(ctx, &student)

@@ -35,9 +35,18 @@ func (s *proofServiceImpl) GenerateProof(ctx context.Context, criteria ProofCrit
 		return nil, fmt.Errorf("pelo menos uma contagem de dificuldade deve ser maior que zero")
 	}
 
+	// Converter service.ProofCriteria para repository.ProofCriteria
+	repoCriteria := repository.ProofCriteria{
+		SubjectID:   criteria.SubjectID,
+		Topic:       criteria.Topic,
+		EasyCount:   criteria.EasyCount,
+		MediumCount: criteria.MediumCount,
+		HardCount:   criteria.HardCount,
+	}
+
 	// Use a nova função GetQuestionsByCriteriaProofGeneration do repositório
 	// que é projetada para buscar o número exato de questões por dificuldade em uma única chamada ou transação.
-	allQuestions, err := s.questionRepo.GetQuestionsByCriteriaProofGeneration(ctx, criteria)
+	allQuestions, err := s.questionRepo.GetQuestionsByCriteriaProofGeneration(ctx, repoCriteria)
 	if err != nil {
 		return nil, fmt.Errorf("erro ao buscar questões para a prova: %w", err)
 	}

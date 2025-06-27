@@ -16,11 +16,20 @@ type QuestionQueryCriteria struct {
 	// Outros campos como Type podem ser adicionados aqui se necessário.
 }
 
+// ProofCriteria defines the criteria for fetching questions for proof generation at the repository level.
+type ProofCriteria struct {
+	SubjectID   int64
+	Topic       *string
+	EasyCount   int
+	MediumCount int
+	HardCount   int
+}
+
 // QuestionRepository define a interface para operações de acesso a dados de questões.
 type QuestionRepository interface {
 	GetQuestionsByCriteria(ctx context.Context, criteria QuestionQueryCriteria) ([]models.Question, error)
 	AddQuestion(ctx context.Context, question *models.Question) (int64, error)
-	GetQuestionsByCriteriaProofGeneration(ctx context.Context, criteria service.ProofCriteria) ([]models.Question, error) // Added for proof generation
+	GetQuestionsByCriteriaProofGeneration(ctx context.Context, criteria ProofCriteria) ([]models.Question, error) // Changed to use repository.ProofCriteria
 	// GetQuestionByID(ctx context.Context, id int64) (models.Question, error)
 	// UpdateQuestion(ctx context.Context, question *models.Question) error
 	// DeleteQuestion(ctx context.Context, id int64) error
