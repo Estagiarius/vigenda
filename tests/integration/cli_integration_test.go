@@ -37,7 +37,8 @@ func TestMain(m *testing.M) {
 	mainGoPath := "cmd/vigenda/main.go"
 	projectRoot := filepath.Join("..", "..") // Relative path to project root from tests/integration
 
-	buildCmd := exec.Command("go", "build", "-o", binPath, mainGoPath)
+	// Use "go build -a" to force rebuilding of all packages
+	buildCmd := exec.Command("go", "build", "-a", "-o", binPath, mainGoPath)
 	buildCmd.Dir = projectRoot // Set working directory for build command to project root
 
 	buildOutput, err := buildCmd.CombinedOutput()
@@ -186,23 +187,42 @@ func TestDashboardOutput(t *testing.T) {
 	// or might not produce the exact golden file output yet.
 	// The task is to set up the test structure.
 
-	// For the dashboard, the command is just `vigenda` (no arguments)
-	// This requires the database to be in a specific state to produce the golden output.
-	// For now, we'll just check if the command runs and compare against the golden file.
-	// Setting up the database state is a more complex task for later or needs to be handled by test fixtures.
+	dbPath := setupTestDB(t, "TestDashboardOutput")
 
-	// stdout, stderr, err := runCLI(t) // No args for dashboard
-	// if err != nil {
-	//  // Handle error, perhaps stderr has useful info
-	// 	t.Fatalf("CLI execution failed: %v\nStderr: %s", err, stderr)
-	// }
-	// if stderr != "" {
-	// 	t.Logf("Stderr output: %s", stderr) // Log non-fatal stderr
-	// }
-	// assertGoldenFile(t, stdout, "golden_files/dashboard_output.txt")
-	// t.Log("TestDashboardOutput: Placeholder - requires database setup for meaningful comparison.")
+	// Seed data necessary for the dashboard to reflect the golden file.
+	// This includes:
+	// - A user (implicit, user_id 1 is often assumed by stubs or initial implementations)
+	// - A class "Turma 9A" (implies a subject too)
+	// - A task "Corrigir provas (Turma 9A)" with due date "Amanhã" (relative to 22/06/2025 in golden file)
+	// - A task "Preparar aula sobre Era Vargas (Turma 9B)" with due date "24/06" (relative to 22/06/2025)
+	// - A notification "5 entregas pendentes para o trabalho "Pesquisa sobre Clima" (Turma 9A)."
+	// The "Agenda de Hoje" part is static in the current CLI main.go's Run function, so no seeding needed for that.
+	// For tasks and notifications, the application needs to query and format them.
+	// Current stubs might not support this complex querying.
+	// We will seed data and see if the actual implementation (once stubs are replaced) picks it up.
+	// For now, the dashboard output in main.go is mostly static.
+	// The golden file `dashboard_output.txt` is:
+	// =================================================
+	// ==                 DASHBOARD                   ==
+	// =================================================
+	//
+	// 🕒 AGENDA DE HOJE (22/06/2025)
+	//    [09:00 - 10:00] Aula de História - Turma 9A
+	//    [14:00 - 15:00] Reunião Pedagógica
+	//
+	// 🔥 TAREFAS PRIORITÁRIAS
+	//    [1] Corrigir provas (Turma 9A) (Prazo: Amanhã)
+	//    [2] Preparar aula sobre Era Vargas (Turma 9B) (Prazo: 24/06)
+	//
+	// 🔔 NOTIFICAÇÕES
+	//    - 5 entregas pendentes para o trabalho "Pesquisa sobre Clima" (Turma 9A).
+	//
+	// The current rootCmd Run function in `cmd/vigenda/main.go` prints exactly this.
+	// So, no specific seeding is strictly necessary for *this current static implementation*.
+	// However, if the dashboard becomes dynamic, seeding will be crucial.
+	// For now, we just ensure the DB is initialized so the app doesn't fail on DB connection.
+	_ = dbPath // Use dbPath to avoid unused variable error if no seeding is done.
 
-	_ = setupTestDB(t, "TestDashboardOutput") // Ensure DB is created and schema applied by app
 
 	// For the dashboard, the command is just `vigenda` (no arguments)
 	stdout, stderr, err := runCLI(t)
@@ -210,8 +230,9 @@ func TestDashboardOutput(t *testing.T) {
 		t.Fatalf("CLI execution failed: %v\nStderr: %s", err, stderr)
 	}
 	if stderr != "" {
-		// For now, allow stderr since services will print "[Stub...]" messages
-		t.Logf("Stderr output (expected with stubs): %s", stderr)
+		// If stubs are fully replaced, stderr should ideally be empty for successful commands.
+		// Allow it for now, but this might be an assertion point later.
+		t.Logf("Stderr output: %s", stderr)
 	}
 	assertGoldenFile(t, stdout, "golden_files/dashboard_output.txt")
 }
@@ -294,7 +315,9 @@ func TestTarefaListarTurmaOutput(t *testing.T) {
 		t.Fatalf("CLI execution failed for 'tarefa listar': %v\nStderr: %s", err, stderr)
 	}
 	if stderr != "" {
-		t.Logf("Stderr output for 'tarefa listar' (expected with stubs): %s", stderr)
+		// Stderr might contain debug logs from services if stubs were still printing.
+		// With real implementations, it should be cleaner.
+		t.Logf("Stderr output for 'tarefa listar': %s", stderr)
 	}
 	assertGoldenFile(t, stdout, "golden_files/tarefa_listar_turma_output.txt")
 }
