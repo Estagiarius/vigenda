@@ -20,6 +20,7 @@ type QuestionQueryCriteria struct {
 type QuestionRepository interface {
 	GetQuestionsByCriteria(ctx context.Context, criteria QuestionQueryCriteria) ([]models.Question, error)
 	AddQuestion(ctx context.Context, question *models.Question) (int64, error)
+	GetQuestionsByCriteriaProofGeneration(ctx context.Context, criteria service.ProofCriteria) ([]models.Question, error) // Added for proof generation
 	// GetQuestionByID(ctx context.Context, id int64) (models.Question, error)
 	// UpdateQuestion(ctx context.Context, question *models.Question) error
 	// DeleteQuestion(ctx context.Context, id int64) error
@@ -47,12 +48,23 @@ type TaskRepository interface {
 	// ... outros métodos
 }
 
-// type ClassRepository interface {
-//    CreateClass(ctx context.Context, class *models.Class) (int64, error)
-//    GetClassByID(ctx context.Context, id int64) (*models.Class, error)
-//    // ... outros métodos
-// }
-//
+type ClassRepository interface {
+	CreateClass(ctx context.Context, class *models.Class) (int64, error)
+	GetClassByID(ctx context.Context, id int64) (*models.Class, error)
+	AddStudent(ctx context.Context, student *models.Student) (int64, error)
+	UpdateStudentStatus(ctx context.Context, studentID int64, status string) error
+	// GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) // Moved to AssessmentRepository as it's mostly used for grading
+}
+
+type AssessmentRepository interface {
+	CreateAssessment(ctx context.Context, assessment *models.Assessment) (int64, error)
+	GetAssessmentByID(ctx context.Context, assessmentID int64) (*models.Assessment, error)
+	GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) // Used for listing students when entering grades
+	EnterGrade(ctx context.Context, grade *models.Grade) error
+	GetGradesByClassID(ctx context.Context, classID int64) ([]models.Grade, []models.Assessment, []models.Student, error) // For calculating class average
+	// GetAssessmentWithGrades(ctx context.Context, assessmentID int64) (*models.AssessmentWithGrades, error) // Example for a more complex query
+}
+
 // Estas são apenas exemplos e devem ser expandidas conforme necessário
 // para cobrir todas as operações de dados requeridas pelos serviços.
 // A TASK-I-01 é responsável pela implementação concreta destes repositórios.

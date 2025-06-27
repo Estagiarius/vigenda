@@ -365,24 +365,24 @@ var taskCompleteCmd = &cobra.Command{
 
 // initializeServices sets up the service layer instances with their repository dependencies.
 func initializeServices(db *sql.DB) {
-	// Initialize repositories with the db connection
-	stubTaskRepo := repository.NewStubTaskRepository(db)
-	stubClassRepo := repository.NewStubClassRepository(db)
-	stubAssessmentRepo := repository.NewStubAssessmentRepository(db)
-	stubQuestionRepo := repository.NewStubQuestionRepository(db)
-	stubSubjectRepo := repository.NewStubSubjectRepository(db)
+	// Initialize real repositories with the db connection
+	taskRepo := repository.NewTaskRepository(db)
+	classRepo := repository.NewClassRepository(db)
+	assessmentRepo := repository.NewAssessmentRepository(db)
+	questionRepo := repository.NewQuestionRepository(db)
+	subjectRepo := repository.NewSubjectRepository(db)
 
-	// Initialize services
-	// For Task, Class, Assessment, the main service files are placeholders, so we use stub constructors.
-	// taskService = service.NewStubTaskService(stubTaskRepo) // Replaced by direct instantiation below
-	taskService = service.NewTaskService(stubTaskRepo) // Use the actual constructor
-	classService = service.NewStubClassService(stubClassRepo)
-	assessmentService = service.NewStubAssessmentService(stubAssessmentRepo)
+	// Initialize services with real repository implementations
+	taskService = service.NewTaskService(taskRepo)
+	// Assuming NewClassService, NewAssessmentService exist or will be created.
+	// If they use stubs for now or are basic passthroughs, that's fine.
+	// For now, let's assume they can take the real repos.
+	// If NewStubClassService was a placeholder for NewClassService:
+	classService = service.NewClassService(classRepo, subjectRepo) // Assuming ClassService might need SubjectRepo too, or just ClassRepo
+	assessmentService = service.NewAssessmentService(assessmentRepo, classRepo) // AssessmentService might need ClassRepo to get students
 
-	// For Question and Proof, the main service files have actual constructors that take repository interfaces.
-	// So we call those, passing in our stub repositories.
-	questionService = service.NewQuestionService(stubQuestionRepo, stubSubjectRepo)
-	proofService = service.NewProofService(stubQuestionRepo)
+	questionService = service.NewQuestionService(questionRepo, subjectRepo)
+	proofService = service.NewProofService(questionRepo) // ProofService uses QuestionRepository for GetQuestionsByCriteriaProofGeneration
 }
 
 func init() {

@@ -93,16 +93,30 @@ func (s *questionServiceImpl) AddQuestionsFromJSON(ctx context.Context, jsonData
 		// Em um cenário real, o SubjectRepository seria usado aqui.
 		// Se s.subjectRepo for nil, esta parte seria pulada ou tratada de forma diferente.
 
-		var subjectID int64 = 1 // Placeholder - DEVE SER SUBSTITUÍDO PELA LÓGICA REAL
+		var subjectID int64
+		// UserID para GetOrCreateByNameAndUser:
+		// Se qJSON.UserID não for fornecido ou for 0, precisamos de um UserID padrão ou do contexto.
+		// Vamos assumir que qJSON.UserID é o UserID do proprietário da questão/disciplina.
+		// Se UserID é um conceito global para o usuário da CLI, ele viria do contexto.
+		// Para este exemplo, vamos usar qJSON.UserID, mas com uma verificação.
+		currentUserID := qJSON.UserID
+		if currentUserID == 0 {
+			// Tentar obter UserID do contexto ou usar um padrão. Para agora, erro se não fornecido.
+			// Em uma aplicação real, o UserID viria do contexto de autenticação.
+			// Se o sistema é monousuário sem autenticação explícita, pode-se usar um UserID fixo (ex: 1).
+			// Para este exemplo, vamos assumir que o JSON deve fornecer o UserID.
+			return addedCount, fmt.Errorf("questão %d: UserID não fornecido no JSON e necessário para obter/criar disciplina", i)
+		}
+
 		if s.subjectRepo != nil {
-			// Exemplo de como poderia ser (requer GetOrCreateByNameAndUser em SubjectRepository):
-			// subject, err := s.subjectRepo.GetOrCreateByNameAndUser(ctx, qJSON.SubjectName, qJSON.UserID)
-			// if err != nil {
-			//     return addedCount, fmt.Errorf("erro ao obter/criar disciplina '%s' para usuário %d: %w", qJSON.SubjectName, qJSON.UserID, err)
-			// }
-			// subjectID = subject.ID
-			// Como SubjectRepository não está implementado, vamos apenas logar um aviso.
-			fmt.Printf("AVISO: SubjectRepository não implementado. Usando SubjectID placeholder para '%s'.\n", qJSON.SubjectName)
+			subject, err := s.subjectRepo.GetOrCreateByNameAndUser(ctx, qJSON.SubjectName, currentUserID)
+			if err != nil {
+				return addedCount, fmt.Errorf("questão %d: erro ao obter/criar disciplina '%s' para usuário %d: %w", i, qJSON.SubjectName, currentUserID, err)
+			}
+			subjectID = subject.ID
+		} else {
+			// Fallback ou erro se subjectRepo não estiver disponível, mas é necessário.
+			return addedCount, fmt.Errorf("questão %d: SubjectRepository não está disponível para resolver disciplina '%s'", i, qJSON.SubjectName)
 		}
 
 
