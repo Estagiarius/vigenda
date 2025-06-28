@@ -8,7 +8,9 @@ Antes de prosseguir com a instalação, certifique-se de que seu sistema atende 
 
 ### 1.1. Sistema Operacional
 
--   [Especifique os sistemas operacionais suportados, por exemplo: Linux (Ubuntu 20.04+, Fedora 34+), macOS (11.0+), Windows 10+ (com WSL2 recomendado)]
+-   **Linux:** Ubuntu 20.04+, Fedora 34+ ou distribuições Linux equivalentes.
+-   **macOS:** 11.0 (Big Sur) ou superior. (Cross-compilação para macOS a partir do Linux pode exigir OSXCross ou configuração similar devido ao CGO).
+-   **Windows:** Windows 10+ (WSL2 é recomendado para uma experiência de desenvolvimento semelhante ao Linux, ou use os binários compilados para Windows).
 
 ### 1.2. Software Essencial
 
@@ -16,139 +18,164 @@ Antes de prosseguir com a instalação, certifique-se de que seu sistema atende 
     -   Verifique a instalação: `git --version`
     -   Instruções de instalação: [https://git-scm.com/book/en/v2/Getting-Started-Installing-Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 
--   **Go (Golang):** [Especifique a versão mínima ou recomendada, ex: 1.18 ou superior]
+-   **Go (Golang):** Versão 1.23.0 ou superior (toolchain go1.24.3, conforme `go.mod`).
     -   Verifique a instalação: `go version`
     -   Instruções de instalação: [https://golang.org/doc/install](https://golang.org/doc/install)
-    -   Certifique-se de que `$GOPATH` e `$GOROOT` estão configurados corretamente e que `$GOPATH/bin` está no seu `PATH`.
+    -   Certifique-se de que `$GOROOT` está configurado corretamente e que `$GOPATH/bin` (se ainda usar GOPATH) e o diretório `bin` da instalação do Go (ex: `/usr/local/go/bin` ou `~/go/bin`) estão no seu `PATH`.
 
--   **GCC (GNU Compiler Collection):** [Especifique se necessário e qual versão, ex: para compilar dependências CGo ou outras ferramentas]
+-   **GCC (GNU Compiler Collection):** Necessário para compilar dependências CGo, como o driver `mattn/go-sqlite3`.
     -   Verifique a instalação: `gcc --version`
     -   Instruções de instalação:
         -   **Linux (Debian/Ubuntu):** `sudo apt update && sudo apt install build-essential`
         -   **Linux (Fedora):** `sudo dnf groupinstall "Development Tools"`
-        -   **macOS:** Xcode Command Line Tools (geralmente instalado com `git` ou ao tentar compilar algo que precise). `xcode-select --install`
-        -   **Windows:** MinGW ou MSYS2.
+        -   **macOS:** Instale as Xcode Command Line Tools: `xcode-select --install`
+        -   **Windows:** É necessário um compilador C compatível com CGO, como o MinGW-w64. O script `build.sh` tenta usar `x86_64-w64-mingw32-gcc` para builds Windows. Instale-o (ex: via MSYS2) e adicione ao PATH.
 
--   **[Outras Ferramentas Essenciais]**
-    -   [Ex: Docker, Docker Compose, Node.js, Python, etc. - inclua versão e link para instalação]
-    -   `[Nome da Ferramenta]`: [Versão] - [Link para Instruções de Instalação]
+-   **(Opcional para Cross-Compilação Windows a partir do Linux/macOS) Mingw-w64:**
+    -   Exemplo de instalação no Ubuntu: `sudo apt install mingw-w64`
+    -   O script `build.sh` usa `CC=x86_64-w64-mingw32-gcc` para compilar para Windows de 64 bits.
 
 ### 1.3. Variáveis de Ambiente (Opcional)
 
-[Liste quaisquer variáveis de ambiente que precisam ser configuradas antes da instalação, por exemplo:]
--   `MYAPP_CONFIG_PATH`: `/etc/myapp/config.json`
--   `DATABASE_URL`: `postgres://user:password@host:port/database`
+-   Para cross-compilação CGO, a variável `CC` pode precisar ser definida para apontar para o compilador C correto para o alvo (ex: `CC=x86_64-w64-mingw32-gcc` ao compilar para Windows 64-bit a partir do Linux). O script `build.sh` tenta fazer isso.
 
 ## 2. Clonando o Repositório
 
 1.  Abra seu terminal ou prompt de comando.
 2.  Navegue até o diretório onde você deseja clonar o projeto.
-3.  Execute o seguinte comando:
+3.  Execute o seguinte comando (substitua pela URL correta se necessário):
     ```bash
-    git clone [URL_DO_REPOSITORIO_GIT]
-    cd [NOME_DO_DIRETORIO_DO_PROJETO]
+    git clone https://github.com/seu-usuario/vigenda.git
+    cd vigenda
     ```
-    Substitua `[URL_DO_REPOSITORIO_GIT]` pela URL correta do repositório (ex: `https://github.com/seu-usuario/seu-projeto.git`) e `[NOME_DO_DIRETORIO_DO_PROJETO]` pelo nome da pasta que será criada.
 
 ## 3. Instalando Dependências do Projeto
 
-[Esta seção varia muito dependendo da linguagem e do gerenciador de pacotes usado.]
-
 ### 3.1. Dependências Go
 
-Se o projeto usa Go modules (um arquivo `go.mod` estará presente na raiz do projeto):
-```bash
-go mod download
-# ou
-go mod tidy # Para limpar dependências não utilizadas e adicionar as que faltam
-```
-Para instalar ferramentas Go específicas que podem ser necessárias (listadas no `tools.go` ou similar):
-```bash
-# Exemplo:
-# go install golang.org/x/tools/cmd/goimports@latest
-# go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-```
+O projeto usa Go Modules para gerenciamento de dependências. O arquivo `go.mod` lista todas as dependências diretas e indiretas.
 
-### 3.2. Dependências [Outra Linguagem/Tecnologia, ex: Node.js para Frontend]
+1.  **Navegue até a raiz do projeto clonado (`vigenda`).**
+2.  **Execute o seguinte comando para sincronizar as dependências:**
+    ```bash
+    go mod tidy
+    ```
+    Este comando garante que o arquivo `go.mod` e `go.sum` estejam consistentes, baixando as dependências necessárias e removendo as não utilizadas.
 
-Se o projeto tem um componente frontend ou utiliza Node.js para scripts:
-```bash
-# Navegue para o diretório relevante, se houver (ex: ./frontend)
-# cd frontend
-npm install
-# ou
-yarn install
-```
+### 3.2. Ferramentas de Desenvolvimento Go (Opcional, mas Recomendado)
+
+Para formatação de código e linting, que são boas práticas de desenvolvimento:
+
+-   **`goimports`** (para formatação e organização automática de imports):
+    ```bash
+    go install golang.org/x/tools/cmd/goimports@latest
+    ```
+-   **`golangci-lint`** (um agregador rápido de linters para Go):
+    -   Verifique o site oficial para o método de instalação mais recente: [https://golangci-lint.run/usage/install/](https://golangci-lint.run/usage/install/)
+    -   Exemplo de instalação (pode variar dependendo do seu SO e preferências):
+        ```bash
+        # Linux/macOS (binário)
+        curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.57.2
+        ```
+        (Substitua `v1.57.2` pela versão mais recente ou desejada).
+        Certifique-se de que `$(go env GOPATH)/bin` ou `~/go/bin` está no seu `PATH`.
 
 ### 3.3. Dependências do Sistema Adicionais
 
-[Liste quaisquer outras bibliotecas ou pacotes do sistema operacional que são dependências diretas do projeto e não são cobertas pelos gerenciadores de pacotes da linguagem.]
-```bash
-# Exemplo para Linux (Debian/Ubuntu)
-# sudo apt install -y libpq-dev libssl-dev
-```
+-   Nenhuma outra dependência de sistema é explicitamente necessária além de Go e GCC para a compilação e execução básica do Vigenda.
 
 ## 4. Configuração do Ambiente
 
 ### 4.1. Arquivos de Configuração
 
--   O projeto pode exigir um arquivo de configuração. Geralmente, um arquivo de exemplo é fornecido (por exemplo, `config.example.json` ou `.env.example`).
--   Copie o arquivo de exemplo para um arquivo de configuração local:
+-   Atualmente, Vigenda não requer arquivos de configuração externos para sua operação básica. As configurações, como o caminho do banco de dados, são gerenciadas internamente (consulte `internal/config/config.go` e `internal/database/database.go`).
+-   Se configurações personalizadas forem introduzidas no futuro, esta seção será atualizada.
+
+### 4.2. Configuração do Banco de Dados
+
+-   O Vigenda utiliza **SQLite** como banco de dados, que é baseado em arquivo.
+-   O arquivo do banco de dados (por exemplo, `vigenda.db` ou similar, dependendo da lógica em `internal/database/database.go`) é criado e gerenciado automaticamente pela aplicação no diretório de dados apropriado (geralmente no diretório de configuração do usuário ou no diretório do projeto).
+-   As migrações de esquema do banco de dados estão localizadas em `internal/database/migrations/` (ex: `001_initial_schema.sql`) e são aplicadas automaticamente pela aplicação na inicialização, se o banco de dados ainda não estiver no esquema esperado. Não há comando manual de migração para o usuário executar.
+
+## 5. Construindo e Executando a Aplicação
+
+### 5.1. Executando a Partir do Código Fonte (Desenvolvimento)
+
+Para executar a aplicação Vigenda diretamente do código fonte (a partir da raiz do projeto `vigenda`):
+```bash
+go run ./cmd/vigenda/main.go [comando_da_cli_vigenda] [argumentos_do_comando]
+```
+Exemplos:
+```bash
+go run ./cmd/vigenda/main.go --help
+go run ./cmd/vigenda/main.go tarefa listar
+go run ./cmd/vigenda/main.go foco iniciar --duracao 25m --tarefa "Estudar Go"
+```
+
+### 5.2. Construindo o Binário
+
+O projeto inclui um script `build.sh` para construir binários para diferentes plataformas (Linux, Windows, macOS).
+
+-   **Para executar o script de build (necessita de `bash` e possivelmente compiladores C específicos para cross-compilação, como MinGW para Windows):**
     ```bash
-    # Exemplo para .env
-    # cp .env.example .env
-    # Exemplo para config.json
-    # cp config.example.json config.json
+    chmod +x build.sh # Certifique-se de que o script é executável
+    ./build.sh
     ```
--   Edite o arquivo de configuração (`.env` ou `config.json`) com as suas configurações específicas (credenciais de banco de dados, chaves de API, etc.). **Nunca comite arquivos de configuração com dados sensíveis no repositório.**
+    Os binários serão gerados no diretório `dist/` (ex: `dist/vigenda-linux-amd64`, `dist/vigenda-windows-amd64.exe`).
 
-### 4.2. Configuração do Banco de Dados (Se Aplicável)
-
--   Certifique-se de que o servidor de banco de dados ([Nome do BD, ex: PostgreSQL, MySQL, MongoDB]) está instalado e em execução.
--   Crie o banco de dados para o projeto:
-    ```sql
-    -- Exemplo para PostgreSQL
-    -- CREATE DATABASE nome_do_banco;
-    -- CREATE USER nome_do_usuario WITH PASSWORD 'sua_senha';
-    -- GRANT ALL PRIVILEGES ON DATABASE nome_do_banco TO nome_do_usuario;
-    ```
--   Execute as migrações do banco de dados (se houver):
+-   **Para construir manualmente para sua plataforma atual (exemplo para Linux):**
+    Use o comando `go build`. O flag `-o` especifica o nome do arquivo de saída.
     ```bash
-    # Exemplo de comando de migração (ajuste conforme a ferramenta do projeto)
-    # go run cmd/migrate/main.go up
-    # ou
-    # ./scripts/run-migrations.sh
+    go build -o vigenda_cli ./cmd/vigenda/main.go
+    ```
+    Isso criará um executável chamado `vigenda_cli` no diretório raiz do projeto.
+
+    Para builds menores, removendo informações de debug e símbolos (similar ao `build.sh`):
+    ```bash
+    go build -ldflags="-s -w" -o vigenda_cli ./cmd/vigenda/main.go
     ```
 
-## 5. Verificando a Instalação
+### 5.3. Executando o Binário Compilado
 
-Após seguir todos os passos, você pode verificar se a instalação foi bem-sucedida:
+Após construir o binário (ex: `vigenda_cli` ou um dos binários em `dist/`):
+```bash
+./vigenda_cli [comando_da_cli_vigenda] [argumentos_do_comando]
+# Exemplo usando um binário de dist:
+# ./dist/vigenda-linux-amd64 tarefa listar
+```
+
+## 6. Verificando a Instalação
+
+Após seguir os passos de instalação de dependências e, opcionalmente, de build:
 
 1.  **Execute os Testes:**
-    Consulte o arquivo `TESTING.md` para instruções detalhadas sobre como executar os testes. Uma suíte de testes passando geralmente indica uma configuração correta.
+    Consulte o arquivo `TESTING.MD` para instruções detalhadas sobre como executar os testes. O comando principal é:
     ```bash
-    # Exemplo:
-    # go test ./...
+    go test ./...
     ```
+    Uma suíte de testes passando geralmente indica uma configuração correta do ambiente de desenvolvimento.
 
-2.  **Execute a Aplicação (Modo de Desenvolvimento):**
+2.  **Execute a Aplicação:**
+    Tente executar um comando básico da aplicação para verificar se ela inicia e responde:
     ```bash
-    # Exemplo:
-    # go run cmd/server/main.go
-    # ou
-    # npm run dev (para projetos Node.js)
+    go run ./cmd/vigenda/main.go --help
+    # ou, se você construiu o binário:
+    # ./vigenda_cli --help
     ```
-    Verifique se a aplicação inicia sem erros e se você consegue acessar funcionalidades básicas (por exemplo, abrir a página principal no navegador se for uma aplicação web).
+    Isso deve exibir a mensagem de ajuda da CLI, confirmando que a aplicação pode ser executada corretamente.
 
-## 6. Solução de Problemas Comuns
+## 7. Solução de Problemas Comuns
 
--   **Erro `command not found: go`:** Certifique-se de que o Go está instalado e que o diretório `bin` do Go está no `PATH` do seu sistema.
--   **Problemas de Permissão:** Ao executar comandos `npm install -g` ou `sudo apt install`, você pode precisar de privilégios de administrador/root.
--   **Dependências CGo Falhando:** Verifique se o GCC (ou um compilador C compatível) está instalado e configurado corretamente. Algumas bibliotecas Go podem precisar compilar código C.
--   **Erro de Conexão com o Banco de Dados:** Verifique se o servidor de banco de dados está em execução, se as credenciais no arquivo de configuração estão corretas e se não há firewalls bloqueando a conexão.
+-   **Erro `command not found: go`:** Certifique-se de que o Go está instalado e que o diretório `bin` do Go (ex: `/usr/local/go/bin` ou `~/go/bin`) está no `PATH` do seu sistema.
+-   **Problemas de Permissão:** Ao instalar ferramentas globais ou pacotes de sistema, você pode precisar de privilégios de `sudo`.
+-   **Dependências CGo Falhando (especialmente em cross-compilação):**
+    -   Verifique se o GCC (ou o compilador C correto para o alvo, como MinGW para Windows) está instalado e configurado corretamente.
+    -   Para cross-compilação, pode ser necessário definir a variável de ambiente `CC` para o compilador C do sistema alvo. O script `build.sh` tenta fazer isso para Windows.
+    -   Consulte a documentação do `mattn/go-sqlite3` para requisitos específicos de CGO e cross-compilação.
+-   **Erro de Conexão com o Banco de Dados:** Como o Vigenda usa SQLite, os erros geralmente estão relacionados a permissões de arquivo no diretório onde o arquivo `.db` é armazenado, ou um arquivo de banco de dados corrompido.
 
-Se você encontrar outros problemas, verifique as `Issues` do projeto no GitHub ou crie uma nova issue com detalhes do erro.
+Se você encontrar outros problemas, verifique as `Issues` do projeto no GitHub (se disponível) ou crie uma nova issue com detalhes do erro.
 
 ---
 
-Com estes passos, seu ambiente de desenvolvimento deve estar pronto para você começar a trabalhar no projeto!
+Com estes passos, seu ambiente de desenvolvimento deve estar pronto para você começar a trabalhar no projeto Vigenda!
