@@ -1,30 +1,32 @@
 package classes
 
 import (
-	"context" // Adicionado para mock do serviço
+	"context"
 	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textinput" // Para BlinkMsg
+	"github.com/charmbracelet/bubbles/table" // Para verificar as colunas da studentsTable
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"vigenda/internal/models"
-	"vigenda/internal/service" // Para o mock do serviço
+	"vigenda/internal/service"
 )
 
 // Mock ClassService
 type mockClassService struct {
-	ListAllClassesFunc  func(ctx context.Context) ([]models.Class, error)
-	CreateClassFunc     func(ctx context.Context, name string, subjectID int64) (models.Class, error)
-	GetClassByIDFunc    func(ctx context.Context, id int64) (models.Class, error)
-	// Adicione outros métodos conforme necessário para satisfazer a interface service.ClassService
+	ListAllClassesFunc        func(ctx context.Context) ([]models.Class, error)
+	CreateClassFunc           func(ctx context.Context, name string, subjectID int64) (models.Class, error)
+	GetClassByIDFunc          func(ctx context.Context, id int64) (models.Class, error)
+	GetStudentsByClassIDFunc  func(ctx context.Context, classID int64) ([]models.Student, error) // Novo
 	ImportStudentsFromCSVFunc func(ctx context.Context, classID int64, csvData []byte) (int, error)
-	UpdateStudentStatusFunc func(ctx context.Context, studentID int64, newStatus string) error
+	UpdateStudentStatusFunc   func(ctx context.Context, studentID int64, newStatus string) error
 }
 
+// ... implementações dos métodos do mock ...
 func (m *mockClassService) ListAllClasses(ctx context.Context) ([]models.Class, error) {
 	if m.ListAllClassesFunc != nil {
 		return m.ListAllClassesFunc(ctx)
@@ -45,6 +47,14 @@ func (m *mockClassService) GetClassByID(ctx context.Context, classID int64) (mod
 	}
 	return models.Class{ID: classID}, nil
 }
+
+func (m *mockClassService) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) { // Novo
+	if m.GetStudentsByClassIDFunc != nil {
+		return m.GetStudentsByClassIDFunc(ctx, classID)
+	}
+	return []models.Student{}, nil
+}
+
 
 func (m *mockClassService) ImportStudentsFromCSV(ctx context.Context, classID int64, csvData []byte) (int, error) {
 	if m.ImportStudentsFromCSVFunc != nil {
@@ -90,14 +100,9 @@ func TestClassesModel_InitCmd(t *testing.T) {
 	} else {
 		assert.True(t, ok, "Comando Init deve produzir fetchedClassesMsg ou errMsg, obteve %T", msg)
 	}
-	// Model.isLoading é definido no início de Init() e no comando, então verificamos o estado após a chamada de Init()
-	// e não após a execução do comando, pois isso já é testado em FetchedClassesMsg.
-	// A verificação aqui é se a chamada a Init() *configura* o carregamento.
-	// O model original é passado por valor para Init, então o model retornado por New() não é modificado por model.Init().
-	// Para testar o isLoading após Init, precisamos do model *antes* de executar o comando.
-	// A linha abaixo está correta: model.isLoading é true porque New() o define e Init() o reafirma.
+
 	newModelForInit := New(mockService)
-	_ = newModelForInit.Init() // Chamada para configurar isLoading
+	_ = newModelForInit.Init()
 	assert.True(t, newModelForInit.isLoading, "isLoading deve ser true após Init ser chamado")
 }
 
@@ -267,7 +272,7 @@ func TestClassesModel_Update_CreateClass_InvalidSubjectID(t *testing.T) {
 
 	cmdResultMsg := cmd()
 	errMsgFromCmd, ok := cmdResultMsg.(errMsg)
-	if !ok { // Pode ser classCreatedMsg com erro de conversão dentro do serviço, dependendo da implementação exata
+	if !ok {
 		createdMsgWithErr, ok2 := cmdResultMsg.(classCreatedMsg)
 		require.True(t, ok2, "Resultado do comando deve ser errMsg ou classCreatedMsg com erro")
 		require.NotNil(t, createdMsgWithErr.err, "classCreatedMsg deve conter um erro")
@@ -335,15 +340,13 @@ func TestClassesModel_FormNavigation(t *testing.T) {
 	assert.True(t, m.createForm.nameInput.Focused(), "nameInput deve estar focado")
 	assert.False(t, m.createForm.subjectIDInput.Focused(), "subjectIDInput não deve estar focado")
 
-	keyShiftTab := tea.KeyMsg{Type: tea.KeyTab, Shift: true} // Simula Shift+Tab
-    // Estando no input de nome (índice 0), Shift+Tab deve ir para o último (índice 1)
+	keyShiftTab := tea.KeyMsg{Type: tea.KeyTab, Shift: true}
 	updatedModel, _ = m.Update(keyShiftTab)
 	m, _ = updatedModel.(Model)
 	assert.Equal(t, 1, m.createForm.focusIndex, "Foco deve ir para subjectIDInput (índice 1) com Shift+Tab a partir do índice 0")
 	assert.True(t, m.createForm.subjectIDInput.Focused(), "subjectIDInput deve estar focado após Shift+Tab")
 	assert.False(t, m.createForm.nameInput.Focused(), "nameInput não deve estar focado após Shift+Tab")
 
-    // Estando no input de subjectID (índice 1), Shift+Tab deve ir para o primeiro (índice 0)
 	updatedModel, _ = m.Update(keyShiftTab)
 	m, _ = updatedModel.(Model)
 	assert.Equal(t, 0, m.createForm.focusIndex, "Foco deve voltar para nameInput (índice 0) com Shift+Tab a partir do índice 1")
@@ -351,10 +354,157 @@ func TestClassesModel_FormNavigation(t *testing.T) {
 	assert.False(t, m.createForm.subjectIDInput.Focused(), "subjectIDInput não deve estar focado após Shift+Tab")
 }
 
-// Helper para obter o tipo de mensagem de um comando
-func getMsgFromCmd(cmd tea.Cmd) tea.Msg {
-	if cmd == nil {
-		return nil
+func TestClassesModel_StudentsTable_Initialization(t *testing.T) {
+	mockService := &mockClassService{}
+	model := New(mockService)
+	require.NotNil(t, model.studentsTable, "studentsTable não deve ser nula")
+	expectedColumns := []string{studentColumnTitleID, studentColumnTitleEnrollment, studentColumnTitleFullName, studentColumnTitleStatus}
+	actualColumns := model.studentsTable.Columns()
+	require.Len(t, actualColumns, len(expectedColumns), "Número incorreto de colunas na studentsTable")
+	for i, expected := range expectedColumns {
+		assert.Equal(t, expected, actualColumns[i].Title, "Título da coluna %d incorreto", i)
 	}
-	return cmd()
+}
+
+
+func TestClassesModel_Update_ListView_EnterSelectsClassAndFetchesStudents(t *testing.T) {
+	initialClasses := []models.Class{
+		{ID: 1, Name: "Turma A", SubjectID: 101},
+		{ID: 2, Name: "Turma B", SubjectID: 102},
+	}
+	mockSvc := &mockClassService{
+		ListAllClassesFunc: func(ctx context.Context) ([]models.Class, error) {
+			return initialClasses, nil
+		},
+		GetStudentsByClassIDFunc: func(ctx context.Context, classID int64) ([]models.Student, error) {
+			assert.Equal(t, initialClasses[0].ID, classID, "ID da turma para buscar alunos incorreto")
+			return []models.Student{{ID: 10, FullName: "Aluno 1"}}, nil
+		},
+	}
+
+	model := New(mockSvc)
+	model, _ = model.Update(fetchedClassesMsg{classes: initialClasses, err: nil})
+	model.isLoading = false
+	model.table.SetCursor(0)
+
+	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
+	updatedModel, cmd := model.Update(keyEnter)
+	m, ok := updatedModel.(Model)
+	require.True(t, ok)
+
+	assert.Equal(t, DetailsView, m.state, "Estado deve mudar para DetailsView")
+	require.NotNil(t, m.selectedClass, "selectedClass não deve ser nil")
+	assert.Equal(t, initialClasses[0].ID, m.selectedClass.ID, "Turma selecionada incorreta")
+	assert.True(t, m.isLoading, "isLoading deve ser true para buscar alunos")
+	assert.Nil(t, m.err, "Erro deve ser nil ao iniciar busca de alunos")
+	assert.Nil(t, m.classStudents, "classStudents deve ser nil antes do fetch")
+
+	require.NotNil(t, cmd, "Comando fetchClassStudentsCmd deve ser retornado")
+	msg := cmd()
+	_, isFetchedStudentsMsg := msg.(fetchedClassStudentsMsg)
+	if !isFetchedStudentsMsg {
+		errMsg, isErrMsg := msg.(errMsg)
+		require.True(t, isErrMsg, "Comando deve produzir fetchedClassStudentsMsg ou errMsg, obteve %T", msg)
+		assert.Fail(t, "Esperado fetchedClassStudentsMsg, mas obteve errMsg: "+errMsg.Error())
+	}
+	assert.True(t, isFetchedStudentsMsg, "Comando deve produzir fetchedClassStudentsMsg ou errMsg")
+}
+
+func TestClassesModel_Update_FetchedClassStudentsMsg_Success(t *testing.T) {
+	mockSvc := &mockClassService{}
+	model := New(mockSvc)
+	model.state = DetailsView
+	model.isLoading = true
+	selectedClass := models.Class{ID: 1, Name: "Turma Teste"}
+	model.selectedClass = &selectedClass
+
+	testStudents := []models.Student{
+		{ID: 1, ClassID: 1, EnrollmentID: "001", FullName: "Alice", Status: "ativo"},
+		{ID: 2, ClassID: 1, EnrollmentID: "002", FullName: "Bob", Status: "inativo"},
+	}
+	msg := fetchedClassStudentsMsg{students: testStudents, err: nil}
+	updatedModel, _ := model.Update(msg)
+	m, _ := updatedModel.(Model)
+
+	assert.False(t, m.isLoading, "isLoading deve ser false após fetchedClassStudentsMsg")
+	assert.Nil(t, m.err, "Erro deve ser nil em caso de sucesso")
+	assert.Equal(t, testStudents, m.classStudents, "classStudents deve ser atualizado")
+	require.Len(t, m.studentsTable.Rows(), 2, "studentsTable deve ter duas linhas")
+	assert.Equal(t, "Alice", m.studentsTable.Rows()[0][2], "Nome do aluno na tabela incorreto")
+	assert.Equal(t, "Bob", m.studentsTable.Rows()[1][2], "Nome do aluno na tabela incorreto")
+}
+
+func TestClassesModel_Update_FetchedClassStudentsMsg_Error(t *testing.T) {
+	mockSvc := &mockClassService{}
+	model := New(mockSvc)
+	model.state = DetailsView
+	model.isLoading = true
+	selectedClass := models.Class{ID: 1, Name: "Turma Teste"}
+	model.selectedClass = &selectedClass
+
+	fetchErr := errors.New("falha ao buscar alunos")
+	msg := fetchedClassStudentsMsg{students: nil, err: fetchErr}
+	updatedModel, _ := model.Update(msg)
+	m, _ := updatedModel.(Model)
+
+	assert.False(t, m.isLoading, "isLoading deve ser false após erro")
+	assert.Equal(t, fetchErr, m.err, "Erro deve ser definido no modelo")
+	assert.Nil(t, m.classStudents, "classStudents deve ser nil em caso de erro")
+	assert.Len(t, m.studentsTable.Rows(), 0, "studentsTable deve estar vazia")
+}
+
+func TestClassesModel_Update_FetchClassStudentsCmd_ReturnsErrMsg(t *testing.T) {
+	mockSvc := &mockClassService{
+		GetStudentsByClassIDFunc: func(ctx context.Context, classID int64) ([]models.Student, error) {
+			return nil, errors.New("erro direto do serviço de alunos")
+		},
+	}
+	model := New(mockSvc)
+	model.state = DetailsView
+	model.isLoading = true
+	selectedClass := models.Class{ID: 1, Name: "Turma Teste"}
+	model.selectedClass = &selectedClass
+
+	cmd := model.fetchClassStudentsCmd(selectedClass.ID)
+	msg := cmd()
+
+	updatedModel, _ := model.Update(msg)
+	m, _ := updatedModel.(Model)
+
+	assert.False(t, m.isLoading, "isLoading deve ser false após errMsg")
+	require.NotNil(t, m.err, "Erro deve ser definido no modelo")
+	assert.Contains(t, m.err.Error(), "erro direto do serviço de alunos", "Mensagem de erro incorreta")
+	assert.Nil(t, m.classStudents, "classStudents deve ser nil")
+	assert.Len(t, m.studentsTable.Rows(), 0, "studentsTable deve estar vazia")
+}
+
+
+func TestClassesModel_Update_DetailsView_EscReturnsToListView(t *testing.T) {
+	mockSvc := &mockClassService{}
+	model := New(mockSvc)
+	model.state = DetailsView
+	selectedClass := models.Class{ID: 1, Name: "Turma Selecionada"}
+	model.selectedClass = &selectedClass
+	model.classStudents = []models.Student{{ID: 1, FullName: "Aluno Teste"}}
+	model.studentsTable.SetRows([]table.Row{{"1", "001", "Aluno Teste", "ativo"}})
+	model.err = errors.New("erro anterior")
+
+	keyEsc := tea.KeyMsg{Type: tea.KeyEscape}
+	updatedModel, _ := model.Update(keyEsc)
+	m, _ := updatedModel.(Model)
+
+	assert.Equal(t, ListView, m.state, "Estado deve mudar para ListView")
+	assert.Nil(t, m.selectedClass, "selectedClass deve ser nil após voltar")
+	assert.Nil(t, m.classStudents, "classStudents deve ser nil após voltar")
+	assert.Len(t, m.studentsTable.Rows(), 0, "Linhas da studentsTable devem ser limpas")
+	assert.Nil(t, m.err, "Erro deve ser limpo após voltar")
+	assert.True(t, m.table.Focused(), "Tabela de turmas deve estar focada")
+}
+
+func TestClassesModel_IsFocused_ForDetailsView(t *testing.T) {
+	mockService := &mockClassService{}
+	model := New(mockService)
+
+	model.state = DetailsView
+	assert.False(t, model.IsFocused(), "Não deve estar focado (para fins de 'esc' global) na DetailsView, a menos que um input interno esteja ativo")
 }

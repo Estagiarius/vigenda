@@ -117,3 +117,42 @@ func (r *classRepository) ListAllClasses(ctx context.Context) ([]models.Class, e
 
 	return classes, nil
 }
+
+func (r *classRepository) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {
+	query := `SELECT id, class_id, enrollment_id, full_name, status
+              FROM students
+              WHERE class_id = ?
+              ORDER BY full_name ASC` // Ordenar por nome completo
+	rows, err := r.db.QueryContext(ctx, query, classID)
+	if err != nil {
+		return nil, fmt.Errorf("classRepository.GetStudentsByClassID: query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var students []models.Student
+	for rows.Next() {
+		var student models.Student
+		var enrollmentID sql.NullString // enrollment_id pode ser NULL
+		if err := rows.Scan(
+			&student.ID,
+			&student.ClassID,
+			&enrollmentID, // Scan para sql.NullString
+			&student.FullName,
+			&student.Status,
+		); err != nil {
+			return nil, fmt.Errorf("classRepository.GetStudentsByClassID: scan failed: %w", err)
+		}
+		if enrollmentID.Valid {
+			student.EnrollmentID = enrollmentID.String
+		} else {
+			student.EnrollmentID = "" // Ou algum outro valor padrão se preferir
+		}
+		students = append(students, student)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("classRepository.GetStudentsByClassID: rows error: %w", err)
+	}
+
+	return students, nil
+}

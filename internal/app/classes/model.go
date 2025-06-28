@@ -20,36 +20,46 @@ type ViewState int
 const (
 	ListView ViewState = iota
 	CreatingView
-	// DetailsView // Para o futuro
+	DetailsView
 )
 
 var (
 	columnTitleID        = "ID"
 	columnTitleName      = "Nome da Turma"
 	columnTitleSubjectID = "ID Disciplina"
+
+	// Colunas para a tabela de alunos
+	studentColumnTitleID         = "ID Aluno"
+	studentColumnTitleEnrollment = "Nº Chamada"
+	studentColumnTitleFullName   = "Nome Completo"
+	studentColumnTitleStatus     = "Status"
 )
 
 // Model representa o modelo para a gestão de turmas.
 type Model struct {
-	classService service.ClassService
-	state        ViewState
-	table        table.Model
-	createForm   struct {
+	classService  service.ClassService
+	state         ViewState
+	table         table.Model // Tabela de turmas
+	studentsTable table.Model // Tabela de alunos para DetailsView
+	createForm    struct {
 		nameInput      textinput.Model
 		subjectIDInput textinput.Model
 		focusIndex     int
 	}
-	allClasses []models.Class // Para armazenar as turmas carregadas
-	isLoading    bool
-	width        int
-	height       int
-	err          error
+	allClasses    []models.Class // Para armazenar as turmas carregadas
+	selectedClass *models.Class  // Turma selecionada para DetailsView
+	classStudents []models.Student // Alunos da turma selecionada
+
+	isLoading bool
+	width     int
+	height    int
+	err       error
 }
 
 // New cria um novo modelo para a gestão de turmas.
 func New(cs service.ClassService) Model {
 	// Tabela para listar turmas
-	t := table.New(
+	classTable := table.New(
 		table.WithColumns([]table.Column{
 			{Title: columnTitleID, Width: 5},
 			{Title: columnTitleName, Width: 30},
@@ -70,7 +80,21 @@ func New(cs service.ClassService) Model {
 		Foreground(lipgloss.Color("229")).
 		Background(lipgloss.Color("57")).
 		Bold(false)
-	t.SetStyles(s)
+	classTable.SetStyles(s)
+
+	// Tabela para listar alunos (em DetailsView)
+	studentsTable := table.New(
+		table.WithColumns([]table.Column{
+			{Title: studentColumnTitleID, Width: 8},
+			{Title: studentColumnTitleEnrollment, Width: 10},
+			{Title: studentColumnTitleFullName, Width: 30},
+			{Title: studentColumnTitleStatus, Width: 10},
+		}),
+		table.WithRows([]table.Row{}),
+		table.WithFocused(false), // Foco inicial na tabela de turmas ou no form
+		table.WithHeight(10),
+	)
+	studentsTable.SetStyles(s) // Reutiliza o mesmo estilo básico
 
 	// Formulário de criação
 	nameInput := textinput.New()
@@ -85,9 +109,10 @@ func New(cs service.ClassService) Model {
 	subjectIDInput.Width = 20
 
 	return Model{
-		classService: cs,
-		state:        ListView, // Estado inicial é a lista
-		table:        t,
+		classService:  cs,
+		state:         ListView, // Estado inicial é a lista
+		table:         classTable,
+		studentsTable: studentsTable,
 		createForm: struct {
 			nameInput      textinput.Model
 			subjectIDInput textinput.Model
@@ -103,9 +128,10 @@ func New(cs service.ClassService) Model {
 
 // Init carrega os dados iniciais para a gestão de turmas.
 func (m Model) Init() tea.Cmd {
-	m.isLoading = true // Garante que isLoading seja true ao iniciar
+	// m.isLoading = true // isLoading já é true por padrão em New e reafirmado aqui
 	return m.fetchClassesCmd
 }
+
 
 // Update lida com mensagens e atualiza o modelo.
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
@@ -114,14 +140,40 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.SetSize(msg.Width, msg.Height) // Chama SetSize para recalcular layout
+		m.SetSize(msg.Width, msg.Height)
 
 	case tea.KeyMsg:
+		// Se estivermos em DetailsView e studentsTable estiver focada, ela deve lidar com as teclas primeiro.
+		// (Isso será relevante quando adicionarmos foco à studentsTable)
+		// if m.state == DetailsView && m.studentsTable.Focused() {
+		// 	var studentsTableCmd tea.Cmd
+		// 	m.studentsTable, studentsTableCmd = m.studentsTable.Update(msg)
+		// 	cmds = append(cmds, studentsTableCmd)
+		// 	return m, tea.Batch(cmds...)
+		// }
+
+
 		switch m.state {
 		case ListView:
 			switch {
-			// case key.Matches(msg, key.NewBinding(key.WithKeys("q"), key.WithHelp("q", "voltar"))):
-			// 'q' ou 'esc' para voltar ao menu é tratado em app.go
+			case key.Matches(msg, key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "detalhes"))):
+				if len(m.allClasses) > 0 && m.table.Cursor() < len(m.allClasses) {
+					selected := m.allClasses[m.table.Cursor()]
+					m.selectedClass = &selected // Armazena um ponteiro para a turma selecionada
+					m.state = DetailsView
+					m.isLoading = true // Mostrar carregamento para os alunos
+					m.err = nil        // Limpar erros anteriores
+					// Limpar alunos e tabela de alunos anteriores
+					m.classStudents = nil
+					m.studentsTable.SetRows([]table.Row{})
+					// Disparar comando para buscar alunos da turma selecionada
+					if m.selectedClass != nil { // Garantir que selectedClass não é nil
+						cmds = append(cmds, m.fetchClassStudentsCmd(m.selectedClass.ID))
+					} else {
+						// Isso não deveria acontecer se a lógica de seleção estiver correta
+						cmds = append(cmds, func() tea.Msg { return errMsg{fmt.Errorf("turma selecionada é nil antes de buscar alunos")} })
+					}
+				}
 			case key.Matches(msg, key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "nova turma"))):
 				m.state = CreatingView
 				m.createForm.focusIndex = 0
@@ -129,23 +181,25 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.createForm.subjectIDInput.Blur()
 				m.createForm.nameInput.SetValue("")
 				m.createForm.subjectIDInput.SetValue("")
-				m.err = nil // Limpa erros anteriores
+				m.err = nil
+				m.selectedClass = nil // Limpa qualquer seleção anterior
 				return m, textinput.Blink
 			default:
 				m.table, cmd = m.table.Update(msg)
 				cmds = append(cmds, cmd)
 			}
+		// ... outros cases para CreatingView, DetailsView (para 'esc')...
 		case CreatingView:
+			// ... (lógica existente) ...
 			switch {
 			case key.Matches(msg, key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancelar"))):
 				m.state = ListView
 				m.err = nil
 				m.createForm.nameInput.Blur()
 				m.createForm.subjectIDInput.Blur()
-				return m, nil // Não precisa de comando, apenas muda o estado
+				m.table.Focus() // Devolve o foco para a tabela de turmas
+				return m, nil
 			case key.Matches(msg, key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "salvar"))):
-				// Salvar apenas se o foco estiver no último campo ou se houver apenas um campo
-				// (Neste caso, com dois campos, quando o foco está no segundo)
 				if m.createForm.focusIndex == 1 {
 					name := strings.TrimSpace(m.createForm.nameInput.Value())
 					subjectIDStr := strings.TrimSpace(m.createForm.subjectIDInput.Value())
@@ -157,7 +211,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.isLoading = true
 					cmds = append(cmds, m.createClassCmd(name, subjectIDStr))
 				} else {
-					m.nextFormInput() // Avança para o próximo campo
+					m.nextFormInput()
 				}
 			case key.Matches(msg, key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "próximo"))),
 				key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "anterior"))):
@@ -167,7 +221,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.nextFormInput()
 				}
 			}
-			// Atualiza o campo focado
 			var focusedInputCmd tea.Cmd
 			if m.createForm.focusIndex == 0 {
 				m.createForm.nameInput, focusedInputCmd = m.createForm.nameInput.Update(msg)
@@ -175,8 +228,26 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.createForm.subjectIDInput, focusedInputCmd = m.createForm.subjectIDInput.Update(msg)
 			}
 			cmds = append(cmds, focusedInputCmd)
+
+		case DetailsView: // Adicionar este case
+			switch {
+			case key.Matches(msg, key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "voltar"))):
+				m.state = ListView
+				m.selectedClass = nil
+				m.classStudents = nil
+				m.studentsTable.SetRows([]table.Row{})
+				m.err = nil
+				m.table.Focus() // Devolve o foco para a tabela de turmas
+				// Não precisa buscar turmas novamente, a lista já está lá
+			// Adicionar navegação na tabela de alunos aqui se necessário
+			// default:
+			// 	m.studentsTable, cmd = m.studentsTable.Update(msg)
+			// 	cmds = append(cmds, cmd)
+			}
 		}
 
+
+	// ... cases para fetchedClassesMsg, classCreatedMsg, errMsg ...
 	case fetchedClassesMsg:
 		m.isLoading = false
 		if msg.err != nil {
@@ -201,18 +272,48 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.isLoading = false
 		if msg.err != nil {
 			m.err = fmt.Errorf("erro ao criar turma: %w", msg.err)
-			// Mantém o estado CreatingView para o usuário corrigir
 		} else {
 			m.state = ListView
 			m.err = nil
-			m.isLoading = true // Ativa isLoading para o fetchClassesCmd
+			m.isLoading = true
+			m.table.Focus()
 			cmds = append(cmds, m.fetchClassesCmd)
 		}
 
 	case errMsg:
 		m.err = msg.err
 		m.isLoading = false
-	}
+
+	// Novo case para processar os alunos buscados
+	case fetchedClassStudentsMsg:
+		m.isLoading = false // Finaliza o estado de carregamento (de alunos)
+		if msg.err != nil {
+			m.err = msg.err // Exibe o erro se a busca de alunos falhar
+			m.classStudents = nil
+			m.studentsTable.SetRows([]table.Row{})
+		} else {
+			m.err = nil // Limpa erros anteriores se a busca for bem-sucedida
+			m.classStudents = msg.students
+			var rows []table.Row
+			if len(m.classStudents) == 0 {
+				// Adiciona uma linha indicando que não há alunos, se desejar
+				// Ou simplesmente deixa a tabela vazia.
+				// rows = append(rows, table.Row{"---", "Nenhum aluno encontrado", "---", "---"})
+			} else {
+				for _, student := range m.classStudents {
+					rows = append(rows, table.Row{
+						fmt.Sprintf("%d", student.ID),
+						student.EnrollmentID, // Já é string ou pode ser ""
+						student.FullName,
+						student.Status,
+					})
+				}
+			}
+			m.studentsTable.SetRows(rows)
+			// Opcionalmente, focar a tabela de alunos aqui se for a próxima interação principal
+			// m.studentsTable.Focus()
+		}
+	} // Fim do switch msg.(type)
 
 	return m, tea.Batch(cmds...)
 }
@@ -276,7 +377,36 @@ func (m Model) View() string {
 
 		helpStyle := lipgloss.NewStyle().Faint(true)
 		b.WriteString(helpStyle.Render("Pressione Tab para navegar, Enter para salvar (no último campo), Esc para cancelar."))
-	}
+
+	case DetailsView: // Novo case
+		if m.selectedClass == nil {
+			// Isso não deveria acontecer se a lógica de estado estiver correta
+			b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("Erro: Nenhuma turma selecionada."))
+		} else {
+			titleStyle := lipgloss.NewStyle().Bold(true).PaddingBottom(1)
+			detailHeaderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Cinza claro
+
+			b.WriteString(titleStyle.Render(fmt.Sprintf("Detalhes da Turma: %s", m.selectedClass.Name)))
+			b.WriteString(fmt.Sprintf("%s %d\n", detailHeaderStyle.Render("ID da Turma:"), m.selectedClass.ID))
+			b.WriteString(fmt.Sprintf("%s %d\n\n", detailHeaderStyle.Render("ID da Disciplina:"), m.selectedClass.SubjectID))
+
+			b.WriteString(lipgloss.NewStyle().Bold(true).Render("Alunos:"))
+			if m.isLoading { // Se estiver carregando alunos especificamente para esta view
+				b.WriteString("\nCarregando alunos...")
+			} else if len(m.classStudents) == 0 && m.err == nil { // m.err == nil para não sobrescrever erro de busca
+				b.WriteString("\nNenhum aluno encontrado para esta turma.")
+			} else if m.err != nil && len(m.classStudents) == 0 {
+				// O erro já foi impresso no topo, aqui apenas indicamos que não há alunos devido ao erro.
+				// Não precisa imprimir nada extra aqui, o erro geral já cobre.
+			} else {
+				// Se não estiver carregando e houver alunos (e nenhum erro de busca de alunos), mostra a tabela
+				b.WriteString("\n" + m.studentsTable.View())
+			}
+		}
+		helpStyle := lipgloss.NewStyle().Faint(true).MarginTop(1)
+		b.WriteString("\n\n" + helpStyle.Render("Pressione 'Esc' para voltar à lista de turmas."))
+
+	} // Fim do switch m.state
 	return b.String()
 }
 
@@ -285,40 +415,49 @@ func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
 
-	// Ajustes gerais de layout baseados no estado
-	titleHeight := 1 // Para o título principal da view (ex: "Lista de Turmas")
+	// Alturas comuns
+	titleHeight := 1
 	errorHeight := 0
 	if m.err != nil {
 		errorHeight = strings.Count(fmt.Sprintf("Erro: %v", m.err), "\n") + 1 + 1 // +1 for padding
 	}
-	helpHeight := 1 // Para a linha de ajuda
+	helpHeight := 1
 
-	remainingHeight := height - titleHeight - errorHeight - helpHeight
+	// Altura disponível para o conteúdo principal da view
+	contentHeight := height - titleHeight - errorHeight - helpHeight
+	if contentHeight < 0 { contentHeight = 0 }
 
-	if m.state == ListView {
-		// Para a tabela, precisamos subtrair a altura do cabeçalho da tabela
-		// A altura da tabela é o corpo + cabeçalho. table.Height() é só o corpo.
-		// table.View() renderiza tudo.
-		// Vamos dar um espaço fixo para o cabeçalho e bordas, e o resto para as linhas.
-		tableHeaderAndBorderHeight := 3 // Estimativa
-		tableBodyHeight := remainingHeight - tableHeaderAndBorderHeight
-		if tableBodyHeight < 1 {
-			tableBodyHeight = 1
-		}
+
+	switch m.state {
+	case ListView:
+		tableHeaderAndBorderHeight := 3
+		tableBodyHeight := contentHeight - tableHeaderAndBorderHeight
+		if tableBodyHeight < 1 { tableBodyHeight = 1 }
 		m.table.SetHeight(tableBodyHeight)
-		m.table.SetWidth(width - 4) // Margens laterais
-	}
+		m.table.SetWidth(width - 4)
 
-	if m.state == CreatingView {
-		// Para o formulário, distribuir espaço para inputs
-		// Altura dos inputs é geralmente 1 linha (ou 3 com bordas)
-		// Largura dos inputs
-		inputWidth := width - 4 // Margens
-		if inputWidth < 20 {
-			inputWidth = 20
-		}
+	case CreatingView:
+		inputWidth := width - 4
+		if inputWidth < 20 { inputWidth = 20 }
 		m.createForm.nameInput.Width = inputWidth
 		m.createForm.subjectIDInput.Width = inputWidth
+
+	case DetailsView:
+		// Altura para os detalhes da turma (ID, Nome, ID Disciplina) - estimativa
+		classDetailsRenderedHeight := 4 // Título da view + ID Turma + ID Disciplina + linha em branco
+
+		// Altura para o cabeçalho "Alunos:"
+		studentsSectionHeaderHeight := 1
+
+		// Altura disponível para a tabela de alunos
+		studentsTableAvailableHeight := contentHeight - classDetailsRenderedHeight - studentsSectionHeaderHeight
+
+		studentsTableHeaderAndBorderHeight := 3 // Estimativa para cabeçalho e bordas da studentsTable
+		studentsTableBodyHeight := studentsTableAvailableHeight - studentsTableHeaderAndBorderHeight
+		if studentsTableBodyHeight < 1 { studentsTableBodyHeight = 1}
+
+		m.studentsTable.SetHeight(studentsTableBodyHeight)
+		m.studentsTable.SetWidth(width - 4) // Margens laterais
 	}
 }
 
@@ -343,6 +482,28 @@ type errMsg struct{ err error }
 
 // Error torna errMsg em um tipo de erro válido.
 func (e errMsg) Error() string { return e.err.Error() }
+
+type fetchedClassStudentsMsg struct {
+	students []models.Student
+	err      error
+}
+
+func (m Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
+	return func() tea.Msg {
+		if m.classService == nil { // Checagem defensiva
+			return errMsg{fmt.Errorf("classService não inicializado")}
+		}
+		// selectedClass é verificado antes de chamar este comando, mas uma checagem de classID aqui é boa.
+		if classID == 0 {
+			return errMsg{fmt.Errorf("ID da turma inválido (0) para buscar alunos")}
+		}
+		students, err := m.classService.GetStudentsByClassID(context.Background(), classID)
+		if err != nil {
+			return errMsg{fmt.Errorf("falha ao buscar alunos para a turma ID %d: %w", classID, err)}
+		}
+		return fetchedClassStudentsMsg{students: students, err: nil}
+	}
+}
 
 func (m Model) fetchClassesCmd() tea.Msg {
 	// context.Background() é geralmente ok para operações TUI que não são canceláveis pelo usuário

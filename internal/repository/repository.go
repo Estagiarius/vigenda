@@ -63,13 +63,13 @@ type ClassRepository interface {
 	AddStudent(ctx context.Context, student *models.Student) (int64, error)
 	UpdateStudentStatus(ctx context.Context, studentID int64, status string) error
 	ListAllClasses(ctx context.Context) ([]models.Class, error) // Método adicionado
-	// GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) // Moved to AssessmentRepository as it's mostly used for grading
+	GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error)
 }
 
 type AssessmentRepository interface {
 	CreateAssessment(ctx context.Context, assessment *models.Assessment) (int64, error)
 	GetAssessmentByID(ctx context.Context, assessmentID int64) (*models.Assessment, error)
-	GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) // Used for listing students when entering grades
+	// GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) // Moved to ClassRepository
 	EnterGrade(ctx context.Context, grade *models.Grade) error
 	GetGradesByClassID(ctx context.Context, classID int64) ([]models.Grade, []models.Assessment, []models.Student, error) // For calculating class average
 	ListAllAssessments(ctx context.Context) ([]models.Assessment, error) // Novo método adicionado

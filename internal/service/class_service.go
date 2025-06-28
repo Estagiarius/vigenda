@@ -172,3 +172,21 @@ func (s *classServiceImpl) ListAllClasses(ctx context.Context) ([]models.Class, 
 	}
 	return classes, nil
 }
+
+func (s *classServiceImpl) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {
+	if classID == 0 {
+		return nil, fmt.Errorf("class ID cannot be zero when fetching students")
+	}
+	// TODO: Adicionar validação para verificar se a turma (classID) realmente existe, se necessário.
+	//       Isso pode envolver uma chamada a s.classRepo.GetClassByID(ctx, classID) primeiro.
+	//       Por enquanto, vamos assumir que o ID da turma é válido se não for zero.
+
+	students, err := s.classRepo.GetStudentsByClassID(ctx, classID)
+	if err != nil {
+		// Não é necessário verificar sql.ErrNoRows aqui, pois o repositório já o trata
+		// e retorna uma lista vazia se nenhum aluno for encontrado, o que é um resultado válido.
+		return nil, fmt.Errorf("service.GetStudentsByClassID: failed to get students: %w", err)
+	}
+	// Se a lista estiver vazia, isso é um resultado válido (turma sem alunos).
+	return students, nil
+}
