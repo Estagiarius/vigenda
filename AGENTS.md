@@ -289,6 +289,15 @@ export VIGENDA_DB_PATH="/caminho/para/sua/vigenda.db"
 
 Este projeto é atualmente mantido para um propósito específico. No entanto, sugestões e discussões sobre melhorias são bem-vindas (se um canal de comunicação for estabelecido, como issues em um repositório Git).
 
+## Documentação do Usuário
+
+Para um guia completo sobre como usar o Vigenda, incluindo detalhes sobre todos os comandos, configuração e exemplos práticos, consulte nossa documentação do usuário:
+
+*   **[Manual do Usuário](./docs/user_manual/README.md)**: Um guia detalhado sobre todas as funcionalidades.
+*   **[Guia de Introdução](./docs/getting_started/README.md)**: Para uma instalação rápida e os primeiros passos.
+*   **[FAQ (Perguntas Frequentes)](./docs/faq/README.md)**: Respostas para as dúvidas mais comuns.
+*   **[Tutoriais](./docs/tutorials/README.md)**: Exemplos práticos passo a passo.
+
 ## Licença
 
 Este projeto não possui uma licença de código aberto definida no momento. Todos os direitos são reservados.
