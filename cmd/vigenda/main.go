@@ -353,10 +353,13 @@ func init() {
 	rootCmd.AddCommand(taskCmd)
 
 	// Class Service Commands
-	classCreateCmd.Flags().String("subjectid", "", "ID da disciplina à qual a turma pertence (obrigatório).")
-	_ = classCreateCmd.MarkFlagRequired("subjectid")
+	// classCreateCmd foi removido pois a criação de turmas agora é feita via TUI.
+	// Mantemos os comandos de importar alunos e atualizar status.
+	// Se classCreateCmd tivesse flags específicas que ainda são relevantes para outros comandos de turma,
+	// essas flags precisariam ser gerenciadas ou removidas cuidadosamente.
+	// Neste caso, subjectid era específico para classCreateCmd.
 
-	classCmd.AddCommand(classCreateCmd, classImportStudentsCmd, classUpdateStudentStatusCmd)
+	classCmd.AddCommand(classImportStudentsCmd, classUpdateStudentStatusCmd)
 	rootCmd.AddCommand(classCmd)
 
 	// Assessment Service Commands
@@ -387,50 +390,16 @@ func init() {
 
 var classCmd = &cobra.Command{
 	Use:   "turma",
-	Short: "Gerencia turmas e alunos (criar, importar-alunos, atualizar-status)",
-	Long: `O comando 'turma' é usado para administrar turmas, incluindo a criação de novas turmas,
-a importação de listas de alunos de ficheiros CSV e a atualização do status de alunos individuais
-(ex: ativo, inativo, transferido).`,
-	Example: `  vigenda turma criar "História 9A" --subjectid 1
-  vigenda turma importar-alunos 1 alunos_9a.csv
+	Short: "Gerencia turmas e alunos (importar-alunos, atualizar-status)",
+	Long: `O comando 'turma' é usado para administrar turmas,
+incluindo a importação de listas de alunos de ficheiros CSV
+e a atualização do status de alunos individuais (ex: ativo, inativo, transferido).
+A criação de turmas é feita através da interface interativa principal (executando 'vigenda' sem subcomandos).`,
+	Example: `  vigenda turma importar-alunos 1 alunos_9a.csv
   vigenda turma atualizar-status 15 transferido`,
 }
 
-var classCreateCmd = &cobra.Command{
-	Use:   "criar [nome_da_turma]",
-	Short: "Cria uma nova turma",
-	Long: `Cria uma nova turma no sistema. É necessário fornecer o nome da turma e o ID da disciplina
-à qual ela pertence através da flag --subjectid.`,
-	Example: `  vigenda turma criar "Matemática - Turma 101" --subjectid 2
-  vigenda turma criar "Geografia 8B" --subjectid 3`,
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		name := args[0]
-		subjectIDStr, _ := cmd.Flags().GetString("subjectid")
-		if subjectIDStr == "" {
-			// Example of interactive input if a required flag is missing
-			var err error
-			subjectIDStr, err = tui.GetInput("Enter Subject ID for the class:", os.Stdout, os.Stdin)
-			if err != nil || subjectIDStr == "" {
-				fmt.Println("Subject ID is required to create a class.")
-				return
-			}
-		}
-
-		subjectID, err := strconv.ParseInt(subjectIDStr, 10, 64)
-		if err != nil {
-			fmt.Println("Error parsing Subject ID:", err)
-			return
-		}
-
-		class, err := classService.CreateClass(context.Background(), name, subjectID)
-		if err != nil {
-			fmt.Println("Error creating class:", err)
-			return
-		}
-		fmt.Printf("Class '%s' (ID: %d) created successfully for Subject ID %d.\n", class.Name, class.ID, subjectID)
-	},
-}
+// var classCreateCmd = &cobra.Command{...} // Removido
 
 var classImportStudentsCmd = &cobra.Command{
 	Use:   "importar-alunos [ID_da_turma] [caminho_do_ficheiro_csv]",
