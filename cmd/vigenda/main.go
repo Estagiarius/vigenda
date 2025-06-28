@@ -14,6 +14,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/table" // Reativado para columns e rows
 	"github.com/spf13/cobra"
+	"vigenda/internal/app" // Import for the new BubbleTea app
 	"vigenda/internal/database"
 	"vigenda/internal/models" // Added import for models package
 	"vigenda/internal/repository"
@@ -45,24 +46,10 @@ Funcionalidades Principais:
 
 Use "vigenda [comando] --help" para mais informações sobre um comando específico.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// This is the main dashboard view
-		// For now, printing a simplified version.
-		// TODO: Implement actual data fetching and formatting as per golden file.
-		fmt.Println("=================================================")
-		fmt.Println("==                 DASHBOARD                   ==")
-		fmt.Println("=================================================")
-		fmt.Println("")
-		fmt.Println("🕒 AGENDA DE HOJE (22/06/2025)")
-		fmt.Println("   [09:00 - 10:00] Aula de História - Turma 9A")
-		fmt.Println("   [14:00 - 15:00] Reunião Pedagógica")
-		fmt.Println("")
-		fmt.Println("🔥 TAREFAS PRIORITÁRIAS")
-		fmt.Println("   [1] Corrigir provas (Turma 9A) (Prazo: Amanhã)")
-		fmt.Println("   [2] Preparar aula sobre Era Vargas (Turma 9B) (Prazo: 24/06)")
-		fmt.Println("")
-		fmt.Println("🔔 NOTIFICAÇÕES")
-		fmt.Println("   - 5 entregas pendentes para o trabalho \"Pesquisa sobre Clima\" (Turma 9A).")
-		fmt.Println("") // Ensure a trailing newline if the golden file has one after trimming
+		// Launch the BubbleTea application
+		// Ensure services are initialized if BubbleTea app needs them immediately.
+		// The PersistentPreRunE should handle DB and service initialization.
+		app.StartApp()
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// This function will run before any command, ensuring DB is initialized.
