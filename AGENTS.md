@@ -179,5 +179,207 @@ Olá, Agente! Este documento fornece diretrizes e informações para ajudá-lo a
 4.  **Consulte a Documentação da Linguagem/Framework:** Verifique a documentação oficial do Go (golang.org), Cobra, Bubbletea, etc.
 5.  **Peça Ajuda (se aplicável e configurado):** Use a ferramenta `request_user_input` descrevendo o problema, o que você já tentou (referenciando os documentos consultados) e onde está preso.
 
----
+
+6.  **Criar uma avaliação para a Turma ID 1:**
+    ```bash
+    ./vigenda avaliacao criar "Prova Mensal - Unidade 1" --classid 1 --term 1 --weight 3.0
+    ```
+
+7.  **Lançar notas para a Avaliação ID 1 (será interativo):**
+    ```bash
+    ./vigenda avaliacao lancar-notas 1
+    ```
+
+8.  **Adicionar questões de um arquivo `historia_questoes.json` ao banco:**
+    (Consulte "Formatos de Ficheiros de Importação" abaixo para a estrutura do JSON)
+    ```bash
+    ./vigenda bancoq add historia_questoes.json
+    ```
+
+9.  **Gerar uma prova para a Disciplina ID 1 com 5 questões fáceis e 3 médias:**
+    ```bash
+    ./vigenda prova gerar --subjectid 1 --easy 5 --medium 3
+    ```
+
+Para obter ajuda sobre qualquer comando específico e suas opções, use a flag `--help`:
+```bash
+./vigenda tarefa add --help
+./vigenda turma importar-alunos --help
+```
+
+## Formatos de Ficheiros de Importação
+
+### 1. Importação de Alunos (CSV)
+
+O comando `vigenda turma importar-alunos` espera um ficheiro CSV com as seguintes colunas:
+
+*   `numero_chamada` (opcional): Número de chamada do aluno.
+*   `nome_completo`: Nome completo do aluno (obrigatório).
+*   `situacao` (opcional): Status do aluno. Valores permitidos: `ativo`, `inativo`, `transferido`. Se omitido, o padrão é `ativo`.
+
+**Exemplo (`alunos.csv`):**
+```csv
+numero_chamada,nome_completo,situacao
+1,"Ana Beatriz Costa","ativo"
+2,"Bruno Dias","ativo"
+,"Carlos Eduardo Lima", # numero_chamada omitido, situacao será 'ativo' por padrão
+4,"Daniel Mendes","transferido"
+```
+
+### 2. Importação de Questões (JSON)
+
+O comando `vigenda bancoq add` espera um ficheiro JSON contendo uma lista (array) de objetos, onde cada objeto representa uma questão.
+
+**Estrutura de cada objeto de questão:**
+
+*   `disciplina` (string, obrigatório): Nome da disciplina à qual a questão pertence (Ex: "História"). *Nota: O sistema tentará encontrar um ID de disciplina correspondente. Idealmente, o sistema deveria permitir referenciar por ID de disciplina diretamente ou ter um mecanismo para criar/mapear disciplinas.*
+*   `topico` (string, opcional): Tópico específico da questão dentro da disciplina (Ex: "Revolução Francesa").
+*   `tipo` (string, obrigatório): Tipo da questão. Valores permitidos: `multipla_escolha`, `dissertativa`.
+*   `dificuldade` (string, obrigatório): Nível de dificuldade. Valores permitidos: `facil`, `media`, `dificil`.
+*   `enunciado` (string, obrigatório): O texto da questão.
+*   `opcoes` (array de strings, obrigatório para `multipla_escolha`): Uma lista das opções de resposta.
+*   `resposta_correta` (string, obrigatório): O texto da resposta correta. Para `multipla_escolha`, deve corresponder exatamente a uma das `opcoes`.
+
+**Exemplo (`questoes.json`):**
+```json
+[
+  {
+    "disciplina": "História",
+    "topico": "Revolução Francesa",
+    "tipo": "multipla_escolha",
+    "dificuldade": "media",
+    "enunciado": "Qual destes eventos é considerado o estopim da Revolução Francesa?",
+    "opcoes": [
+      "A Queda da Bastilha",
+      "A convocação dos Estados Gerais",
+      "O Juramento da Quadra de Tênis"
+    ],
+    "resposta_correta": "A Queda da Bastilha"
+  },
+  {
+    "disciplina": "Matemática",
+    "topico": "Álgebra",
+    "tipo": "dissertativa",
+    "dificuldade": "facil",
+    "enunciado": "Explique o que é uma equação de primeiro grau e dê um exemplo.",
+    "resposta_correta": "Uma equação de primeiro grau é uma igualdade que envolve uma ou mais incógnitas com expoente 1. Exemplo: 2x + 3 = 7."
+  }
+]
+```
+
+## Configuração da Base de Dados
+
+O Vigenda suporta diferentes tipos de bases de dados, configuráveis através de variáveis de ambiente.
+
+### Tipos de Base de Dados Suportados
+
+*   **SQLite** (padrão): Leve, baseada em ficheiro, ideal para uso individual.
+*   **PostgreSQL**: Robusta, para cenários com múltiplos utilizadores ou maior volume de dados.
+
+### Variáveis de Ambiente para Configuração
+
+As seguintes variáveis de ambiente podem ser usadas para configurar a conexão com a base de dados:
+
+*   `VIGENDA_DB_TYPE`: Especifica o tipo de base de dados.
+    *   Valores: `sqlite` (padrão), `postgres`.
+*   `VIGENDA_DB_DSN`: Uma string de conexão (Data Source Name) completa. Se esta variável for definida, ela tem precedência sobre as variáveis individuais abaixo.
+    *   **Exemplo SQLite DSN**: `file:/caminho/absoluto/para/meu_vigenda.db?cache=shared&mode=rwc`
+    *   **Exemplo PostgreSQL DSN**: `postgres://utilizador:senha@localhost:5432/nome_da_base?sslmode=disable`
+
+#### Configuração Específica para SQLite
+
+Se `VIGENDA_DB_TYPE` for `sqlite` (ou não estiver definida) e `VIGENDA_DB_DSN` não for fornecida, a seguinte variável é usada:
+
+*   `VIGENDA_DB_PATH`: Caminho para o ficheiro da base de dados SQLite.
+    *   **Padrão**: Um ficheiro `vigenda.db` no diretório de configuração do utilizador (ex: `~/.config/vigenda/vigenda.db` no Linux) ou no diretório atual se o diretório de configuração não for acessível.
+    *   **Exemplo**: `export VIGENDA_DB_PATH="/caminho/para/sua/vigenda.db"`
+
+#### Configuração Específica para PostgreSQL
+
+Se `VIGENDA_DB_TYPE` for `postgres` e `VIGENDA_DB_DSN` não for fornecida, as seguintes variáveis são usadas para construir a DSN:
+
+*   `VIGENDA_DB_HOST`: Endereço do servidor PostgreSQL.
+    *   Padrão: `localhost`
+*   `VIGENDA_DB_PORT`: Porta do servidor PostgreSQL.
+    *   Padrão: `5432`
+*   `VIGENDA_DB_USER`: Nome de utilizador para a conexão. (Obrigatório)
+*   `VIGENDA_DB_PASSWORD`: Senha para o utilizador. (Pode ser vazia se o método de autenticação permitir)
+*   `VIGENDA_DB_NAME`: Nome da base de dados PostgreSQL. (Obrigatório)
+*   `VIGENDA_DB_SSLMODE`: Modo de SSL para a conexão PostgreSQL.
+    *   Padrão: `disable`
+    *   Outros valores comuns: `require`, `verify-ca`, `verify-full`.
+
+### Exemplos de Configuração
+
+#### SQLite (Caminho Personalizado)
+
+Se você quiser usar SQLite mas num local específico:
+```bash
+export VIGENDA_DB_TYPE="sqlite"
+export VIGENDA_DB_PATH="/var/data/vigenda_production.db"
+./vigenda
+```
+Ou, de forma mais concisa, se `VIGENDA_DB_TYPE` for omitido (assume SQLite):
+```bash
+export VIGENDA_DB_PATH="/var/data/vigenda_production.db"
+./vigenda ...
+```
+
+#### PostgreSQL (Usando Variáveis Individuais)
+
+```bash
+export VIGENDA_DB_TYPE="postgres"
+export VIGENDA_DB_HOST="my.postgres.server.com"
+export VIGENDA_DB_PORT="5433"
+export VIGENDA_DB_USER="vigenda_user"
+export VIGENDA_DB_PASSWORD="super_secret_password"
+export VIGENDA_DB_NAME="vigenda_prod_db"
+export VIGENDA_DB_SSLMODE="require"
+./vigenda
+```
+
+#### PostgreSQL (Usando DSN Completa)
+
+```bash
+export VIGENDA_DB_TYPE="postgres" # Ou pode ser inferido pela DSN se o driver souber
+export VIGENDA_DB_DSN="postgresql://vigenda_user:super_secret_password@my.postgres.server.com:5433/vigenda_prod_db?sslmode=require"
+./vigenda
+```
+
+**Nota sobre Migrações de Esquema (Schema Migrations):**
+*   Para **SQLite**, o Vigenda tentará aplicar o esquema inicial (`001_initial_schema.sql`) automaticamente se a base de dados parecer vazia (ex: a tabela `users` não existir).
+*   Para **PostgreSQL**, as migrações de esquema devem ser geridas externamente (ex: usando ferramentas como `goose`, `migrate`, `Flyway`, ou scripts SQL manuais). O Vigenda não tentará criar tabelas ou modificar o esquema numa base de dados PostgreSQL existente. Certifique-se de que o esquema definido em `internal/database/migrations/001_initial_schema.sql` (ou uma versão compatível) já foi aplicado à sua base de dados PostgreSQL antes de executar a aplicação.
+
+Por padrão, o Vigenda cria e utiliza um ficheiro de base de dados SQLite chamado `vigenda.db` no diretório de configuração do utilizador ou no diretório atual.
+
+Você pode especificar um caminho diferente para o ficheiro da base de dados SQLite (se estiver a usar SQLite e não uma DSN completa) definindo a variável de ambiente `VIGENDA_DB_PATH`:
+
+```bash
+export VIGENDA_DB_PATH="/caminho/para/sua/vigenda.db"
+./vigenda ...
+```
+
+## Contribuições
+
+Este projeto é atualmente mantido para um propósito específico. No entanto, sugestões e discussões sobre melhorias são bem-vindas (se um canal de comunicação for estabelecido, como issues em um repositório Git).
+
+## Documentação do Usuário
+
+Para um guia completo sobre como usar o Vigenda, incluindo detalhes sobre todos os comandos, configuração e exemplos práticos, consulte nossa documentação do usuário:
+
+*   **[Manual do Usuário](./docs/user_manual/README.md)**: Um guia detalhado sobre todas as funcionalidades.
+*   **[Guia de Introdução](./docs/getting_started/README.md)**: Para uma instalação rápida e os primeiros passos.
+*   **[FAQ (Perguntas Frequentes)](./docs/faq/README.md)**: Respostas para as dúvidas mais comuns.
+*   **[Tutoriais](./docs/tutorials/README.md)**: Exemplos práticos passo a passo.
+*   **[Guia do Desenvolvedor](./docs/developer/README.md)**: Informações sobre a arquitetura do projeto, como configurar o ambiente de desenvolvimento e diretrizes para contribuição (para desenvolvedores).
+
+## Licença
+
+Este projeto não possui uma licença de código aberto definida no momento. Todos os direitos são reservados.
+
+## Reporte de Bugs
+
+Para informações sobre como reportar bugs, como eles são analisados e gerenciados, por favor consulte o arquivo [BUG_REPORTING.md](BUG_REPORTING.md).
+
 Lembre-se, seu objetivo é produzir código de alta qualidade e documentação que seja fácil de manter e entender. Siga estas diretrizes e use os documentos fornecidos para guiá-lo. Atualize esta documentação e as outras conforme o projeto evolui. Boa codificação!
+
