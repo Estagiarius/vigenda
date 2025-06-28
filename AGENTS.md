@@ -14,10 +14,13 @@ Olá, Agente! Este documento fornece diretrizes e informações para ajudá-lo a
     -   Testes: Pacote `testing` nativo do Go, `stretchr/testify` (assert, require, mock).
 -   **Estrutura do Repositório Principal (Pacotes Go):**
     -   `README.md`: Visão geral, instalação básica, como contribuir. **LEIA PRIMEIRO.**
-    -   `TECHNICAL_SPECIFICATION.MD`: Detalhes da arquitetura em camadas, fluxo de dados, padrões de design. Consulte para entender a organização.
-    -   `INSTALLATION.MD`: Instruções detalhadas para configurar o ambiente de desenvolvimento, incluindo Go, GCC e ferramentas.
+    -   `TECHNICAL_SPECIFICATION.MD`: Detalhes da arquitetura em camadas, fluxo de dados (com diagramas Mermaid), descrição detalhada de módulos internos, padrões de design. Consulte para entender a organização.
+    -   `DATABASE_SCHEMA.md`: Documentação detalhada do esquema do banco de dados SQLite, incluindo tabelas, colunas e relacionamentos. **Consulte ao trabalhar com repositórios ou modelos.**
+    -   `INSTALLATION.MD`: Instruções detalhadas para configurar o ambiente de desenvolvimento (Go, GCC, ferramentas) e seção expandida de solução de problemas.
     -   `TESTING.MD`: Como executar testes unitários, de integração, benchmarks e linters. Inclui comandos específicos.
-    -   `CONTRIBUTING.MD`: Diretrizes para contribuição (humanos e IA), padrões de codificação Go, formato de commit (Conventional Commits), processo de PR. **SIGA RIGOROSAMENTE.**
+    -   `EXAMPLES.md`: Exemplos práticos de uso da CLI Vigenda para diversos cenários.
+    -   `CONTRIBUTING.MD`: Diretrizes para contribuição (humanos e IA), padrões de codificação Go (incluindo Godoc), formato de commit (Conventional Commits), processo de PR. **SIGA RIGOROSAMENTE.**
+    -   `CODE_OF_CONDUCT.md`: Código de Conduta para Contribuidores.
     -   `CHANGELOG.MD`: Registro de mudanças.
     -   `AGENTS.md`: Este arquivo.
     -   `go.mod`, `go.sum`: Gerenciamento de dependências Go.
