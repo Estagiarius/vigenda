@@ -8,6 +8,8 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"vigenda/internal/app/tasks" // Import for the tasks module
+	"vigenda/internal/service"   // Import for service interfaces
 )
 
 var (
@@ -17,23 +19,29 @@ var (
 
 // Model represents the main application model.
 type Model struct {
-	list         list.Model
-	currentView  View
-	width        int
-	height       int
-	quitting     bool
-	err          error // To store any critical errors for display
-	// Potentially, sub-models for different views will be added here
-	// e.g., tasksModel tasks.Model
+	list        list.Model
+	currentView View
+	tasksModel  tasks.Model // Add tasks model
+	// Add other sub-models here as they are developed e.g. classesModel classes.Model
+	width    int
+	height   int
+	quitting bool
+	err      error // To store any critical errors for display
+
+	// Services - these will be injected
+	taskService service.TaskService
+	// classService service.ClassService
+	// ... other services
 }
 
 // Init initializes the application model.
 func (m Model) Init() tea.Cmd {
-	return nil // No initial command
+	return nil // No initial command, sub-models handle their own Init
 }
 
 // New creates a new instance of the application model.
-func New() Model {
+// It requires services to be injected for its sub-models.
+func New(ts service.TaskService /* add other services as params */) Model {
 	// Define menu items using the View enum for safer mapping
 	menuItems := []list.Item{
 		menuItem{title: DashboardView.String(), view: DashboardView}, // Dashboard is the menu itself
@@ -57,9 +65,17 @@ func New() Model {
 	}
 	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys // Keep it simple for now
 
+	// Initialize sub-models
+	tm := tasks.New(ts)
+	// cm := classes.New(cs) // Example for future
+
 	return Model{
-		list:        l,
-		currentView: DashboardView, // Start with the main menu
+		list:         l,
+		currentView:  DashboardView, // Start with the main menu
+		tasksModel:   tm,
+		taskService:  ts,
+		// classesModel: cm,
+		// classService: cs,
 	}
 }
 
@@ -82,7 +98,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		// Adjust list size, leaving space for title and help
-		m.list.SetSize(msg.Width-appStyle.GetHorizontalPadding(), msg.Height-appStyle.GetVerticalPadding()-lipgloss.Height(m.list.Title)-2)
+		listHeight := msg.Height - appStyle.GetVerticalPadding() - lipgloss.Height(m.list.Title) - 2
+		m.list.SetSize(msg.Width-appStyle.GetHorizontalPadding(), listHeight)
+
+		// Propagate size to sub-models
+		// Subtracting space used by main app's padding/title, etc.
+		// This might need adjustment based on how much space the main app's chrome takes.
+		subViewWidth := msg.Width - appStyle.GetHorizontalPadding()
+		subViewHeight := msg.Height - appStyle.GetVerticalPadding() // Example: if subview takes full height within padding
+
+		m.tasksModel.SetSize(subViewWidth, subViewHeight)
+		// if m.classesModel != nil { m.classesModel.SetSize(subViewWidth, subViewHeight) }
+
 		return m, nil
 
 	case tea.KeyMsg:
@@ -107,25 +134,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// For other items, switch the view.
 					if selectedItem.view != DashboardView {
 						m.currentView = selectedItem.view
-						// Here you might load data or initialize the sub-model for the new view
-						// For now, just switching the view enum is enough for placeholder views.
+						// If switching to a view that needs initialization (like loading data)
+						if m.currentView == TaskManagementView {
+							cmd = m.tasksModel.Init() // Trigger task loading
+						}
+						// Add similar blocks for other views if they need explicit Init on switch
 					}
 				}
-				return m, nil
+				return m, cmd // Return cmd which might come from sub-model Init
 			}
 			m.list, cmd = m.list.Update(msg) // Update the list component
-		default: // Other views (TaskManagementView, ClassManagementView, etc.)
+
+		case TaskManagementView:
+			var updatedTasksModel tasks.Model
+			updatedTasksModel, cmd = m.tasksModel.Update(msg)
+			m.tasksModel = updatedTasksModel
+			// Check for 'esc' or 'q' to navigate back, if not handled by sub-model
 			if key.Matches(msg, key.NewBinding(key.WithKeys("esc", "q"))) {
-				// Go back to the main menu from any other view
-				m.currentView = DashboardView
-				// You might want to reset the state of the sub-view here
-				return m, nil
+				if !m.tasksModel.IsFocused() { // Example: if sub-model has focus concept
+					m.currentView = DashboardView
+				}
 			}
-			// Later, pass messages to sub-models:
-			// switch m.currentView {
-			// case TaskManagementView:
-			//   m.tasksModel, cmd = m.tasksModel.Update(msg)
-			// }
+		// Add cases for other views like ClassManagementView etc.
+		// default: // Other views
+		//  if key.Matches(msg, key.NewBinding(key.WithKeys("esc", "q"))) {
+		//    m.currentView = DashboardView
+		//    return m, nil
+		//  }
 		}
 
 	case error:
@@ -145,20 +180,21 @@ func (m Model) View() string {
 	}
 
 	var viewContent string
+	var help string
 
 	switch m.currentView {
 	case DashboardView: // Main Menu
 		viewContent = m.list.View()
-	default: // Placeholder for other views
+		help = "\nNavegue com ↑/↓, selecione com Enter. Pressione 'q' para sair."
+	case TaskManagementView:
+		viewContent = m.tasksModel.View()
+		// Help text for task view might be part of tasksModel.View() or defined here
+		help = "\nNavegue na tabela com ↑/↓. Pressione 'esc' ou 'q' para voltar ao menu."
+	// Add cases for other views
+	default: // Placeholder for other views not yet fully integrated
 		viewContent = fmt.Sprintf("Você está na visão: %s\n\nPressione 'esc' ou 'q' para voltar ao menu principal.", m.currentView.String())
-	}
-
-	// Basic help footer
-	help := "\nNavegue com ↑/↓, selecione com Enter."
-	if m.currentView != DashboardView {
 		help = "\nPressione 'esc' ou 'q' para voltar ao menu."
 	}
-
 
 	return appStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
 		viewContent,
@@ -167,8 +203,10 @@ func (m Model) View() string {
 }
 
 // StartApp is a helper to run the BubbleTea program.
-func StartApp() {
-	p := tea.NewProgram(New(), tea.WithAltScreen()) // Using AltScreen is common for TUIs
+// It requires services to be passed for initializing the main model.
+func StartApp(ts service.TaskService /*, other services */) {
+	model := New(ts /*, other services */)
+	p := tea.NewProgram(model, tea.WithAltScreen()) // Using AltScreen is common for TUIs
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Erro ao executar o Vigenda TUI: %v\n", err)
 		os.Exit(1)
