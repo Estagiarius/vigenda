@@ -8,19 +8,24 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/spec/v2.0.
 ## [Não Lançado]
 
 ### Adicionado
--   Estrutura inicial da documentação do desenvolvedor:
+-   Estrutura inicial da documentação do desenvolvedor (TASK-DOC-02):
     -   `README.md`: Visão geral do projeto, instalação e contribuição.
-    -   `API_DOCUMENTATION.md`: Modelo para documentação de API.
+    -   `API_DOCUMENTATION.md`: Modelo para documentação de API (marcado como não aplicável para CLI).
     -   `TECHNICAL_SPECIFICATION.MD`: Modelo para especificações técnicas.
     -   `CONTRIBUTING.md`: Guia detalhado para contribuições.
     -   `CHANGELOG.md`: Este arquivo, para rastrear mudanças.
-    -   `INSTALLATION.md`: Modelo para documentação de instalação.
-    -   `TESTING.md`: Modelo para documentação de testes.
+    -   `INSTALLATION.MD`: Modelo para documentação de instalação.
+    -   `TESTING.MD`: Modelo para documentação de testes.
     -   `AGENTS.md`: Modelo para documentação específica para agentes de IA.
 -   Configuração inicial do ambiente de desenvolvimento (instalação de Go e GCC).
 
 ### Alterado
--   (Nenhuma alteração ainda)
+-   **Aprofundamento da Documentação do Desenvolvedor:**
+    -   `README.md`: Preenchido com detalhes específicos do projeto Vigenda, incluindo descrição, pré-requisitos (Go 1.23.0, GCC), instruções de instalação (`go mod tidy`), e execução (`go run`, `build.sh`).
+    -   `TECHNICAL_SPECIFICATION.MD`: Detalhada a arquitetura em camadas do Vigenda, componentes principais (pacotes Go), fluxo de dados com diagrama textual (Mermaid), escolhas tecnológicas (Go, Cobra, Bubbletea, SQLite), padrões de design, considerações de segurança, escalabilidade, desempenho e estratégia de testes.
+    -   `INSTALLATION.MD`: Especificados os sistemas operacionais suportados, versões de Go e GCC, instruções para MinGW (cross-compilação Windows), `go mod tidy`, instalação de `goimports` e `golangci-lint`. Detalhados os comandos de build (`./build.sh`, `go build`) e execução.
+    -   `TESTING.MD`: Detalhados os tipos de testes (Unitários, Integração, E2E, Performance), ferramentas (pacote `testing`, Testify, `os/exec`, Golden Files, `golangci-lint`, `goimports`), e comandos específicos para executar todos os testes, testes de pacotes, testes por nome, benchmarks e verificar cobertura de teste.
+    -   `AGENTS.md`: Adaptado significativamente para o projeto Vigenda, detalhando a visão geral, tecnologias, estrutura de diretórios Go, configuração de ambiente, e comandos úteis específicos (`go test`, `go run`, `go build`, `golangci-lint run`, `goimports -w`).
 
 ### Corrigido
 -   (Nenhum bug corrigido ainda)
