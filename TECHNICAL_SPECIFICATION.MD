@@ -53,6 +53,53 @@ A estrutura do projeto reflete essas camadas através dos seguintes pacotes prin
     -   **Responsabilidade:** Carrega e gerencia as configurações da aplicação. Isso pode incluir caminhos de arquivo, configurações de banco de dados (embora atualmente o caminho do DB pareça fixo ou derivado), ou outras preferências do usuário.
     -   **Tecnologias:** Go.
 
+#### 2.2.1. Detalhamento dos Módulos Internos (`internal/`)
+
+##### `internal/config` (`config.go`)
+-   **Responsabilidade Principal:** Carregar e fornecer acesso a configurações da aplicação. Atualmente, parece lidar principalmente com a determinação do caminho do banco de dados e o nome do arquivo de log.
+-   **Principais Funções/Structs:**
+    -   `LoadConfig()`: (Inferido) Função que carrega as configurações.
+    -   `GetDBPath()`: (Inferido) Retorna o caminho para o arquivo de banco de dados SQLite.
+    -   `GetLogPath()`: (Inferido) Retorna o caminho para o arquivo de log.
+-   **Interações:** Usado principalmente pela camada `database` para saber onde encontrar/criar o banco de dados e potencialmente por outras partes da aplicação que precisam de caminhos configurados.
+
+##### `internal/database` (`database.go`, `connection.go`, `migrations/`)
+-   **Responsabilidade Principal:** Gerenciar a conexão com o banco de dados SQLite, incluindo a inicialização da conexão e a aplicação de migrações de esquema.
+-   **Principais Funções/Structs:**
+    -   `InitDB(dbPath string)` ou `GetDBConnection()`: (Inferido) Estabelece e retorna uma conexão (`*sql.DB`) com o banco de dados SQLite.
+    -   Lógica para executar migrações SQL a partir do diretório `migrations/` na primeira inicialização ou quando necessário.
+-   **Interações:** Fornece a conexão `*sql.DB` para a camada `repository` para que ela possa executar operações CRUD. Interage com `internal/config` para obter o caminho do banco de dados.
+
+##### `internal/models` (`models.go`)
+-   **Responsabilidade Principal:** Definir as estruturas de dados (structs Go) que representam as entidades centrais do domínio da aplicação. Essas structs são usadas em todas as outras camadas.
+-   **Principais Funções/Structs:**
+    -   `User`, `Subject`, `Class`, `Student`, `Lesson`, `Assessment`, `Grade`, `Task`, `Question`. Cada struct define os campos correspondentes às colunas da tabela do banco de dados.
+-   **Interações:** Usado extensivamente pelas camadas `service` e `repository` para transferir dados e pela camada `tui` para exibir informações.
+
+##### `internal/repository` (ex: `task_repository.go`, `subject_repository.go`, etc.)
+-   **Responsabilidade Principal:** Implementar a lógica de acesso a dados (Data Access Logic). Abstrai as operações de banco de dados (CRUD - Create, Read, Update, Delete) para as entidades de domínio. Cada tipo de entidade geralmente tem seu próprio arquivo de repositório (ex: `TaskRepository` para `Task`).
+-   **Principais Funções/Structs:**
+    -   Interfaces (ex: `TaskRepositoryInterface`) definindo os métodos CRUD (ex: `CreateTask`, `GetTaskByID`, `GetAllTasks`, `UpdateTask`, `DeleteTask`).
+    -   Structs de implementação (ex: `taskSQLRepository`) que implementam essas interfaces e contêm um `*sql.DB` para interagir com o banco de dados.
+    -   Métodos que constroem e executam consultas SQL (SELECT, INSERT, UPDATE, DELETE) usando a conexão do banco de dados.
+-   **Interações:** Recebe chamadas da camada `service` e interage com `internal/database` (ou diretamente com `*sql.DB` fornecido por ele) e `internal/models`.
+
+##### `internal/service` (ex: `task_service.go`, `class_service.go`, etc.)
+-   **Responsabilidade Principal:** Conter a lógica de negócios da aplicação. Orquestra o fluxo de dados entre a camada de apresentação (TUI/CLI) e a camada de repositório. Valida dados de entrada, executa cálculos, toma decisões com base nas regras de negócio e formata dados para apresentação.
+-   **Principais Funções/Structs:**
+    -   Structs de serviço (ex: `TaskService`) que geralmente dependem de interfaces de repositório (injetadas via construtor para testabilidade).
+    -   Métodos públicos que expõem as funcionalidades de negócios (ex: `CreateNewTask`, `ListTasksForUser`, `CompleteTask`).
+-   **Interações:** Chamado pela camada `cmd/vigenda` (comandos Cobra) ou `internal/tui`. Interage com a camada `repository` para buscar ou persistir dados e com `internal/models` para manipular os dados do domínio.
+
+##### `internal/tui` (`tui.go`, `prompt.go`, `table.go`, `statusbar.go`, etc.)
+-   **Responsabilidade Principal:** Implementar todos os aspectos da Interface de Texto do Usuário (TUI) usando `charmbracelet/bubbletea`. Isso inclui a definição de modelos (`bubbletea.Model`), a lógica de atualização (`Update` func), a renderização da visualização (`View` func) e o manuseio de mensagens (`tea.Msg`).
+-   **Principais Funções/Structs:**
+    -   Modelos Bubbletea para diferentes telas ou componentes da TUI (ex: um modelo para a visualização de tarefas, um modelo para o formulário de adição de disciplina).
+    -   Funções `Update` que lidam com eventos do usuário (teclado, mouse) e outras mensagens.
+    -   Funções `View` que renderizam o estado atual do modelo como string para exibição no terminal, usando `lipgloss` para estilização.
+    -   Componentes reutilizáveis (como os de `prompt.go`, `table.go`) que encapsulam partes da UI.
+-   **Interações:** Interage com a camada `service` para buscar dados a serem exibidos ou para enviar dados inseridos pelo usuário para processamento. É orquestrada pelos comandos CLI em `cmd/vigenda`.
+
 ### 2.3. Fluxo de Dados e Diagrama de Camadas (Exemplo: Adicionar uma Tarefa)
 
 A seguir, um exemplo de fluxo de dados para a funcionalidade de adicionar uma nova tarefa, ilustrando a interação entre as camadas.
@@ -101,6 +148,63 @@ graph LR
     -   A TUI/CLI exibe uma mensagem de sucesso ou erro para o usuário. Se for a TUI, ela pode atualizar sua visualização para incluir a nova tarefa.
 
 Este fluxo demonstra a separação de responsabilidades: a TUI/CLI lida com a interação do usuário, o Serviço com a lógica de negócios, e o Repositório com a persistência de dados.
+
+### 2.4. Outros Fluxos de Dados Importantes (Diagramas Textuais)
+
+#### a. Listar Tarefas de uma Disciplina (via TUI)
+
+```mermaid
+graph LR
+    Usuario --> TUI_List[TUI: Solicita listar tarefas];
+    TUI_List -- ID da Disciplina --> Serv_ListTask[Service: TaskService.ListTasksBySubject];
+    Serv_ListTask -- SubjectID --> Repo_ListTask[Repository: TaskRepository.FindBySubjectID];
+    Repo_ListTask -- Consulta SQL --> DB_Task[Database: SQLite];
+    DB_Task -- Lista de Tarefas --> Repo_ListTask;
+    Repo_ListTask -- Lista de models.Task --> Serv_ListTask;
+    Serv_ListTask -- Lista de Tarefas Formatada --> TUI_List;
+    TUI_List -- Exibe Tabela de Tarefas --> Usuario;
+```
+
+**Passos:**
+1.  O usuário, através da TUI, seleciona uma disciplina e a opção de listar suas tarefas.
+2.  A TUI envia o ID da disciplina para `TaskService`.
+3.  `TaskService` chama `TaskRepository.FindBySubjectID(subjectID)`.
+4.  `TaskRepository` executa uma consulta `SELECT * FROM tasks WHERE subject_id = ?` (ou similar, considerando a estrutura atual, `tasks` tem `class_id`, então o fluxo pode envolver buscar `classes` da `subject` primeiro, depois `tasks` dessas `classes`).
+5.  O banco de dados retorna as tarefas.
+6.  Os dados são mapeados para `[]models.Task` e retornados ao serviço.
+7.  O serviço pode formatar os dados e retorná-los à TUI.
+8.  A TUI renderiza uma tabela com as tarefas.
+
+*(Nota: A tabela `tasks` atualmente tem `class_id` e não `subject_id` direto. O fluxo acima é uma simplificação. Um fluxo mais preciso envolveria: TUI -> Service (pede tarefas da disciplina) -> Service consulta ClassService/Repo para turmas da disciplina -> Service consulta TaskService/Repo para tarefas de cada turma OU TaskRepo faz um JOIN complexo.)*
+
+#### b. Iniciar Sessão de Foco para uma Tarefa (via CLI)
+
+```mermaid
+graph LR
+    Usuario -- Comando 'foco iniciar --tarefaID X' --> CLI_Focus[CLI: Cobra Command];
+    CLI_Focus -- TarefaID, Duração --> Serv_Focus[Service: FocusService.StartFocusSession];
+    Serv_Focus -- Valida TarefaID --> Repo_TaskFocus[Repository: TaskRepository.GetByID];
+    Repo_TaskFocus -- Consulta SQL --> DB_FocusTask[Database: SQLite];
+    DB_FocusTask -- Dados da Tarefa --> Repo_TaskFocus;
+    Repo_TaskFocus -- model.Task --> Serv_Focus;
+    Serv_Focus -- Cria FocusBlock/StudySession --> Repo_Focus[Repository: FocusRepository.CreateSession];
+    Repo_Focus -- INSERT SQL --> DB_FocusSession[Database: SQLite];
+    DB_FocusSession -- Confirmação --> Repo_Focus;
+    Repo_Focus -- Confirmação --> Serv_Focus;
+    Serv_Focus -- Inicia Timer TUI --> TUI_Focus[TUI: Focus Timer Display];
+    TUI_Focus -- Atualizações de Tempo --> Usuario;
+    Serv_Focus -- Ao Concluir/Interromper --> Repo_FocusUpdate[Repository: FocusRepository.UpdateSession];
+    Repo_FocusUpdate -- UPDATE SQL --> DB_FocusSession;
+```
+
+**Passos:**
+1.  Usuário executa `vigenda foco iniciar --tarefaID <ID> --duracao <tempo>`.
+2.  O comando Cobra (`cmd/vigenda`) parseia os argumentos e chama `FocusService.StartFocusSession`.
+3.  `FocusService` primeiro busca a tarefa pelo ID usando `TaskRepository` para garantir que ela existe.
+4.  Se a tarefa existe, `FocusService` cria um novo registro de `FocusBlock` ou `StudySession` (dependendo do modelo exato) e o salva usando um `FocusRepository` (ou `StudySessionRepository`).
+5.  O `FocusRepository` insere os dados no banco de dados.
+6.  `FocusService` então inicia a lógica do temporizador e atualiza a TUI (`internal/tui`) para exibir o contador regressivo.
+7.  Quando a sessão de foco termina (ou é interrompida), `FocusService` atualiza o registro da sessão no banco de dados (ex: marcando como concluída, registrando a duração efetiva).
 
 ## 3. Escolhas Tecnológicas
 

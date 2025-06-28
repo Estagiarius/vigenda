@@ -26,9 +26,16 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/spec/v2.0.
     -   `INSTALLATION.MD`: Especificados os sistemas operacionais suportados, versões de Go e GCC, instruções para MinGW (cross-compilação Windows), `go mod tidy`, instalação de `goimports` e `golangci-lint`. Detalhados os comandos de build (`./build.sh`, `go build`) e execução.
     -   `TESTING.MD`: Detalhados os tipos de testes (Unitários, Integração, E2E, Performance), ferramentas (pacote `testing`, Testify, `os/exec`, Golden Files, `golangci-lint`, `goimports`), e comandos específicos para executar todos os testes, testes de pacotes, testes por nome, benchmarks e verificar cobertura de teste.
     -   `AGENTS.md`: Adaptado significativamente para o projeto Vigenda, detalhando a visão geral, tecnologias, estrutura de diretórios Go, configuração de ambiente, e comandos úteis específicos (`go test`, `go run`, `go build`, `golangci-lint run`, `goimports -w`).
+-   **Extensão Adicional da Documentação:**
+    -   `DATABASE_SCHEMA.md`: Novo arquivo criado para documentar o esquema do banco de dados SQLite, detalhando todas as tabelas, colunas e relacionamentos baseados em `001_initial_schema.sql`.
+    -   `TECHNICAL_SPECIFICATION.MD`: Expandido com uma subseção detalhando os módulos internos (`internal/config`, `internal/database`, `internal/models`, `internal/repository`, `internal/service`, `internal/tui`) e adicionados mais dois diagramas de fluxo de dados (Mermaid) para "Listar Tarefas" e "Iniciar Sessão de Foco".
+    -   `EXAMPLES.md`: Novo arquivo criado com exemplos de uso da CLI Vigenda para cenários comuns e avançados.
+    -   `INSTALLATION.MD`: Seção de "Solução de Problemas Comuns" expandida com mais cenários e soluções detalhadas (CGo, permissões, `go mod`, ferramentas de dev).
+    -   Comentários Godoc: Adicionados comentários Godoc iniciais para todas as structs e seus campos em `internal/models/models.go` e para a struct e funções públicas em `internal/service/task_service.go`.
+    -   `CODE_OF_CONDUCT.md`: Novo arquivo criado usando o template do Contributor Covenant v2.1.
 
 ### Corrigido
--   (Nenhum bug corrigido ainda)
+-   Problemas de dessincronização de arquivos de documentação (`INSTALLATION.MD`, `TESTING.MD`, `AGENTS.MD`) que impediam atualizações, recriando-os quando necessário.
 
 ### Removido
 -   (Nada removido ainda)
