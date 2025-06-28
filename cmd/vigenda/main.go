@@ -47,9 +47,9 @@ Funcionalidades Principais:
 Use "vigenda [comando] --help" para mais informações sobre um comando específico.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// Launch the BubbleTea application
-		// PersistentPreRunE ensures services like taskService are initialized.
+		// PersistentPreRunE ensures all necessary services are initialized.
 		// Pass the initialized services to the TUI application.
-		app.StartApp(taskService /*, classService, assessmentService, etc. */)
+		app.StartApp(taskService, classService, assessmentService, questionService, proofService)
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// This function will run before any command, ensuring DB is initialized.

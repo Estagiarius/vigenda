@@ -8,8 +8,12 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"vigenda/internal/app/tasks" // Import for the tasks module
-	"vigenda/internal/service"   // Import for service interfaces
+	"vigenda/internal/app/assessments" // Import for the assessments module
+	"vigenda/internal/app/classes"     // Import for the classes module
+	"vigenda/internal/app/proofs"      // Import for the proofs module
+	"vigenda/internal/app/questions"   // Import for the questions module
+	"vigenda/internal/app/tasks"       // Import for the tasks module
+	"vigenda/internal/service"         // Import for service interfaces
 )
 
 var (
@@ -19,18 +23,25 @@ var (
 
 // Model represents the main application model.
 type Model struct {
-	list        list.Model
-	currentView View
-	tasksModel  tasks.Model // Add tasks model
-	// Add other sub-models here as they are developed e.g. classesModel classes.Model
+	list             list.Model
+	currentView      View
+	tasksModel       tasks.Model       // Tasks sub-model
+	classesModel     classes.Model     // Classes sub-model
+	assessmentsModel assessments.Model // Assessments sub-model
+	questionsModel   questions.Model   // Questions sub-model
+	proofsModel      proofs.Model      // Proofs sub-model
+	// Add other sub-models here as they are developed
 	width    int
 	height   int
 	quitting bool
 	err      error // To store any critical errors for display
 
 	// Services - these will be injected
-	taskService service.TaskService
-	// classService service.ClassService
+	taskService       service.TaskService
+	classService      service.ClassService
+	assessmentService service.AssessmentService
+	questionService   service.QuestionService
+	proofService      service.ProofService
 	// ... other services
 }
 
@@ -41,7 +52,7 @@ func (m Model) Init() tea.Cmd {
 
 // New creates a new instance of the application model.
 // It requires services to be injected for its sub-models.
-func New(ts service.TaskService /* add other services as params */) Model {
+func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /* add other services as params */) Model {
 	// Define menu items using the View enum for safer mapping
 	menuItems := []list.Item{
 		menuItem{title: DashboardView.String(), view: DashboardView}, // Dashboard is the menu itself
@@ -67,15 +78,24 @@ func New(ts service.TaskService /* add other services as params */) Model {
 
 	// Initialize sub-models
 	tm := tasks.New(ts)
-	// cm := classes.New(cs) // Example for future
+	cm := classes.New(cs)
+	am := assessments.New(as)
+	qm := questions.New(qs)
+	pm := proofs.New(ps) // Initialize proofs model
 
 	return Model{
-		list:         l,
-		currentView:  DashboardView, // Start with the main menu
-		tasksModel:   tm,
-		taskService:  ts,
-		// classesModel: cm,
-		// classService: cs,
+		list:              l,
+		currentView:       DashboardView, // Start with the main menu
+		tasksModel:        tm,
+		taskService:       ts,
+		classesModel:      cm,
+		classService:      cs,
+		assessmentsModel:  am,
+		assessmentService: as,
+		questionsModel:    qm,
+		questionService:   qs,
+		proofsModel:       pm,
+		proofService:      ps,
 	}
 }
 
@@ -108,7 +128,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		subViewHeight := msg.Height - appStyle.GetVerticalPadding() // Example: if subview takes full height within padding
 
 		m.tasksModel.SetSize(subViewWidth, subViewHeight)
-		// if m.classesModel != nil { m.classesModel.SetSize(subViewWidth, subViewHeight) }
+		m.classesModel.SetSize(subViewWidth, subViewHeight)
+		m.assessmentsModel.SetSize(subViewWidth, subViewHeight)
+		m.questionsModel.SetSize(subViewWidth, subViewHeight)
+		m.proofsModel.SetSize(subViewWidth, subViewHeight) // Propagate to proofsModel too
 
 		return m, nil
 
@@ -137,6 +160,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// If switching to a view that needs initialization (like loading data)
 						if m.currentView == TaskManagementView {
 							cmd = m.tasksModel.Init() // Trigger task loading
+						} else if m.currentView == ClassManagementView {
+							cmd = m.classesModel.Init() // Trigger class module init
+						} else if m.currentView == AssessmentManagementView {
+							cmd = m.assessmentsModel.Init() // Trigger assessment module init
+						} else if m.currentView == QuestionBankView {
+							cmd = m.questionsModel.Init() // Trigger questions module init
+						} else if m.currentView == ProofGenerationView {
+							cmd = m.proofsModel.Init() // Trigger proofs module init
 						}
 						// Add similar blocks for other views if they need explicit Init on switch
 					}
@@ -149,18 +180,57 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var updatedTasksModel tasks.Model
 			updatedTasksModel, cmd = m.tasksModel.Update(msg)
 			m.tasksModel = updatedTasksModel
-			// Check for 'esc' or 'q' to navigate back, if not handled by sub-model
-			if key.Matches(msg, key.NewBinding(key.WithKeys("esc", "q"))) {
-				if !m.tasksModel.IsFocused() { // Example: if sub-model has focus concept
+			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) { // 'q' might be for sub-model actions
+				if !m.tasksModel.IsFocused() {
 					m.currentView = DashboardView
 				}
 			}
-		// Add cases for other views like ClassManagementView etc.
-		// default: // Other views
-		//  if key.Matches(msg, key.NewBinding(key.WithKeys("esc", "q"))) {
-		//    m.currentView = DashboardView
-		//    return m, nil
-		//  }
+
+		case ClassManagementView:
+			var updatedClassesModel classes.Model
+			updatedClassesModel, cmd = m.classesModel.Update(msg)
+			m.classesModel = updatedClassesModel
+			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) {
+				if !m.classesModel.IsFocused() {
+					m.currentView = DashboardView
+				}
+			}
+
+		case AssessmentManagementView:
+			var updatedAssessmentsModel assessments.Model
+			updatedAssessmentsModel, cmd = m.assessmentsModel.Update(msg)
+			m.assessmentsModel = updatedAssessmentsModel
+			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) {
+				if !m.assessmentsModel.IsFocused() {
+					m.currentView = DashboardView
+				}
+			}
+
+		case QuestionBankView:
+			var updatedQuestionsModel questions.Model
+			updatedQuestionsModel, cmd = m.questionsModel.Update(msg)
+			m.questionsModel = updatedQuestionsModel
+			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) {
+				if !m.questionsModel.IsFocused() {
+					m.currentView = DashboardView
+				}
+			}
+
+		case ProofGenerationView:
+			var updatedProofsModel proofs.Model
+			updatedProofsModel, cmd = m.proofsModel.Update(msg)
+			m.proofsModel = updatedProofsModel
+			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) {
+				if !m.proofsModel.IsFocused() {
+					m.currentView = DashboardView
+				}
+			}
+
+		default: // Other views (if any become active without specific handling yet)
+			if key.Matches(msg, key.NewBinding(key.WithKeys("esc", "q"))) {
+				m.currentView = DashboardView // Default back to dashboard
+				return m, nil
+			}
 		}
 
 	case error:
@@ -189,7 +259,20 @@ func (m Model) View() string {
 	case TaskManagementView:
 		viewContent = m.tasksModel.View()
 		// Help text for task view might be part of tasksModel.View() or defined here
-		help = "\nNavegue na tabela com ↑/↓. Pressione 'esc' ou 'q' para voltar ao menu."
+		help = "\nNavegue na tabela com ↑/↓. Pressione 'esc' para voltar ao menu."
+	case ClassManagementView:
+		viewContent = m.classesModel.View()
+		// Help text for class view, could be dynamic based on classesModel.state
+		help = "\nNavegue com ↑/↓, Enter para selecionar. 'esc' para voltar/cancelar."
+	case AssessmentManagementView:
+		viewContent = m.assessmentsModel.View()
+		help = "\nNavegue com ↑/↓, Enter para selecionar. 'esc' para voltar/cancelar."
+	case QuestionBankView:
+		viewContent = m.questionsModel.View()
+		help = "\nUse Enter para selecionar/submeter. 'esc' para voltar/cancelar."
+	case ProofGenerationView:
+		viewContent = m.proofsModel.View()
+		help = "\nUse Tab/Setas para navegar no formulário. 'esc' para voltar."
 	// Add cases for other views
 	default: // Placeholder for other views not yet fully integrated
 		viewContent = fmt.Sprintf("Você está na visão: %s\n\nPressione 'esc' ou 'q' para voltar ao menu principal.", m.currentView.String())
@@ -204,8 +287,8 @@ func (m Model) View() string {
 
 // StartApp is a helper to run the BubbleTea program.
 // It requires services to be passed for initializing the main model.
-func StartApp(ts service.TaskService /*, other services */) {
-	model := New(ts /*, other services */)
+func StartApp(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /*, other services */) {
+	model := New(ts, cs, as, qs, ps /*, other services */)
 	p := tea.NewProgram(model, tea.WithAltScreen()) // Using AltScreen is common for TUIs
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Erro ao executar o Vigenda TUI: %v\n", err)

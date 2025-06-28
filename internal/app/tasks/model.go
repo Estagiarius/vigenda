@@ -5,7 +5,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"context" // Required for service calls
 	"fmt"     // For formatting data into table rows
-	"time"    // For formatting dates
+	// "time"    // For formatting dates // No longer directly used for formatting here
 
 	"github.com/charmbracelet/lipgloss"
 	"vigenda/internal/models" // Required for models.Task
@@ -39,13 +39,13 @@ func (m Model) loadTasksCmd() tea.Msg {
 // New creates a new task management model.
 // It requires a TaskService to interact with the backend.
 func New(taskService service.TaskService) Model {
-	_ = time.Now() // Diagnostic to ensure 'time' package is seen as used.
+	// _ = time.Now() // Diagnostic to ensure 'time' package is seen as used.
 	columns := []table.Column{
 		{Title: "ID", Width: 4},
 		{Title: "Título", Width: 30},
 		// {Title: "Descrição", Width: 40}, // Description can be long, maybe show in a detail view
 		{Title: "Prazo", Width: 10},
-		{Title: "Concluída", Width: 10},
+		// {Title: "Concluída", Width: 10}, // Tasks listed are active, so always false.
 		{Title: "ID Turma", Width: 8},
 	}
 
@@ -68,16 +68,18 @@ func New(taskService service.TaskService) Model {
 		Bold(false)
 	t.SetStyles(s)
 
+	// isLoading is true by default as Init will be called to load tasks.
 	return Model{
 		taskService: taskService,
 		table:       t,
-		isLoading:   true, // Start in loading state
+		isLoading:   true,
 	}
 }
 
+// Init is called when the model becomes active. It starts the process of loading tasks.
 func (m Model) Init() tea.Cmd {
-	// Load initial tasks
-	m.isLoading = true // Ensure loading state is true when Init is called
+	m.isLoading = true // Explicitly set loading to true
+	m.err = nil        // Clear any previous errors
 	return m.loadTasksCmd
 }
 
@@ -97,8 +99,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			if task.DueDate != nil {
 				dueDate = task.DueDate.Format("02/01/2006")
 			}
-			classID := "N/A"
-			if task.ClassID != nil {
+			classID := "N/A" // Default for tasks not associated with a class (e.g., system bugs)
+			if task.ClassID != nil && *task.ClassID != 0 { // Check if ClassID is non-nil and not zero
 				classID = fmt.Sprintf("%d", *task.ClassID)
 			}
 			rows[i] = table.Row{
@@ -106,7 +108,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				task.Title,
 				// task.Description, // If description column is re-added
 				dueDate,
-				fmt.Sprintf("%t", task.IsCompleted),
+				// fmt.Sprintf("%t", task.IsCompleted), // Removed as we only show active tasks
 				classID,
 			}
 		}
