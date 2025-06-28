@@ -144,6 +144,15 @@ func (s *stubClassService) GetClassByID(ctx context.Context, classID int64) (mod
 	return s.classRepo.GetClassByID(ctx, classID)
 }
 
+func (s *stubClassService) ListAllClasses(ctx context.Context) ([]models.Class, error) {
+	fmt.Printf("[StubClassService] ListAllClasses called\n")
+	// Retorna uma lista pré-definida de turmas ou uma lista vazia para o stub
+	return []models.Class{
+		{ID: 1, UserID: 1, SubjectID: 101, Name: "Turma Stub A"},
+		{ID: 2, UserID: 1, SubjectID: 102, Name: "Turma Stub B"},
+	}, nil
+}
+
 // StubAssessmentService
 type stubAssessmentService struct {
 	assessmentRepo *repository.StubAssessmentRepository
@@ -191,6 +200,16 @@ func (s *stubAssessmentService) CalculateClassAverage(ctx context.Context, class
 	fmt.Printf("[StubAssessmentService] CalculateClassAverage for ClassID %d\n", classID)
 	// This is a complex calculation in reality. Stub returns a fixed value.
 	return 7.5, nil
+}
+
+func (s *stubAssessmentService) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {
+	fmt.Printf("[StubAssessmentService] ListAllAssessments called\n")
+	// Retorna uma lista pré-definida de avaliações ou uma lista vazia para o stub
+	now := time.Now()
+	return []models.Assessment{
+		{ID: 1, ClassID: 1, Name: "Prova 1 Stub", Term: 1, Weight: 2, AssessmentDate: &now},
+		{ID: 2, ClassID: 1, Name: "Trabalho 1 Stub", Term: 1, Weight: 1.5, AssessmentDate: &now},
+	}, nil
 }
 
 // StubQuestionService

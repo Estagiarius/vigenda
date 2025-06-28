@@ -23,6 +23,7 @@ type ClassService interface {
 	ImportStudentsFromCSV(ctx context.Context, classID int64, csvData []byte) (int, error)
 	UpdateStudentStatus(ctx context.Context, studentID int64, newStatus string) error
 	GetClassByID(ctx context.Context, classID int64) (models.Class, error) // Added for task list header
+	ListAllClasses(ctx context.Context) ([]models.Class, error)            // Método adicionado
 }
 
 // AssessmentService define os métodos para a gestão de avaliações e notas.
@@ -30,6 +31,7 @@ type AssessmentService interface {
 	CreateAssessment(ctx context.Context, name string, classID int64, term int, weight float64) (models.Assessment, error)
 	EnterGrades(ctx context.Context, assessmentID int64, studentGrades map[int64]float64) error
 	CalculateClassAverage(ctx context.Context, classID int64) (float64, error)
+	ListAllAssessments(ctx context.Context) ([]models.Assessment, error) // Novo método adicionado
 }
 
 // QuestionService define os métodos para o banco de questões e geração de provas.

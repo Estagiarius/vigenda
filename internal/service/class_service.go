@@ -164,3 +164,11 @@ func (s *classServiceImpl) GetClassByID(ctx context.Context, classID int64) (mod
 	}
 	return *class, nil
 }
+
+func (s *classServiceImpl) ListAllClasses(ctx context.Context) ([]models.Class, error) {
+	classes, err := s.classRepo.ListAllClasses(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("service.ListAllClasses: %w", err)
+	}
+	return classes, nil
+}
