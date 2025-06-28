@@ -297,6 +297,7 @@ Para um guia completo sobre como usar o Vigenda, incluindo detalhes sobre todos 
 *   **[Guia de Introdução](./docs/getting_started/README.md)**: Para uma instalação rápida e os primeiros passos.
 *   **[FAQ (Perguntas Frequentes)](./docs/faq/README.md)**: Respostas para as dúvidas mais comuns.
 *   **[Tutoriais](./docs/tutorials/README.md)**: Exemplos práticos passo a passo.
+*   **[Guia do Desenvolvedor](./docs/developer/README.md)**: Informações sobre a arquitetura do projeto, como configurar o ambiente de desenvolvimento e diretrizes para contribuição (para desenvolvedores).
 
 ## Licença
 
