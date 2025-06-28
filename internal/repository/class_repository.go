@@ -93,3 +93,27 @@ func (r *classRepository) UpdateStudentStatus(ctx context.Context, studentID int
 	}
 	return nil
 }
+
+func (r *classRepository) ListAllClasses(ctx context.Context) ([]models.Class, error) {
+	query := `SELECT id, user_id, subject_id, name FROM classes`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("classRepository.ListAllClasses: query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var classes []models.Class
+	for rows.Next() {
+		var class models.Class
+		if err := rows.Scan(&class.ID, &class.UserID, &class.SubjectID, &class.Name); err != nil {
+			return nil, fmt.Errorf("classRepository.ListAllClasses: scan failed: %w", err)
+		}
+		classes = append(classes, class)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("classRepository.ListAllClasses: rows error: %w", err)
+	}
+
+	return classes, nil
+}

@@ -108,8 +108,10 @@ func New(assessmentService service.AssessmentService /*, classService service.Cl
 	l.SetFilteringEnabled(false)
 	l.Styles.Title = lipgloss.NewStyle().Bold(true).MarginBottom(1)
 	l.AdditionalShortHelpKeys = func() []key.Binding{
-		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "selecionar")),
-		key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "voltar")),
+		return []key.Binding{
+			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "selecionar")),
+			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "voltar")),
+		}
 	}
 
 	cols := []table.Column{
@@ -708,5 +710,3 @@ func (m Model) IsFocused() bool {
 	       (m.state == EnterGradesView && len(m.studentsForGrading) > 0) || // inputting grades (complex focus)
 	       m.state == ClassAverageView // inputting class ID
 }
-
-[end of internal/app/assessments/model.go]

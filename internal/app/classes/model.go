@@ -458,7 +458,8 @@ func (m *Model) submitFormCmd() tea.Cmd {
 			m.isLoading = false
 			return nil
 		}
-		classID, err := strconv.ParseInt(classIDStr, 10, 64)
+		// classID, err := strconv.ParseInt(classIDStr, 10, 64) // Comentado para evitar erro de não utilizado
+		_, err := strconv.ParseInt(classIDStr, 10, 64)
 		if err != nil {
 			m.err = fmt.Errorf("ID da Turma inválido: %w", err)
 			m.isLoading = false

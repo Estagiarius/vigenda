@@ -144,6 +144,15 @@ func (s *stubClassService) GetClassByID(ctx context.Context, classID int64) (mod
 	return s.classRepo.GetClassByID(ctx, classID)
 }
 
+func (s *stubClassService) ListAllClasses(ctx context.Context) ([]models.Class, error) {
+	fmt.Printf("[StubClassService] ListAllClasses called\n")
+	// Retorna uma lista pré-definida de turmas ou uma lista vazia para o stub
+	return []models.Class{
+		{ID: 1, UserID: 1, SubjectID: 101, Name: "Turma Stub A"},
+		{ID: 2, UserID: 1, SubjectID: 102, Name: "Turma Stub B"},
+	}, nil
+}
+
 // StubAssessmentService
 type stubAssessmentService struct {
 	assessmentRepo *repository.StubAssessmentRepository

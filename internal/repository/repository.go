@@ -62,6 +62,7 @@ type ClassRepository interface {
 	GetClassByID(ctx context.Context, id int64) (*models.Class, error)
 	AddStudent(ctx context.Context, student *models.Student) (int64, error)
 	UpdateStudentStatus(ctx context.Context, studentID int64, status string) error
+	ListAllClasses(ctx context.Context) ([]models.Class, error) // Método adicionado
 	// GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) // Moved to AssessmentRepository as it's mostly used for grading
 }
 

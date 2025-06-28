@@ -33,17 +33,14 @@ const (
 type Model struct {
 	questionService service.QuestionService
 	state           ViewState
-
-	list       list.Model // For actions
-	textInputs []textinput.Model
-	focusIndex int // For form navigation
-
-	isLoading bool
-	err       error
-	message   string
-
-	width  int
-	height int
+	list            list.Model
+	textInputs      []textinput.Model
+	focusIndex      int
+	isLoading       bool
+	err             error
+	message         string
+	width           int
+	height          int
 }
 
 // --- Messages ---
