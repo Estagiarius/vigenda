@@ -170,3 +170,27 @@ func (r *assessmentRepository) GetGradesByClassID(ctx context.Context, classID i
 
 	return grades, assessments, students, nil
 }
+
+func (r *assessmentRepository) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {
+	query := `SELECT id, class_id, name, term, weight, assessment_date FROM assessments`
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("assessmentRepository.ListAllAssessments: query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var assessments []models.Assessment
+	for rows.Next() {
+		var asm models.Assessment
+		if err := rows.Scan(&asm.ID, &asm.ClassID, &asm.Name, &asm.Term, &asm.Weight, &asm.AssessmentDate); err != nil {
+			return nil, fmt.Errorf("assessmentRepository.ListAllAssessments: scan failed: %w", err)
+		}
+		assessments = append(assessments, asm)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("assessmentRepository.ListAllAssessments: rows error: %w", err)
+	}
+
+	return assessments, nil
+}

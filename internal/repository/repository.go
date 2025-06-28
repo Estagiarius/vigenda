@@ -72,6 +72,7 @@ type AssessmentRepository interface {
 	GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) // Used for listing students when entering grades
 	EnterGrade(ctx context.Context, grade *models.Grade) error
 	GetGradesByClassID(ctx context.Context, classID int64) ([]models.Grade, []models.Assessment, []models.Student, error) // For calculating class average
+	ListAllAssessments(ctx context.Context) ([]models.Assessment, error) // Novo método adicionado
 	// GetAssessmentWithGrades(ctx context.Context, assessmentID int64) (*models.AssessmentWithGrades, error) // Example for a more complex query
 }
 

@@ -285,7 +285,8 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				if m.focusIndex == 1 { // Submit button for ID input
 					m.isLoading = true
 					classIDStr := m.textInputs[0].Value()
-					classID, err := strconv.ParseInt(classIDStr, 10, 64)
+					// classID, err := strconv.ParseInt(classIDStr, 10, 64) // Comentado para evitar erro de não utilizado
+					_, err := strconv.ParseInt(classIDStr, 10, 64)
 					if err != nil {
 						m.err = fmt.Errorf("ID da Turma inválido: %w", err)
 						m.isLoading = false

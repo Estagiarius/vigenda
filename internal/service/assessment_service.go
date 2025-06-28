@@ -185,3 +185,11 @@ func findStudent(students []models.Student, studentID int64) (models.Student, bo
     }
     return models.Student{}, false
 }
+
+func (s *assessmentServiceImpl) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {
+	assessments, err := s.assessmentRepo.ListAllAssessments(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("service.ListAllAssessments: %w", err)
+	}
+	return assessments, nil
+}

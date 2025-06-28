@@ -61,11 +61,13 @@ func New(questionService service.QuestionService) Model {
 	l.Title = "Banco de Questões"
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
-	l.Styles.Title = lipgloss.NewStyle().Bold(true).MarginBottom(1)
-	l.AdditionalShortHelpKeys = func() []key.Binding{
-		key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "selecionar")),
-		key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "voltar")),
-	}
+
+	// Se você quiser configurar key bindings personalizados para a lista:
+	// keyBindings := []key.Binding{
+	//     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "selecionar")),
+	//     key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "voltar")),
+	// }
+	// Você precisaria aplicar esses bindings conforme a API da biblioteca
 
 	// Text input for JSON file path
 	inputs := make([]textinput.Model, 1)

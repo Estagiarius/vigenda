@@ -31,6 +31,7 @@ type AssessmentService interface {
 	CreateAssessment(ctx context.Context, name string, classID int64, term int, weight float64) (models.Assessment, error)
 	EnterGrades(ctx context.Context, assessmentID int64, studentGrades map[int64]float64) error
 	CalculateClassAverage(ctx context.Context, classID int64) (float64, error)
+	ListAllAssessments(ctx context.Context) ([]models.Assessment, error) // Novo método adicionado
 }
 
 // QuestionService define os métodos para o banco de questões e geração de provas.

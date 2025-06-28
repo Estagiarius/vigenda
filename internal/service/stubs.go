@@ -202,6 +202,16 @@ func (s *stubAssessmentService) CalculateClassAverage(ctx context.Context, class
 	return 7.5, nil
 }
 
+func (s *stubAssessmentService) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {
+	fmt.Printf("[StubAssessmentService] ListAllAssessments called\n")
+	// Retorna uma lista pré-definida de avaliações ou uma lista vazia para o stub
+	now := time.Now()
+	return []models.Assessment{
+		{ID: 1, ClassID: 1, Name: "Prova 1 Stub", Term: 1, Weight: 2, AssessmentDate: &now},
+		{ID: 2, ClassID: 1, Name: "Trabalho 1 Stub", Term: 1, Weight: 1.5, AssessmentDate: &now},
+	}, nil
+}
+
 // StubQuestionService
 type stubQuestionService struct {
 	questionRepo repository.QuestionRepository
