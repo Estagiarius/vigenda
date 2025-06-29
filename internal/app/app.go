@@ -47,14 +47,12 @@ type Model struct {
 
 // Init initializes the application model.
 func (m Model) Init() tea.Cmd {
-	fmt.Println("[LOG app.Model] Init() called.")
 	return nil // No initial command, sub-models handle their own Init
 }
 
 // New creates a new instance of the application model.
 // It requires services to be injected for its sub-models.
 func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /* add other services as params */) Model {
-	fmt.Println("[LOG app.Model] New() called.")
 	// Define menu items using the View enum for safer mapping
 	menuItems := []list.Item{
 		menuItem{title: DashboardView.String(), view: DashboardView}, // Dashboard is the menu itself
@@ -140,63 +138,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		// Global keybindings
 		if key.Matches(msg, key.NewBinding(key.WithKeys("ctrl+c"))) {
-			fmt.Println("[LOG app.Model] Update(): Ctrl+C pressed. Quitting.")
 			m.quitting = true
 			return m, tea.Quit
 		}
-		fmt.Printf("[LOG app.Model] Update(): Received KeyMsg: %s, CurrentView: %s\n", msg.String(), m.currentView.String())
-
 
 		// View-specific keybindings
 		switch m.currentView {
 		case DashboardView: // Main Menu
-			fmt.Printf("[LOG app.Model] Update(): Key '%s' in DashboardView\n", msg.String())
 			switch {
 			case key.Matches(msg, key.NewBinding(key.WithKeys("q"))):
-				fmt.Println("[LOG app.Model] Update(): 'q' pressed in Dashboard. Quitting.")
 				m.quitting = true
 				return m, tea.Quit
 			case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
-				fmt.Println("[LOG app.Model] Update(): 'enter' pressed in Dashboard.")
 				selectedItem, ok := m.list.SelectedItem().(menuItem)
 				if ok {
-					fmt.Printf("[LOG app.Model] Update(): Selected item: '%s', Target View: %s\n", selectedItem.title, selectedItem.view.String())
 					if selectedItem.view != DashboardView {
-						fmt.Printf("[LOG app.Model] Update(): Changing currentView from %s to %s\n", m.currentView.String(), selectedItem.view.String())
 						m.currentView = selectedItem.view
-						fmt.Printf("[LOG app.Model] Update(): currentView is now %s\n", m.currentView.String())
 
 						// If switching to a view that needs initialization (like loading data)
 						if m.currentView == TaskManagementView {
-							fmt.Println("[LOG app.Model] Update(): Initializing TaskManagementView.")
 							cmd = m.tasksModel.Init()
 						} else if m.currentView == ClassManagementView {
-							fmt.Println("[LOG app.Model] Update(): Initializing ClassManagementView.")
 							cmd = m.classesModel.Init()
 						} else if m.currentView == AssessmentManagementView {
-							fmt.Println("[LOG app.Model] Update(): Initializing AssessmentManagementView.")
 							cmd = m.assessmentsModel.Init()
 						} else if m.currentView == QuestionBankView {
-							fmt.Println("[LOG app.Model] Update(): Initializing QuestionBankView.")
 							cmd = m.questionsModel.Init()
 						} else if m.currentView == ProofGenerationView {
-							fmt.Println("[LOG app.Model] Update(): Initializing ProofGenerationView.")
 							cmd = m.proofsModel.Init()
 						}
-						if cmd != nil {
-							fmt.Printf("[LOG app.Model] Update(): Sub-model Init() returned a command.\n")
-						} else {
-							fmt.Printf("[LOG app.Model] Update(): Sub-model Init() returned nil command.\n")
-						}
-					} else {
-						fmt.Println("[LOG app.Model] Update(): Dashboard selected, no view change or init.")
 					}
-				} else {
-					fmt.Println("[LOG app.Model] Update(): Enter pressed but no item selected or item is not menuItem.")
 				}
 				return m, cmd
 			}
-			fmt.Println("[LOG app.Model] Update(): Updating list component in DashboardView.")
 			m.list, cmd = m.list.Update(msg)
 
 		case TaskManagementView:
@@ -266,15 +240,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 // View renders the application's UI.
 func (m Model) View() string {
 	if m.quitting {
-		fmt.Println("[LOG app.Model] View(): Quitting.")
 		return appStyle.Render("Saindo do Vigenda...\n")
 	}
 	if m.err != nil {
-		fmt.Printf("[LOG app.Model] View(): Rendering error: %v\n", m.err)
 		return appStyle.Render(fmt.Sprintf("Ocorreu um erro: %v\nPressione 'q' para sair ou 'esc' para voltar ao menu.", m.err))
 	}
 
-	fmt.Printf("[LOG app.Model] View(): Rendering currentView: %s\n", m.currentView.String())
 	var viewContent string
 	var help string
 
@@ -313,13 +284,10 @@ func (m Model) View() string {
 // StartApp is a helper to run the BubbleTea program.
 // It requires services to be passed for initializing the main model.
 func StartApp(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /*, other services */) {
-	fmt.Println("[LOG app] StartApp(): called.")
 	model := New(ts, cs, as, qs, ps /*, other services */)
-	fmt.Println("[LOG app] StartApp(): Model created. Initializing BubbleTea program.")
 	p := tea.NewProgram(model, tea.WithAltScreen())
-	fmt.Println("[LOG app] StartApp(): Program created. Running...")
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "[LOG app] StartApp(): Error running BubbleTea program: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error running BubbleTea program: %v\n", err)
 		os.Exit(1)
 	}
 }

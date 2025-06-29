@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"vigenda/internal/models"
 	"vigenda/internal/service"
+	"time" // Adicionar import para time
 )
 
 type ViewState int
@@ -35,6 +36,8 @@ var (
 	columnTitleID        = "ID"
 	columnTitleName      = "Nome da Turma"
 	columnTitleSubjectID = "ID Disciplina"
+
+	dbOperationTimeout = 5 * time.Second // Timeout para operações de DB
 
 	// Colunas para a tabela de alunos
 	studentColumnTitleID         = "ID Aluno"
@@ -139,7 +142,6 @@ func New(cs service.ClassService) Model {
 
 // Init carrega os dados iniciais para a gestão de turmas.
 func (m Model) Init() tea.Cmd {
-	fmt.Println("[LOG classes.Model] Init() called. isLoading set to true.")
 	m.isLoading = true // Garantir que o estado de carregamento seja ativado
 	return m.fetchClassesCmd
 }
@@ -288,7 +290,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// ... cases para fetchedClassesMsg, classCreatedMsg, errMsg ...
 	case fetchedClassesMsg:
-		fmt.Printf("[LOG classes.Model] Update(): received fetchedClassesMsg. Error: %v, Classes count: %d\n", msg.err, len(msg.classes))
 		m.isLoading = false
 		if msg.err != nil {
 			m.err = msg.err
@@ -305,13 +306,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					fmt.Sprintf("%d", cls.SubjectID),
 				})
 			}
-			fmt.Println("[LOG classes.Model] Update(): setting rows for main class table.")
 			m.table.SetRows(rows)
-			fmt.Println("[LOG classes.Model] Update(): rows set for main class table.")
 		}
 
 	case classCreatedMsg:
-		fmt.Printf("[LOG classes.Model] Update(): received classCreatedMsg. Error: %v\n", msg.err)
 		m.isLoading = false
 		if msg.err != nil {
 			m.err = fmt.Errorf("erro ao criar turma: %w", msg.err)
@@ -324,13 +322,11 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case errMsg:
-		fmt.Printf("[LOG classes.Model] Update(): received errMsg. Error: %v\n", msg.err)
 		m.err = msg.err
 		m.isLoading = false
 
 	// Novo case para processar os alunos buscados
 	case fetchedClassStudentsMsg:
-		fmt.Printf("[LOG classes.Model] Update(): received fetchedClassStudentsMsg. Error: %v, Students count: %d\n", msg.err, len(msg.students))
 		m.isLoading = false // Finaliza o estado de carregamento (de alunos)
 		if msg.err != nil {
 			m.err = msg.err // Exibe o erro se a busca de alunos falhar
@@ -558,12 +554,16 @@ func (m Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
 		if m.classService == nil { // Checagem defensiva
 			return errMsg{fmt.Errorf("classService não inicializado")}
 		}
-		// selectedClass é verificado antes de chamar este comando, mas uma checagem de classID aqui é boa.
 		if classID == 0 {
 			return errMsg{fmt.Errorf("ID da turma inválido (0) para buscar alunos")}
 		}
-		students, err := m.classService.GetStudentsByClassID(context.Background(), classID)
+
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+
+		students, err := m.classService.GetStudentsByClassID(ctx, classID)
 		if err != nil {
+			// O erro já pode ser context.DeadlineExceeded ou um erro do DB
 			return errMsg{fmt.Errorf("falha ao buscar alunos para a turma ID %d: %w", classID, err)}
 		}
 		return fetchedClassStudentsMsg{students: students, err: nil}
@@ -571,23 +571,27 @@ func (m Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
 }
 
 func (m Model) fetchClassesCmd() tea.Msg {
-	fmt.Println("[LOG classes.Model] fetchClassesCmd(): called")
 	if m.classService == nil {
-		fmt.Println("[LOG classes.Model] fetchClassesCmd(): classService is nil!")
 		return errMsg{fmt.Errorf("classService não inicializado em fetchClassesCmd")}
 	}
-	fmt.Println("[LOG classes.Model] fetchClassesCmd(): calling classService.ListAllClasses()")
-	classes, err := m.classService.ListAllClasses(context.Background())
+
+	// Criar um contexto com timeout
+	ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+	defer cancel() // É crucial chamar cancel para liberar recursos
+
+	classes, err := m.classService.ListAllClasses(ctx) // Passar o contexto com timeout
 	if err != nil {
-		fmt.Printf("[LOG classes.Model] fetchClassesCmd(): error from ListAllClasses: %v\n", err)
-		return errMsg{fmt.Errorf("falha ao buscar turmas: %w", err)}
+		return errMsg{fmt.Errorf("falha ao buscar turmas (pode ter ocorrido timeout): %w", err)}
 	}
-	fmt.Printf("[LOG classes.Model] fetchClassesCmd(): ListAllClasses returned %d classes. Returning fetchedClassesMsg.\n", len(classes))
 	return fetchedClassesMsg{classes: classes, err: nil}
 }
 
 func (m Model) createClassCmd(name string, subjectIDStr string) tea.Cmd {
 	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+
+
 		subjectID, convErr := strconv.ParseInt(subjectIDStr, 10, 64)
 		if convErr != nil {
 			return errMsg{fmt.Errorf("ID da disciplina inválido ('%s'): %w", subjectIDStr, convErr)}
@@ -598,7 +602,7 @@ func (m Model) createClassCmd(name string, subjectIDStr string) tea.Cmd {
 			return errMsg{fmt.Errorf("nome da turma não pode ser vazio")}
 		}
 		// UserID é tratado pelo serviço/repositório
-		createdClass, err := m.classService.CreateClass(context.Background(), name, subjectID)
+		createdClass, err := m.classService.CreateClass(ctx, name, subjectID)
 		if err != nil {
 			// Retorna um erro específico para criação, ou pode ser errMsg também
 			return classCreatedMsg{err: fmt.Errorf("serviço falhou ao criar turma: %w", err)}

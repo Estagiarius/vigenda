@@ -46,18 +46,14 @@ Funcionalidades Principais:
 
 Use "vigenda [comando] --help" para mais informações sobre um comando específico.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("[LOG main.go rootCmd] Run: Launching TUI application.")
 		// Launch the BubbleTea application
 		// PersistentPreRunE ensures all necessary services are initialized.
 		// Pass the initialized services to the TUI application.
 		app.StartApp(taskService, classService, assessmentService, questionService, proofService)
-		fmt.Println("[LOG main.go rootCmd] Run: TUI application finished.")
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("[LOG main.go rootCmd] PersistentPreRunE: called.")
 		// This function will run before any command, ensuring DB is initialized.
 		if db == nil { // Initialize only once
-			fmt.Println("[LOG main.go rootCmd] PersistentPreRunE: DB is nil, initializing.")
 			dbType := os.Getenv("VIGENDA_DB_TYPE")
 			dbDSN := os.Getenv("VIGENDA_DB_DSN") // Generic DSN
 
@@ -120,21 +116,13 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 			}
 
 			var err error
-			fmt.Printf("[LOG main.go rootCmd] PersistentPreRunE: Attempting DB connection with type '%s' and DSN/Path '%s'\n", config.DBType, config.DSN)
 			db, err = database.GetDBConnection(config)
 			if err != nil {
-				fmt.Printf("[LOG main.go rootCmd] PersistentPreRunE: DB connection failed: %v\n", err)
 				return fmt.Errorf("failed to initialize database (type: %s): %w", config.DBType, err)
 			}
-			fmt.Println("[LOG main.go rootCmd] PersistentPreRunE: DB connection successful.")
 			// Initialize services here, after DB is ready
-			fmt.Println("[LOG main.go rootCmd] PersistentPreRunE: Initializing services.")
 			initializeServices(db)
-			fmt.Println("[LOG main.go rootCmd] PersistentPreRunE: Services initialized.")
-		} else {
-			fmt.Println("[LOG main.go rootCmd] PersistentPreRunE: DB already initialized.")
 		}
-		fmt.Println("[LOG main.go rootCmd] PersistentPreRunE: finished.")
 		return nil
 	},
 }
