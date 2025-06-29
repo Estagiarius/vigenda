@@ -65,7 +65,8 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 			dbName := os.Getenv("VIGENDA_DB_NAME")
 			dbSSLMode := os.Getenv("VIGENDA_DB_SSLMODE") // Primarily for PostgreSQL
 
-			config := database.DBConfig{}
+			// Use the non-conflicting DBConfig type from connection.go
+			config := database.DBConfig{} // This should refer to database.DBConfig from connection.go
 
 			if dbType == "" {
 				dbType = "sqlite" // Default to SQLite
@@ -80,6 +81,7 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 					// VIGENDA_DB_PATH is specific to SQLite if VIGENDA_DB_DSN is not used
 					sqlitePath := os.Getenv("VIGENDA_DB_PATH")
 					if sqlitePath == "" {
+						// Use the non-conflicting DefaultSQLitePath from connection.go
 						sqlitePath = database.DefaultSQLitePath()
 					}
 					config.DSN = sqlitePath
@@ -116,6 +118,7 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 			}
 
 			var err error
+			// Use the non-conflicting GetDBConnection from connection.go
 			db, err = database.GetDBConnection(config)
 			if err != nil {
 				return fmt.Errorf("failed to initialize database (type: %s): %w", config.DBType, err)
