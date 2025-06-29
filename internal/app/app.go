@@ -152,29 +152,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
 				selectedItem, ok := m.list.SelectedItem().(menuItem)
 				if ok {
-					// DashboardView itself is the menu, so selecting it does nothing new
-					// or could refresh a dashboard if it were more complex.
-					// For other items, switch the view.
 					if selectedItem.view != DashboardView {
 						m.currentView = selectedItem.view
+
 						// If switching to a view that needs initialization (like loading data)
 						if m.currentView == TaskManagementView {
-							cmd = m.tasksModel.Init() // Trigger task loading
+							cmd = m.tasksModel.Init()
 						} else if m.currentView == ClassManagementView {
-							cmd = m.classesModel.Init() // Trigger class module init
+							cmd = m.classesModel.Init()
 						} else if m.currentView == AssessmentManagementView {
-							cmd = m.assessmentsModel.Init() // Trigger assessment module init
+							cmd = m.assessmentsModel.Init()
 						} else if m.currentView == QuestionBankView {
-							cmd = m.questionsModel.Init() // Trigger questions module init
+							cmd = m.questionsModel.Init()
 						} else if m.currentView == ProofGenerationView {
-							cmd = m.proofsModel.Init() // Trigger proofs module init
+							cmd = m.proofsModel.Init()
 						}
-						// Add similar blocks for other views if they need explicit Init on switch
 					}
 				}
-				return m, cmd // Return cmd which might come from sub-model Init
+				return m, cmd
 			}
-			m.list, cmd = m.list.Update(msg) // Update the list component
+			m.list, cmd = m.list.Update(msg)
 
 		case TaskManagementView:
 			var updatedTasksModel tasks.Model
@@ -258,11 +255,9 @@ func (m Model) View() string {
 		help = "\nNavegue com ↑/↓, selecione com Enter. Pressione 'q' para sair."
 	case TaskManagementView:
 		viewContent = m.tasksModel.View()
-		// Help text for task view might be part of tasksModel.View() or defined here
 		help = "\nNavegue na tabela com ↑/↓. Pressione 'esc' para voltar ao menu."
 	case ClassManagementView:
 		viewContent = m.classesModel.View()
-		// Help text for class view, could be dynamic based on classesModel.state
 		help = "\nNavegue com ↑/↓, Enter para selecionar. 'esc' para voltar/cancelar."
 	case AssessmentManagementView:
 		viewContent = m.assessmentsModel.View()
@@ -273,25 +268,26 @@ func (m Model) View() string {
 	case ProofGenerationView:
 		viewContent = m.proofsModel.View()
 		help = "\nUse Tab/Setas para navegar no formulário. 'esc' para voltar."
-	// Add cases for other views
-	default: // Placeholder for other views not yet fully integrated
+	default:
 		viewContent = fmt.Sprintf("Você está na visão: %s\n\nPressione 'esc' ou 'q' para voltar ao menu principal.", m.currentView.String())
 		help = "\nPressione 'esc' ou 'q' para voltar ao menu."
 	}
 
-	return appStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
+	finalRender := appStyle.Render(lipgloss.JoinVertical(lipgloss.Left,
 		viewContent,
 		lipgloss.NewStyle().MarginTop(1).Render(help),
 	))
+	// fmt.Printf("[LOG app.Model] View(): Final render string length: %d\n", len(finalRender)) // Potencialmente muito verboso
+	return finalRender
 }
 
 // StartApp is a helper to run the BubbleTea program.
 // It requires services to be passed for initializing the main model.
 func StartApp(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /*, other services */) {
 	model := New(ts, cs, as, qs, ps /*, other services */)
-	p := tea.NewProgram(model, tea.WithAltScreen()) // Using AltScreen is common for TUIs
+	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Erro ao executar o Vigenda TUI: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error running BubbleTea program: %v\n", err)
 		os.Exit(1)
 	}
 }

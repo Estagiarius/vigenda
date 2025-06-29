@@ -24,6 +24,7 @@ type ClassService interface {
 	UpdateStudentStatus(ctx context.Context, studentID int64, newStatus string) error
 	GetClassByID(ctx context.Context, classID int64) (models.Class, error) // Added for task list header
 	ListAllClasses(ctx context.Context) ([]models.Class, error)            // Método adicionado
+	GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error)
 }
 
 // AssessmentService define os métodos para a gestão de avaliações e notas.
