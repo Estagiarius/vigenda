@@ -23,6 +23,14 @@ const (
 	DetailsView
 )
 
+type FocusTarget int
+
+const (
+	FocusTargetNone FocusTarget = iota
+	FocusTargetStudentsTable
+	FocusTargetStatusSelector // Será usado na Parte 2
+)
+
 var (
 	columnTitleID        = "ID"
 	columnTitleName      = "Nome da Turma"
@@ -49,6 +57,8 @@ type Model struct {
 	allClasses    []models.Class // Para armazenar as turmas carregadas
 	selectedClass *models.Class  // Turma selecionada para DetailsView
 	classStudents []models.Student // Alunos da turma selecionada
+
+	detailsViewFocusTarget FocusTarget // Novo campo
 
 	isLoading bool
 	width     int
@@ -122,7 +132,8 @@ func New(cs service.ClassService) Model {
 			subjectIDInput: subjectIDInput,
 			focusIndex:     0, // Foco no primeiro campo quando o formulário abrir
 		},
-		isLoading: true, // Começa carregando
+		detailsViewFocusTarget: FocusTargetNone, // Explícito para clareza
+		isLoading:              true,            // Começa carregando
 	}
 }
 
@@ -229,20 +240,47 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			}
 			cmds = append(cmds, focusedInputCmd)
 
-		case DetailsView: // Adicionar este case
+		case DetailsView:
 			switch {
 			case key.Matches(msg, key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "voltar"))):
-				m.state = ListView
-				m.selectedClass = nil
-				m.classStudents = nil
-				m.studentsTable.SetRows([]table.Row{})
-				m.err = nil
-				m.table.Focus() // Devolve o foco para a tabela de turmas
-				// Não precisa buscar turmas novamente, a lista já está lá
-			// Adicionar navegação na tabela de alunos aqui se necessário
-			// default:
-			// 	m.studentsTable, cmd = m.studentsTable.Update(msg)
-			// 	cmds = append(cmds, cmd)
+				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
+					m.detailsViewFocusTarget = FocusTargetNone
+					m.studentsTable.Blur()
+				} else { // FocusTargetNone ou outros futuros focos não tratados aqui
+					m.state = ListView
+					m.selectedClass = nil
+					m.classStudents = nil
+					m.studentsTable.SetRows([]table.Row{})
+					m.err = nil
+					m.table.Focus()
+				}
+
+			case key.Matches(msg, key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "focar/navegar"))):
+				if m.detailsViewFocusTarget == FocusTargetNone {
+					m.detailsViewFocusTarget = FocusTargetStudentsTable
+					m.studentsTable.Focus() // table.Focus() não retorna cmd, mas é necessário para o estado interno da tabela
+				} else if m.detailsViewFocusTarget == FocusTargetStudentsTable {
+					// Se já estiver na tabela, Tab pode remover o foco (ou ir para próximo elemento focável)
+					m.detailsViewFocusTarget = FocusTargetNone
+					m.studentsTable.Blur()
+				}
+				// Se houvesse outros elementos focáveis, Tab poderia ciclar entre eles.
+
+			case key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "remover foco"))):
+				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
+					m.detailsViewFocusTarget = FocusTargetNone
+					m.studentsTable.Blur()
+				}
+				// Se houvesse outros elementos focáveis, Shift+Tab poderia ciclar na ordem inversa.
+
+			default:
+				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
+					var studentsTableCmd tea.Cmd
+					m.studentsTable, studentsTableCmd = m.studentsTable.Update(msg)
+					cmds = append(cmds, studentsTableCmd)
+				}
+				// Lógica para outras teclas se nenhum elemento específico estiver focado
+				// ou se o foco estiver em outros elementos (como o futuro seletor de status)
 			}
 		}
 
@@ -396,15 +434,30 @@ func (m Model) View() string {
 			} else if len(m.classStudents) == 0 && m.err == nil { // m.err == nil para não sobrescrever erro de busca
 				b.WriteString("\nNenhum aluno encontrado para esta turma.")
 			} else if m.err != nil && len(m.classStudents) == 0 {
-				// O erro já foi impresso no topo, aqui apenas indicamos que não há alunos devido ao erro.
-				// Não precisa imprimir nada extra aqui, o erro geral já cobre.
+				// Erro já impresso globalmente
 			} else {
-				// Se não estiver carregando e houver alunos (e nenhum erro de busca de alunos), mostra a tabela
-				b.WriteString("\n" + m.studentsTable.View())
+				studentsTableRender := m.studentsTable.View()
+				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
+					// Adiciona uma borda sutil para indicar foco na tabela de alunos
+					focusBorderStyle := lipgloss.NewStyle().
+						Border(lipgloss.RoundedBorder()).
+						BorderForeground(lipgloss.Color("63")). // Magenta para foco
+						Padding(0,0) // Padding (0,1) pode ser muito se a tabela já tem suas margens
+
+					studentsTableRender = focusBorderStyle.Render(studentsTableRender)
+				}
+				b.WriteString("\n" + studentsTableRender)
 			}
 		}
 		helpStyle := lipgloss.NewStyle().Faint(true).MarginTop(1)
-		b.WriteString("\n\n" + helpStyle.Render("Pressione 'Esc' para voltar à lista de turmas."))
+		currentHelp := "Pressione 'Esc' para voltar."
+		if m.detailsViewFocusTarget == FocusTargetNone {
+			currentHelp += " Use Tab para focar a tabela de alunos."
+		} else if m.detailsViewFocusTarget == FocusTargetStudentsTable {
+			currentHelp += " Use Setas para navegar, Shift+Tab ou Esc para sair do foco da tabela."
+			// Futuramente: "... 's' para mudar status."
+		}
+		b.WriteString("\n\n" + helpStyle.Render(currentHelp))
 
 	} // Fim do switch m.state
 	return b.String()
