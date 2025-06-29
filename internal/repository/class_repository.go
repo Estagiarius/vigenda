@@ -95,14 +95,18 @@ func (r *classRepository) UpdateStudentStatus(ctx context.Context, studentID int
 }
 
 func (r *classRepository) ListAllClasses(ctx context.Context) ([]models.Class, error) {
+	fmt.Println("[LOG ClassRepository] ListAllClasses(): called")
 	query := `SELECT id, user_id, subject_id, name FROM classes`
+	fmt.Println("[LOG ClassRepository] ListAllClasses(): executing query:", query)
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
+		fmt.Printf("[LOG ClassRepository] ListAllClasses(): error executing query: %v\n", err)
 		return nil, fmt.Errorf("classRepository.ListAllClasses: query failed: %w", err)
 	}
 	defer rows.Close()
 
 	var classes []models.Class
+	fmt.Println("[LOG ClassRepository] ListAllClasses(): scanning rows...")
 	for rows.Next() {
 		var class models.Class
 		if err := rows.Scan(&class.ID, &class.UserID, &class.SubjectID, &class.Name); err != nil {
@@ -110,11 +114,14 @@ func (r *classRepository) ListAllClasses(ctx context.Context) ([]models.Class, e
 		}
 		classes = append(classes, class)
 	}
+	fmt.Printf("[LOG ClassRepository] ListAllClasses(): finished scanning, found %d classes.\n", len(classes))
 
 	if err = rows.Err(); err != nil {
+		fmt.Printf("[LOG ClassRepository] ListAllClasses(): error after scanning rows: %v\n", err)
 		return nil, fmt.Errorf("classRepository.ListAllClasses: rows error: %w", err)
 	}
 
+	fmt.Println("[LOG ClassRepository] ListAllClasses(): success")
 	return classes, nil
 }
 

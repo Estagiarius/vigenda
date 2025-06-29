@@ -139,7 +139,8 @@ func New(cs service.ClassService) Model {
 
 // Init carrega os dados iniciais para a gestão de turmas.
 func (m Model) Init() tea.Cmd {
-	// m.isLoading = true // isLoading já é true por padrão em New e reafirmado aqui
+	fmt.Println("[LOG classes.Model] Init() called. isLoading set to true.")
+	m.isLoading = true // Garantir que o estado de carregamento seja ativado
 	return m.fetchClassesCmd
 }
 
@@ -287,6 +288,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// ... cases para fetchedClassesMsg, classCreatedMsg, errMsg ...
 	case fetchedClassesMsg:
+		fmt.Printf("[LOG classes.Model] Update(): received fetchedClassesMsg. Error: %v, Classes count: %d\n", msg.err, len(msg.classes))
 		m.isLoading = false
 		if msg.err != nil {
 			m.err = msg.err
@@ -303,10 +305,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					fmt.Sprintf("%d", cls.SubjectID),
 				})
 			}
+			fmt.Println("[LOG classes.Model] Update(): setting rows for main class table.")
 			m.table.SetRows(rows)
+			fmt.Println("[LOG classes.Model] Update(): rows set for main class table.")
 		}
 
 	case classCreatedMsg:
+		fmt.Printf("[LOG classes.Model] Update(): received classCreatedMsg. Error: %v\n", msg.err)
 		m.isLoading = false
 		if msg.err != nil {
 			m.err = fmt.Errorf("erro ao criar turma: %w", msg.err)
@@ -319,11 +324,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		}
 
 	case errMsg:
+		fmt.Printf("[LOG classes.Model] Update(): received errMsg. Error: %v\n", msg.err)
 		m.err = msg.err
 		m.isLoading = false
 
 	// Novo case para processar os alunos buscados
 	case fetchedClassStudentsMsg:
+		fmt.Printf("[LOG classes.Model] Update(): received fetchedClassStudentsMsg. Error: %v, Students count: %d\n", msg.err, len(msg.students))
 		m.isLoading = false // Finaliza o estado de carregamento (de alunos)
 		if msg.err != nil {
 			m.err = msg.err // Exibe o erro se a busca de alunos falhar
@@ -534,7 +541,12 @@ type classCreatedMsg struct {
 type errMsg struct{ err error }
 
 // Error torna errMsg em um tipo de erro válido.
-func (e errMsg) Error() string { return e.err.Error() }
+func (e errMsg) Error() string {
+	if e.err == nil {
+		return "unknown error in errMsg"
+	}
+	return e.err.Error()
+}
 
 type fetchedClassStudentsMsg struct {
 	students []models.Student
@@ -559,13 +571,18 @@ func (m Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
 }
 
 func (m Model) fetchClassesCmd() tea.Msg {
-	// context.Background() é geralmente ok para operações TUI que não são canceláveis pelo usuário
-	// de forma granular, mas se houver operações longas, um contexto com timeout/cancel pode ser melhor.
+	fmt.Println("[LOG classes.Model] fetchClassesCmd(): called")
+	if m.classService == nil {
+		fmt.Println("[LOG classes.Model] fetchClassesCmd(): classService is nil!")
+		return errMsg{fmt.Errorf("classService não inicializado em fetchClassesCmd")}
+	}
+	fmt.Println("[LOG classes.Model] fetchClassesCmd(): calling classService.ListAllClasses()")
 	classes, err := m.classService.ListAllClasses(context.Background())
 	if err != nil {
-		// Retorna um erro que pode ser tratado no Update
+		fmt.Printf("[LOG classes.Model] fetchClassesCmd(): error from ListAllClasses: %v\n", err)
 		return errMsg{fmt.Errorf("falha ao buscar turmas: %w", err)}
 	}
+	fmt.Printf("[LOG classes.Model] fetchClassesCmd(): ListAllClasses returned %d classes. Returning fetchedClassesMsg.\n", len(classes))
 	return fetchedClassesMsg{classes: classes, err: nil}
 }
 
