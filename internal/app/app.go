@@ -101,31 +101,6 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 	}
 }
 
-// View type and String method (moved from views.go for simplicity in logging, can be kept separate)
-type View int
-
-const (
-	DashboardView View = iota
-	TaskManagementView
-	ClassManagementView
-	AssessmentManagementView
-	QuestionBankView
-	ProofGenerationView
-	// Add other views here
-)
-
-func (v View) String() string {
-	return [...]string{
-		"Dashboard",
-		"Gerenciamento de Tarefas",
-		"Gerenciamento de Turmas",
-		"Gerenciamento de Avaliações",
-		"Banco de Questões",
-		"Geração de Provas",
-	}[v]
-}
-
-
 // menuItem holds the title and the corresponding view for a menu entry.
 type menuItem struct {
 	title string
