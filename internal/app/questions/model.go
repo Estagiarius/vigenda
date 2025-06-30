@@ -103,7 +103,7 @@ func (i actionItem) Title() string       { return i.title }
 func (i actionItem) Description() string { return i.description }
 func (i actionItem) FilterValue() string { return i.title }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type to tea.Model
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 

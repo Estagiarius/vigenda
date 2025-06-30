@@ -83,7 +83,7 @@ func (m Model) Init() tea.Cmd {
 	return m.loadTasksCmd
 }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type to tea.Model
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {

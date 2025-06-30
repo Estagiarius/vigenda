@@ -152,7 +152,8 @@ func (m Model) Init() tea.Cmd {
 
 
 // Update lida com mensagens e atualiza o modelo.
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type to tea.Model
+	log.Printf("ClassesModel: Update - Recebida msg tipo %T", msg) // Log adicionado anteriormente
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
