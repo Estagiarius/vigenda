@@ -586,7 +586,8 @@ type fetchedClassStudentsMsg struct {
 	err      error
 }
 
-func (m Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
+// Changed to pointer receiver for consistency
+func (m *Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
 	return func() tea.Msg {
 		if m.classService == nil { // Checagem defensiva
 			return errMsg{fmt.Errorf("classService não inicializado")}
@@ -628,7 +629,8 @@ func (m Model) fetchClassesCmd() tea.Msg {
 	return fetchedClassesMsg{classes: classes, err: nil}
 }
 
-func (m Model) createClassCmd(name string, subjectIDStr string) tea.Cmd {
+// Changed to pointer receiver for consistency
+func (m *Model) createClassCmd(name string, subjectIDStr string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
 		defer cancel()
