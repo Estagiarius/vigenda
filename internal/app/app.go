@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"log" // Adicionado para logging
 	"os"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -184,6 +185,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case ClassManagementView:
+			log.Printf("AppModel: Update - CurrentView=ClassManagementView, encaminhando msg tipo %T para ClassesModel.Update", msg)
 			var updatedClassesModel classes.Model
 			updatedClassesModel, cmd = m.classesModel.Update(msg)
 			m.classesModel = updatedClassesModel
