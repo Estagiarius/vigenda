@@ -5,10 +5,11 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log" // Adicionado para logging
 	"strconv"
 	"strings"
 	"vigenda/internal/models"
-	"vigenda/internal/repository" // Added import
+	"vigenda/internal/repository"
 )
 
 type classServiceImpl struct {
@@ -166,10 +167,14 @@ func (s *classServiceImpl) GetClassByID(ctx context.Context, classID int64) (mod
 }
 
 func (s *classServiceImpl) ListAllClasses(ctx context.Context) ([]models.Class, error) {
+	log.Println("Service: classServiceImpl.ListAllClasses - Chamado.")
+	log.Println("Service: classServiceImpl.ListAllClasses - Chamando repositório para listar turmas.")
 	classes, err := s.classRepo.ListAllClasses(ctx)
 	if err != nil {
+		log.Printf("Service: classServiceImpl.ListAllClasses - Erro ao listar turmas do repositório: %v", err)
 		return nil, fmt.Errorf("service.ListAllClasses: %w", err)
 	}
+	log.Printf("Service: classServiceImpl.ListAllClasses - Repositório retornou %d turmas.", len(classes))
 	return classes, nil
 }
 

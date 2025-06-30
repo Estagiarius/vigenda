@@ -95,29 +95,30 @@ func (m *Model) loadInitialData() {
 
 func (m *Model) loadClasses() tea.Cmd {
 	m.isLoading = true
+	log.Println("TUI: loadClasses - Iniciando carregamento de turmas.")
 	return func() tea.Msg {
+		log.Println("TUI: loadClasses (async) - Tentando carregar turmas do serviço.")
 		classes, err := m.classService.ListAllClasses(context.Background())
 		if err != nil {
-			log.Printf("Error loading classes: %v", err)
-			return errMsg{err}
+			log.Printf("TUI: loadClasses (async) - Erro ao carregar turmas: %v", err)
+			return errMsg{err: err, context: "loading classes"}
 		}
-		// Return the message directly, not wrapped in Batch for this specific case
-		// as Batch expects tea.Cmd, and classesLoadedMsg is tea.Msg.
-		// The func() tea.Msg { return tea.Msg(nil) } was to force a redraw,
-		// but the message itself should trigger an Update cycle.
+		log.Printf("TUI: loadClasses (async) - Turmas carregadas com sucesso: %d turmas.", len(classes))
 		return classesLoadedMsg(classes)
 	}
 }
 
 func (m *Model) loadStudentsForClass(classID int64) tea.Cmd {
 	m.isLoading = true
+	log.Printf("TUI: loadStudentsForClass - Iniciando carregamento de alunos para a turma ID %d.", classID)
 	return func() tea.Msg {
+		log.Printf("TUI: loadStudentsForClass (async) - Tentando carregar alunos para a turma ID %d do serviço.", classID)
 		students, err := m.classService.GetStudentsByClassID(context.Background(), classID)
 		if err != nil {
-			log.Printf("Error loading students for class %d: %v", classID, err)
-			return errMsg{err}
+			log.Printf("TUI: loadStudentsForClass (async) - Erro ao carregar alunos para a turma ID %d: %v", classID, err)
+			return errMsg{err: err, context: fmt.Sprintf("loading students for class %d", classID)}
 		}
-		// Return the message directly
+		log.Printf("TUI: loadStudentsForClass (async) - Alunos carregados com sucesso para a turma ID %d: %d alunos.", classID, len(students))
 		return studentsLoadedMsg(students)
 	}
 }
@@ -176,6 +177,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case classesLoadedMsg:
+		log.Println("TUI: Update - Recebida classesLoadedMsg.")
 		m.isLoading = false
 		m.classes = []models.Class(msg)
 		items := make([]list.Item, len(m.classes))
@@ -185,8 +187,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list = list.New(items, list.NewDefaultDelegate(), 0, 0)
 		m.list.Title = "Turmas"
 		m.list.SetShowHelp(false) // We'll use our own help display
+		log.Printf("TUI: Update - Lista de turmas atualizada com %d itens.", len(items))
 
 	case studentsLoadedMsg:
+		log.Println("TUI: Update - Recebida studentsLoadedMsg.")
 		m.isLoading = false
 		m.students = []models.Student(msg)
 		items := make([]list.Item, len(m.students))
@@ -200,11 +204,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list.Title = "Alunos"
 		}
 		m.list.SetShowHelp(false)
+		log.Printf("TUI: Update - Lista de alunos atualizada com %d itens.", len(items))
 
 	case errMsg:
+		log.Printf("TUI: Update - Recebida errMsg. Contexto: '%s', Erro: %v", msg.context, msg.err)
 		m.isLoading = false
-		m.err = msg
-		log.Printf("Error received in Update: %v", msg) // Log the error
+		m.err = msg.err // Store the actual error
+		// Log the error
 		// Potentially return m, tea.Quit or display error to user
 		return m, tea.Quit // For now, quit on error
 
@@ -288,9 +294,15 @@ func (lis listItemStudent) FilterValue() string { return lis.FullName }
 func (lis listItemStudent) ID() int64           { return lis.Student.ID }
 
 // Messages for async operations
-type errMsg struct{ error }
+// errMsg now includes a context string to identify the source of the error.
+type errMsg struct {
+	err     error
+	context string // e.g., "loading classes", "loading students for class X"
+}
 
-func (e errMsg) Error() string { return e.error.Error() }
+func (e errMsg) Error() string {
+	return fmt.Sprintf("context: %s, error: %v", e.context, e.err)
+}
 
 type classesLoadedMsg []models.Class
 type studentsLoadedMsg []models.Student

@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	// "time" // Not used anymore
+	"log" // Adicionado para logging
 	"vigenda/internal/models"
 )
 
@@ -95,26 +95,34 @@ func (r *classRepository) UpdateStudentStatus(ctx context.Context, studentID int
 }
 
 func (r *classRepository) ListAllClasses(ctx context.Context) ([]models.Class, error) {
+	log.Println("Repository: classRepository.ListAllClasses - Chamado.")
 	query := `SELECT id, user_id, subject_id, name FROM classes`
+	log.Printf("Repository: classRepository.ListAllClasses - Executando query: %s", query)
+
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
+		log.Printf("Repository: classRepository.ListAllClasses - Erro ao executar query: %v", err)
 		return nil, fmt.Errorf("classRepository.ListAllClasses: query failed: %w", err)
 	}
 	defer rows.Close()
 
 	var classes []models.Class
+	log.Println("Repository: classRepository.ListAllClasses - Lendo linhas do resultado...")
 	for rows.Next() {
 		var class models.Class
 		if err := rows.Scan(&class.ID, &class.UserID, &class.SubjectID, &class.Name); err != nil {
+			log.Printf("Repository: classRepository.ListAllClasses - Erro ao escanear linha: %v", err)
 			return nil, fmt.Errorf("classRepository.ListAllClasses: scan failed: %w", err)
 		}
 		classes = append(classes, class)
 	}
 
 	if err = rows.Err(); err != nil {
+		log.Printf("Repository: classRepository.ListAllClasses - Erro após iteração das linhas: %v", err)
 		return nil, fmt.Errorf("classRepository.ListAllClasses: rows error: %w", err)
 	}
 
+	log.Printf("Repository: classRepository.ListAllClasses - Query bem-sucedida. %d turmas lidas.", len(classes))
 	return classes, nil
 }
 
