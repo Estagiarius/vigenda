@@ -121,7 +121,7 @@ func New(proofService service.ProofService) *Model { // Return *Model
 		inputs[i] = ti
 	}
 
-	return Model{
+	return &Model{ // Corrected to return a pointer
 		proofService: proofService,
 		state:        FormView,
 		textInputs:   inputs,

@@ -77,7 +77,7 @@ func New(questionService service.QuestionService) *Model { // Return *Model
 	ti.Placeholder = "Caminho para o arquivo JSON de questões"
 	inputs[0] = ti
 
-	return Model{
+	return &Model{ // Corrected to return a pointer
 		questionService: questionService,
 		state:           ActionListView,
 		list:            l,

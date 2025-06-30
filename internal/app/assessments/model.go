@@ -135,7 +135,7 @@ func New(assessmentService service.AssessmentService /*, classService service.Cl
 		inputs[i] = ti
 	}
 
-	return Model{
+	return &Model{ // Ensure this returns a pointer
 		assessmentService: assessmentService,
 		// classService: classService,
 		state:      ListView,
