@@ -91,7 +91,7 @@ func (m *Model) generateProofCmd() tea.Cmd {
 	}
 }
 
-func New(proofService service.ProofService) Model {
+func New(proofService service.ProofService) *Model { // Return *Model
 	inputs := make([]textinput.Model, 5) // SubjectID, Topic, Easy, Medium, Hard
 	placeholders := []string{
 		"ID da Disciplina (obrigatório)",
@@ -129,19 +129,21 @@ func New(proofService service.ProofService) Model {
 	}
 }
 
-func (m Model) Init() tea.Cmd {
+// Changed to pointer receiver
+func (m *Model) Init() tea.Cmd {
 	m.state = FormView
 	m.err = nil
 	m.message = "Insira os critérios para gerar a prova."
 	m.generatedProof = nil
-	m.resetForm()
-	if len(m.textInputs) > 0 {
-	    return m.textInputs[0].Focus()
-	}
+	m.resetForm() // resetForm now handles focus
+	// if len(m.textInputs) > 0 { // Focus is handled by resetForm
+	//     return m.textInputs[0].Focus()
+	// }
 	return nil
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type to tea.Model
+// Changed to pointer receiver
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -153,14 +155,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 				m.err = nil
 				m.message = "Insira os critérios para gerar a prova."
 				m.generatedProof = nil // Clear previous proof
-				m.resetForm() // Reset form fields
-				if len(m.textInputs) > 0 {
-					cmds = append(cmds, m.textInputs[0].Focus())
-				}
-				return m, tea.Batch(cmds...)
+				m.resetForm() // Reset form fields and focus
+				// No need to explicitly return focus cmd here as resetForm handles it.
+				return m, nil // Return m directly
 			}
 			// If in FormView, Esc is handled by parent model to go to main menu
-			return m, nil
+			return m, nil // Return m directly
 		}
 
 		switch m.state {
@@ -189,15 +189,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 				cmds = append(cmds, m.updateInputFocusStyle())
 			} else { // Pass to focused text input
 				if m.focusIndex < len(m.textInputs) {
-					m.textInputs[m.focusIndex], cmd = m.textInputs[m.focusIndex].Update(msg)
+					// m.textInputs[m.focusIndex], cmd = m.textInputs[m.focusIndex].Update(msg)
+					var updatedInput textinput.Model
+					updatedInput, cmd = m.textInputs[m.focusIndex].Update(msg)
+					m.textInputs[m.focusIndex] = updatedInput
 					cmds = append(cmds, cmd)
 				}
 			}
 
 		case ProofView:
 			// Currently, no interaction in proof view other than Esc
-			pass_through := true // TODO: remove this variable
-			_ = pass_through      // TODO: remove this variable
+			// pass_through := true // TODO: remove this variable
+			// _ = pass_through      // TODO: remove this variable
 		}
 
 	// Handle async results
@@ -223,22 +226,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 		m.state = FormView // Revert to form on other errors
 
 	case tea.WindowSizeMsg:
-		m.width = msg.Width - baseStyle.GetHorizontalFrameSize()
-		m.height = msg.Height - baseStyle.GetVerticalFrameSize() - 1
-
-		inputWidth := m.width - 4 // Basic padding
-		if inputWidth < 30 {
-			inputWidth = 30 // Min width for placeholders
-		}
-		for i := range m.textInputs {
-			m.textInputs[i].Width = inputWidth
-		}
+		m.SetSize(msg.Width, msg.Height) // Use SetSize method
 	}
 
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) View() string {
+// Changed to pointer receiver
+func (m *Model) View() string {
 	var b strings.Builder
 
 	if m.isLoading {

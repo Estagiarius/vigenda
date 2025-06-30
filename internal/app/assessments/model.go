@@ -95,7 +95,7 @@ func (m *Model) loadAssessmentsCmd(classID int64) tea.Cmd {
 }
 
 
-func New(assessmentService service.AssessmentService /*, classService service.ClassService */) Model {
+func New(assessmentService service.AssessmentService /*, classService service.ClassService */) *Model { // Return *Model
 	actionItems := []list.Item{
 		actionItem{title: "Listar Avaliações", description: "Visualizar todas as avaliações (pode pedir turma)."},
 		actionItem{title: "Criar Nova Avaliação", description: "Adicionar uma nova avaliação para uma turma."},
@@ -147,7 +147,8 @@ func New(assessmentService service.AssessmentService /*, classService service.Cl
 	}
 }
 
-func (m Model) Init() tea.Cmd {
+// Changed to pointer receiver
+func (m *Model) Init() tea.Cmd {
 	m.state = ListView
 	m.err = nil
 	m.message = ""
@@ -165,8 +166,8 @@ func (i actionItem) Title() string       { return i.title }
 func (i actionItem) Description() string { return i.description }
 func (i actionItem) FilterValue() string { return i.title }
 
-
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type to tea.Model
+// Changed to pointer receiver
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -192,8 +193,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 
 		switch m.state {
 		case ListView:
-			m.list, cmd = m.list.Update(msg)
+			// m.list, cmd = m.list.Update(msg)
+			var updatedList list.Model
+			updatedList, cmd = m.list.Update(msg)
+			m.list = updatedList
 			cmds = append(cmds, cmd)
+
 			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
 				selected, ok := m.list.SelectedItem().(actionItem)
 				if ok {
@@ -204,30 +209,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 					case "Listar Avaliações":
 						m.isLoading = true
 						m.state = ListAssessmentsView // Dedicated view for table
-						// We might need to ask for Class ID first or show all.
-						// For now, let's assume we list all.
-						// A better UX would be to list classes, select one, then list its assessments.
-						// This is a simplified path for now.
 						cmds = append(cmds, m.loadAssessmentsCmd(0)) // 0 for all, or adapt service
 					case "Criar Nova Avaliação":
 						m.state = CreateAssessmentView
 						m.setupCreateAssessmentForm()
 					case "Lançar Notas":
-						// This needs to first ask for Assessment ID
-						m.state = EnterGradesView // Intermediate state to ask for ID
+						m.state = EnterGradesView
 						m.setupEnterAssessmentIDForm("Lançar Notas para Avaliação ID:")
 					case "Calcular Média da Turma":
-						// This needs to first ask for Class ID
-						m.state = ClassAverageView // Intermediate state to ask for ID
+						m.state = ClassAverageView
 						m.setupEnterClassIDForm("Calcular Média para Turma ID:")
 					}
 				}
 			}
 
 		case ListAssessmentsView: // Navigating the table of assessments
-			m.table, cmd = m.table.Update(msg)
+			// m.table, cmd = m.table.Update(msg)
+			var updatedTable table.Model
+			updatedTable, cmd = m.table.Update(msg)
+			m.table = updatedTable
 			cmds = append(cmds, cmd)
-			// Potentially Enter here could select an assessment for details/actions
 
 		case CreateAssessmentView:
 			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
@@ -241,7 +242,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 				cmds = append(cmds, m.updateFormInputs(msg))
 			}
 
-		case EnterGradesView: // Could be asking for Assessment ID, or showing student list
+		case EnterGradesView:
 			if len(m.studentsForGrading) == 0 { // Still asking for Assessment ID
 				if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
 					if m.focusIndex == 1 { // Submit button for ID input
@@ -253,30 +254,22 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 							m.isLoading = false
 						} else {
 							m.currentAssessmentID = &assessmentID
-							// Now load students for this assessment
 							cmds = append(cmds, m.loadStudentsForGradingCmd(assessmentID))
 						}
-					} else {
+					} else { // Focus is on the input field itself
 						m.textInputs[0], cmd = m.textInputs[0].Update(msg)
 						cmds = append(cmds, cmd)
 					}
-				} else {
+				} else { // Other keys for the input field
 					m.textInputs[0], cmd = m.textInputs[0].Update(msg)
 					cmds = append(cmds, cmd)
 				}
 			} else { // Displaying students and grade inputs
-				// This part needs a more complex navigation (table for students, inputs for grades)
-				// For now, just acknowledge it's complex.
-				// Handle navigation between grade inputs, and a final submit.
-				// This is a placeholder for a more robust implementation.
 				if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
-					// Potentially submit all grades
 					m.isLoading = true
 					cmds = append(cmds, m.submitGradesCmd())
 				} else {
-					// Handle focus and input for grade fields (m.gradesInput)
-					// This is simplified. A real implementation would manage focus across many inputs.
-					// For now, let's assume any key press is for the "current" grade input if one were active.
+					// Simplified: This would need focus management for m.gradesInput
 				}
 			}
 
@@ -285,22 +278,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 				if m.focusIndex == 1 { // Submit button for ID input
 					m.isLoading = true
 					classIDStr := m.textInputs[0].Value()
-					// classID, err := strconv.ParseInt(classIDStr, 10, 64) // Comentado para evitar erro de não utilizado
 					_, err := strconv.ParseInt(classIDStr, 10, 64)
 					if err != nil {
 						m.err = fmt.Errorf("ID da Turma inválido: %w", err)
 						m.isLoading = false
 					} else {
-						// cmds = append(cmds, m.calculateClassAverageCmd(classID))
-						// Placeholder for actual call
 						m.err = fmt.Errorf("Cálculo de média da turma TUI não totalmente implementado.")
 						m.isLoading = false
 					}
-				} else {
+				} else { // Focus on input
 					m.textInputs[0], cmd = m.textInputs[0].Update(msg)
 					cmds = append(cmds, cmd)
 				}
-			} else {
+			} else { // Other keys for input
 				m.textInputs[0], cmd = m.textInputs[0].Update(msg)
 				cmds = append(cmds, cmd)
 			}
@@ -344,16 +334,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 			m.studentsForGrading = msg.students
 			m.message = fmt.Sprintf("Alunos carregados para avaliação: %s. Insira as notas.", msg.assessmentName)
 			m.gradesInput = make(map[int64]textinput.Model)
-			for _, s := range msg.students {
+			for i, s := range msg.students { // Use index for focus logic if needed
 				ti := textinput.New()
 				ti.Placeholder = "Nota (ex: 7.5)"
 				ti.CharLimit = 5
 				ti.Width = 10
-				// ti.Validate = isFloatOrEmpty // TODO: Implement validator
 				m.gradesInput[s.ID] = ti
+				if i == 0 { // Focus the first grade input
+					// This needs a proper focus management system for multiple inputs
+				}
 			}
-			// Focus the first grade input or a general "submit" area
-			// This part of UI interaction is complex and simplified here.
 		}
 
 	case gradesEnteredMsg:
@@ -364,8 +354,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 			m.message = "Notas lançadas com sucesso!"
 			m.state = ListView
 			m.list.Select(-1)
-			m.studentsForGrading = nil // Clear student list
-			m.gradesInput = make(map[int64]textinput.Model) // Clear grade inputs
+			m.studentsForGrading = nil
+			m.gradesInput = make(map[int64]textinput.Model)
 		}
 
 	case error:
@@ -373,33 +363,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 		m.isLoading = false
 
 	case tea.WindowSizeMsg:
-		m.width = msg.Width - baseStyle.GetHorizontalFrameSize()
-		m.height = msg.Height - baseStyle.GetVerticalFrameSize() -1
-
-		listHeight := m.height - lipgloss.Height(m.list.Title) - 2
-		m.list.SetSize(m.width, listHeight)
-
-		m.table.SetWidth(m.width)
-		tableHeight := m.height - 6
-		if tableHeight < 5 { tableHeight = 5 }
-		m.table.SetHeight(tableHeight)
-
-		inputWidth := m.width - 20 // More padding for forms
-		if inputWidth < 20 { inputWidth = 20 }
-		for i := range m.textInputs {
-			if i < len(m.textInputs) {
-				m.textInputs[i].Width = inputWidth
-			}
-		}
-		// Also resize gradesInput if active
-		for _, ti := range m.gradesInput {
-			ti.Width = 10 // Fixed small width for grade inputs
-		}
+		m.SetSize(msg.Width, msg.Height) // Use the SetSize method
 	}
 
 	// Update table if it's the component in focus (e.g. for scrolling)
-	if m.state == ListAssessmentsView {
-		m.table, cmd = m.table.Update(msg)
+	if m.state == ListAssessmentsView && m.table.Focused() { // Check if table is focused
+		var updatedTable table.Model
+		updatedTable, cmd = m.table.Update(msg)
+		m.table = updatedTable
 		cmds = append(cmds, cmd)
 	}
 
@@ -407,7 +378,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 	return m, tea.Batch(cmds...)
 }
 
-
+// Changed to pointer receiver
 func (m *Model) View() string {
 	var b strings.Builder
 

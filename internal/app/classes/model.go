@@ -71,7 +71,8 @@ type Model struct {
 }
 
 // New cria um novo modelo para a gestão de turmas.
-func New(cs service.ClassService) Model {
+// Changed to return *Model
+func New(cs service.ClassService) *Model {
 	log.Println("ClassesModel: New - Criando novo modelo de classes.")
 	// Tabela para listar turmas
 	classTable := table.New(
@@ -123,7 +124,7 @@ func New(cs service.ClassService) Model {
 	subjectIDInput.CharLimit = 10
 	subjectIDInput.Width = 20
 
-	return Model{
+	return &Model{ // Return pointer
 		classService:  cs,
 		state:         ListView, // Estado inicial é a lista
 		table:         classTable,
@@ -143,7 +144,8 @@ func New(cs service.ClassService) Model {
 }
 
 // Init carrega os dados iniciais para a gestão de turmas.
-func (m Model) Init() tea.Cmd {
+// Changed to pointer receiver
+func (m *Model) Init() tea.Cmd {
 	log.Printf("ClassesModel: Init - Chamado. isLoading antes: %t", m.isLoading)
 	m.isLoading = true // Garantir que o estado de carregamento seja ativado
 	log.Printf("ClassesModel: Init - isLoading depois: %t. Retornando fetchClassesCmd.", m.isLoading)
@@ -152,7 +154,8 @@ func (m Model) Init() tea.Cmd {
 
 
 // Update lida com mensagens e atualiza o modelo.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type to tea.Model
+// Changed to pointer receiver
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	log.Printf("ClassesModel: Update - Recebida msg tipo %T", msg) // Log adicionado anteriormente
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
@@ -202,9 +205,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 				m.createForm.subjectIDInput.SetValue("")
 				m.err = nil
 				m.selectedClass = nil // Limpa qualquer seleção anterior
-				return m, textinput.Blink
+				return m, textinput.Blink // Return m directly as it's now *Model
 			default:
-				m.table, cmd = m.table.Update(msg)
+				// m.table, cmd = m.table.Update(msg)
+				// cmds = append(cmds, cmd)
+				var updatedTable table.Model
+				updatedTable, cmd = m.table.Update(msg)
+				m.table = updatedTable
 				cmds = append(cmds, cmd)
 			}
 		// ... outros cases para CreatingView, DetailsView (para 'esc')...
@@ -217,7 +224,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 				m.createForm.nameInput.Blur()
 				m.createForm.subjectIDInput.Blur()
 				m.table.Focus() // Devolve o foco para a tabela de turmas
-				return m, nil
+				return m, nil // Return m directly
 			case key.Matches(msg, key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "salvar"))):
 				if m.createForm.focusIndex == 1 {
 					name := strings.TrimSpace(m.createForm.nameInput.Value())
@@ -225,7 +232,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 
 					if name == "" || subjectIDStr == "" {
 						m.err = fmt.Errorf("nome da turma e ID da disciplina são obrigatórios")
-						return m, nil
+						return m, nil // Return m directly
 					}
 					m.isLoading = true
 					cmds = append(cmds, m.createClassCmd(name, subjectIDStr))
@@ -284,7 +291,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 			default:
 				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
 					var studentsTableCmd tea.Cmd
-					m.studentsTable, studentsTableCmd = m.studentsTable.Update(msg)
+					// m.studentsTable, studentsTableCmd = m.studentsTable.Update(msg)
+					var updatedStudentsTable table.Model
+					updatedStudentsTable, studentsTableCmd = m.studentsTable.Update(msg)
+					m.studentsTable = updatedStudentsTable
 					cmds = append(cmds, studentsTableCmd)
 				}
 				// Lógica para outras teclas se nenhum elemento específico estiver focado
@@ -381,6 +391,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 	return m, tea.Batch(cmds...)
 }
 
+// Changed to pointer receiver
 func (m *Model) nextFormInput() {
 	m.createForm.focusIndex = (m.createForm.focusIndex + 1) % 2 // 2 campos
 	if m.createForm.focusIndex == 0 {
@@ -392,6 +403,7 @@ func (m *Model) nextFormInput() {
 	}
 }
 
+// Changed to pointer receiver
 func (m *Model) prevFormInput() {
 	m.createForm.focusIndex = (m.createForm.focusIndex - 1 + 2) % 2 // 2 campos
 	if m.createForm.focusIndex == 0 {
@@ -404,7 +416,8 @@ func (m *Model) prevFormInput() {
 }
 
 // View renderiza a UI para a gestão de turmas.
-func (m Model) View() string {
+// Changed to pointer receiver
+func (m *Model) View() string {
 	log.Printf("ClassesModel: View - Chamado. isLoading: %t, State: %v, Error: %v", m.isLoading, m.state, m.err)
 	var b strings.Builder
 

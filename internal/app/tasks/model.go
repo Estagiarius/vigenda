@@ -31,14 +31,16 @@ type tasksLoadedMsg struct {
 }
 
 // loadTasksCmd is a command that fetches tasks from the service.
-func (m Model) loadTasksCmd() tea.Msg {
+// Changed to pointer receiver for consistency, though not strictly necessary if it doesn't modify m
+func (m *Model) loadTasksCmd() tea.Msg {
 	tasks, err := m.taskService.ListAllActiveTasks(context.Background()) // Or another appropriate listing method
 	return tasksLoadedMsg{tasks: tasks, err: err}
 }
 
 // New creates a new task management model.
 // It requires a TaskService to interact with the backend.
-func New(taskService service.TaskService) Model {
+// Changed to return *Model
+func New(taskService service.TaskService) *Model {
 	// _ = time.Now() // Diagnostic to ensure 'time' package is seen as used.
 	columns := []table.Column{
 		{Title: "ID", Width: 4},
@@ -69,7 +71,7 @@ func New(taskService service.TaskService) Model {
 	t.SetStyles(s)
 
 	// isLoading is true by default as Init will be called to load tasks.
-	return Model{
+	return &Model{ // Return pointer
 		taskService: taskService,
 		table:       t,
 		isLoading:   true,
@@ -77,13 +79,15 @@ func New(taskService service.TaskService) Model {
 }
 
 // Init is called when the model becomes active. It starts the process of loading tasks.
-func (m Model) Init() tea.Cmd {
+// Changed to pointer receiver
+func (m *Model) Init() tea.Cmd {
 	m.isLoading = true // Explicitly set loading to true
 	m.err = nil        // Clear any previous errors
 	return m.loadTasksCmd
 }
 
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type to tea.Model
+// Changed to pointer receiver
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
@@ -124,11 +128,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { // Changed return type
 		return m, nil
 	}
 
-	m.table, cmd = m.table.Update(msg) // This updates the table's internal state (like cursor)
+	// Ensure m.table is updated if it's a pointer, or if m.table.Update modifies it in place
+	// and returns a new table instance (which is typical for Bubbles components).
+	var updatedTable table.Model
+	updatedTable, cmd = m.table.Update(msg) // This updates the table's internal state (like cursor)
+	m.table = updatedTable
 	return m, cmd
 }
 
-func (m Model) View() string {
+// Changed to pointer receiver
+func (m *Model) View() string {
 	if m.err != nil {
 		// Basic error display for now
 		return "Erro ao carregar tarefas: " + m.err.Error()

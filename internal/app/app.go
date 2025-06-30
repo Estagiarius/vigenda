@@ -26,11 +26,11 @@ var (
 type Model struct {
 	list             list.Model
 	currentView      View
-	tasksModel       tasks.Model       // Tasks sub-model
-	classesModel     classes.Model     // Classes sub-model
-	assessmentsModel assessments.Model // Assessments sub-model
-	questionsModel   questions.Model   // Questions sub-model
-	proofsModel      proofs.Model      // Proofs sub-model
+	tasksModel       *tasks.Model       // Changed to pointer
+	classesModel     *classes.Model     // Changed to pointer
+	assessmentsModel *assessments.Model // Changed to pointer
+	questionsModel   *questions.Model   // Changed to pointer
+	proofsModel      *proofs.Model      // Changed to pointer
 	// Add other sub-models here as they are developed
 	width    int
 	height   int
@@ -47,13 +47,15 @@ type Model struct {
 }
 
 // Init initializes the application model.
-func (m Model) Init() tea.Cmd {
+// Changed to pointer receiver
+func (m *Model) Init() tea.Cmd {
 	return nil // No initial command, sub-models handle their own Init
 }
 
 // New creates a new instance of the application model.
 // It requires services to be injected for its sub-models.
-func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /* add other services as params */) Model {
+// Changed to return *Model
+func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /* add other services as params */) *Model {
 	// Define menu items using the View enum for safer mapping
 	menuItems := []list.Item{
 		menuItem{title: DashboardView.String(), view: DashboardView}, // Dashboard is the menu itself
@@ -84,18 +86,18 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 	qm := questions.New(qs)
 	pm := proofs.New(ps) // Initialize proofs model
 
-	return Model{
+	return &Model{ // Return pointer
 		list:              l,
 		currentView:       DashboardView, // Start with the main menu
-		tasksModel:        tm,
+		tasksModel:        tm, // tasks.New now returns *tasks.Model
 		taskService:       ts,
-		classesModel:      cm,
+		classesModel:      cm, // classes.New now returns *classes.Model
 		classService:      cs,
-		assessmentsModel:  am,
+		assessmentsModel:  am, // assessments.New now returns *assessments.Model
 		assessmentService: as,
-		questionsModel:    qm,
+		questionsModel:    qm, // questions.New now returns *questions.Model
 		questionService:   qs,
-		proofsModel:       pm,
+		proofsModel:       pm, // proofs.New now returns *proofs.Model
 		proofService:      ps,
 	}
 }
@@ -111,7 +113,8 @@ func (i menuItem) Title() string       { return i.title }
 func (i menuItem) Description() string { return "" } // Could add descriptions later
 
 // Update handles messages and updates the model.
-func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Changed to pointer receiver
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	log.Printf("AppModel: Update GLOBAL - Recebida msg tipo %T Valor: %v", msg, msg)
 	var cmd tea.Cmd
 	var cmds []tea.Cmd // Use a slice to collect commands
@@ -209,7 +212,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TaskManagementView:
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.tasksModel.Update(msg) // msg is the original tea.Msg
-		m.tasksModel = updatedModel.(tasks.Model)
+		m.tasksModel = updatedModel.(*tasks.Model) // Type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		// Handle 'esc' to go back to dashboard
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
@@ -222,7 +225,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Printf("AppModel: Update (delegação) - CurrentView=ClassManagementView, encaminhando msg tipo %T para ClassesModel.Update", msg)
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.classesModel.Update(msg) // msg is the original tea.Msg
-		m.classesModel = updatedModel.(classes.Model)
+		m.classesModel = updatedModel.(*classes.Model) // Type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
 			if !m.classesModel.IsFocused() {
@@ -233,7 +236,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case AssessmentManagementView:
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.assessmentsModel.Update(msg)
-		m.assessmentsModel = updatedModel.(assessments.Model)
+		m.assessmentsModel = updatedModel.(*assessments.Model) // Type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
 			if !m.assessmentsModel.IsFocused() {
@@ -244,7 +247,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case QuestionBankView:
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.questionsModel.Update(msg)
-		m.questionsModel = updatedModel.(questions.Model)
+		m.questionsModel = updatedModel.(*questions.Model) // Type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
 			if !m.questionsModel.IsFocused() {
@@ -255,7 +258,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ProofGenerationView:
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.proofsModel.Update(msg)
-		m.proofsModel = updatedModel.(proofs.Model)
+		m.proofsModel = updatedModel.(*proofs.Model) // Type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
 			if !m.proofsModel.IsFocused() {
@@ -271,7 +274,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the application's UI.
-func (m Model) View() string {
+// Changed to pointer receiver
+func (m *Model) View() string {
 	if m.quitting {
 		return appStyle.Render("Saindo do Vigenda...\n")
 	}
@@ -317,10 +321,13 @@ func (m Model) View() string {
 // StartApp is a helper to run the BubbleTea program.
 // It requires services to be passed for initializing the main model.
 func StartApp(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /*, other services */) {
+	// New now returns *Model, so model is already a pointer.
 	model := New(ts, cs, as, qs, ps /*, other services */)
+	// tea.NewProgram expects tea.Model, and *Model now implements tea.Model.
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
-		fmt.Fprintf(os.Stderr, "Error running BubbleTea program: %v\n", err)
-		os.Exit(1)
+		// Use log for consistency, as file logging is set up.
+		log.Fatalf("Error running BubbleTea program: %v", err)
+		// os.Exit(1) // log.Fatalf will exit
 	}
 }
