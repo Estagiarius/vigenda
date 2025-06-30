@@ -112,6 +112,7 @@ func (i menuItem) Description() string { return "" } // Could add descriptions l
 
 // Update handles messages and updates the model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	log.Printf("AppModel: Update GLOBAL - Recebida msg tipo %T Valor: %v", msg, msg)
 	var cmd tea.Cmd
 
 	switch msg := msg.(type) {
