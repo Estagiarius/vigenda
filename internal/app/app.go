@@ -114,130 +114,160 @@ func (i menuItem) Description() string { return "" } // Could add descriptions l
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	log.Printf("AppModel: Update GLOBAL - Recebida msg tipo %T Valor: %v", msg, msg)
 	var cmd tea.Cmd
+	var cmds []tea.Cmd // Use a slice to collect commands
 
+	// First switch for messages that AppModel handles directly or globally
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Adjust list size, leaving space for title and help
 		listHeight := msg.Height - appStyle.GetVerticalPadding() - lipgloss.Height(m.list.Title) - 2
 		m.list.SetSize(msg.Width-appStyle.GetHorizontalPadding(), listHeight)
 
-		// Propagate size to sub-models
-		// Subtracting space used by main app's padding/title, etc.
-		// This might need adjustment based on how much space the main app's chrome takes.
-		subViewWidth := msg.Width - appStyle.GetHorizontalPadding()
-		subViewHeight := msg.Height - appStyle.GetVerticalPadding() // Example: if subview takes full height within padding
+		// Propagate WindowSizeMsg to all submodels so they can resize
+		var subCmd tea.Cmd
+		// We don't strictly need to capture the updated models here if WindowSizeMsg only affects size
+		// and doesn't return a new model instance, but it's safer if it might.
+		updatedTasksModel, subCmd := m.tasksModel.Update(msg)
+		m.tasksModel = updatedTasksModel.(tasks.Model) // Assuming Update might change the model type or state
+		cmds = append(cmds, subCmd)
 
-		m.tasksModel.SetSize(subViewWidth, subViewHeight)
-		m.classesModel.SetSize(subViewWidth, subViewHeight)
-		m.assessmentsModel.SetSize(subViewWidth, subViewHeight)
-		m.questionsModel.SetSize(subViewWidth, subViewHeight)
-		m.proofsModel.SetSize(subViewWidth, subViewHeight) // Propagate to proofsModel too
+		updatedClassesModel, subCmd := m.classesModel.Update(msg)
+		m.classesModel = updatedClassesModel.(classes.Model)
+		cmds = append(cmds, subCmd)
 
-		return m, nil
+		updatedAssessmentsModel, subCmd := m.assessmentsModel.Update(msg)
+		m.assessmentsModel = updatedAssessmentsModel.(assessments.Model)
+		cmds = append(cmds, subCmd)
+
+		updatedQuestionsModel, subCmd := m.questionsModel.Update(msg)
+		m.questionsModel = updatedQuestionsModel.(questions.Model)
+		cmds = append(cmds, subCmd)
+
+		updatedProofsModel, subCmd := m.proofsModel.Update(msg)
+		m.proofsModel = updatedProofsModel.(proofs.Model)
+		cmds = append(cmds, subCmd)
+		return m, tea.Batch(cmds...)
 
 	case tea.KeyMsg:
-		// Global keybindings
+		// Global quit
 		if key.Matches(msg, key.NewBinding(key.WithKeys("ctrl+c"))) {
 			m.quitting = true
-			return m, tea.Quit
+			cmds = append(cmds, tea.Quit)
+			return m, tea.Batch(cmds...)
 		}
 
-		// View-specific keybindings
-		switch m.currentView {
-		case DashboardView: // Main Menu
-			switch {
-			case key.Matches(msg, key.NewBinding(key.WithKeys("q"))):
-				m.quitting = true
-				return m, tea.Quit
-			case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
-				selectedItem, ok := m.list.SelectedItem().(menuItem)
-				if ok {
-					if selectedItem.view != DashboardView {
-						m.currentView = selectedItem.view
+		if m.currentView == DashboardView {
+			// Handle navigation for the main menu
+			var listCmd tea.Cmd
+			m.list, listCmd = m.list.Update(msg)
+			cmds = append(cmds, listCmd)
 
-						// If switching to a view that needs initialization (like loading data)
-						if m.currentView == TaskManagementView {
-							cmd = m.tasksModel.Init()
-						} else if m.currentView == ClassManagementView {
-							cmd = m.classesModel.Init()
-						} else if m.currentView == AssessmentManagementView {
-							cmd = m.assessmentsModel.Init()
-						} else if m.currentView == QuestionBankView {
-							cmd = m.questionsModel.Init()
-						} else if m.currentView == ProofGenerationView {
-							cmd = m.proofsModel.Init()
-						}
+			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
+				selectedItem, ok := m.list.SelectedItem().(menuItem)
+				if ok && selectedItem.view != DashboardView {
+					m.currentView = selectedItem.view
+					log.Printf("AppModel: Mudando para view %v", m.currentView)
+					// Dispatch Init command for the selected submodel
+					switch m.currentView {
+					case TaskManagementView:
+						cmds = append(cmds, m.tasksModel.Init())
+					case ClassManagementView:
+						cmds = append(cmds, m.classesModel.Init())
+					case AssessmentManagementView:
+						cmds = append(cmds, m.assessmentsModel.Init())
+					case QuestionBankView:
+						cmds = append(cmds, m.questionsModel.Init())
+					case ProofGenerationView:
+						cmds = append(cmds, m.proofsModel.Init())
 					}
 				}
-				return m, cmd
+			} else if key.Matches(msg, key.NewBinding(key.WithKeys("q"))) { // 'q' to quit from dashboard
+				m.quitting = true
+				cmds = append(cmds, tea.Quit)
 			}
-			m.list, cmd = m.list.Update(msg)
-
-		case TaskManagementView:
-			var updatedTasksModel tasks.Model
-			updatedTasksModel, cmd = m.tasksModel.Update(msg)
-			m.tasksModel = updatedTasksModel
-			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) { // 'q' might be for sub-model actions
-				if !m.tasksModel.IsFocused() {
-					m.currentView = DashboardView
-				}
-			}
-
-		case ClassManagementView:
-			log.Printf("AppModel: Update - CurrentView=ClassManagementView, encaminhando msg tipo %T para ClassesModel.Update", msg)
-			var updatedClassesModel classes.Model
-			updatedClassesModel, cmd = m.classesModel.Update(msg)
-			m.classesModel = updatedClassesModel
-			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) {
-				if !m.classesModel.IsFocused() {
-					m.currentView = DashboardView
-				}
-			}
-
-		case AssessmentManagementView:
-			var updatedAssessmentsModel assessments.Model
-			updatedAssessmentsModel, cmd = m.assessmentsModel.Update(msg)
-			m.assessmentsModel = updatedAssessmentsModel
-			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) {
-				if !m.assessmentsModel.IsFocused() {
-					m.currentView = DashboardView
-				}
-			}
-
-		case QuestionBankView:
-			var updatedQuestionsModel questions.Model
-			updatedQuestionsModel, cmd = m.questionsModel.Update(msg)
-			m.questionsModel = updatedQuestionsModel
-			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) {
-				if !m.questionsModel.IsFocused() {
-					m.currentView = DashboardView
-				}
-			}
-
-		case ProofGenerationView:
-			var updatedProofsModel proofs.Model
-			updatedProofsModel, cmd = m.proofsModel.Update(msg)
-			m.proofsModel = updatedProofsModel
-			if key.Matches(msg, key.NewBinding(key.WithKeys("esc"))) {
-				if !m.proofsModel.IsFocused() {
-					m.currentView = DashboardView
-				}
-			}
-
-		default: // Other views (if any become active without specific handling yet)
-			if key.Matches(msg, key.NewBinding(key.WithKeys("esc", "q"))) {
-				m.currentView = DashboardView // Default back to dashboard
-				return m, nil
-			}
+			return m, tea.Batch(cmds...)
 		}
+		// If not in DashboardView, KeyMsg will be passed to the submodel delegation below.
 
 	case error:
 		m.err = msg
-		return m, nil
+		log.Printf("AppModel: Erro global recebido: %v", msg)
+		// Optionally, you might want to switch to an error view or quit
+		// For now, just store the error. The View method can display it.
+		// cmds = append(cmds, tea.Quit) // Uncomment to quit on any unhandled error
+		return m, tea.Batch(cmds...) // Return accumulated commands
+
+		// Default case for the first switch: if the msg type wasn't WindowSizeMsg, KeyMsg (for dashboard), or error,
+		// it will fall through to the submodel delegation logic.
 	}
-	return m, cmd
+
+	// Second stage: Delegate message to the active submodel if not handled above
+	// This is where messages like `classes.fetchedClassesMsg` should be handled.
+	var submodelCmd tea.Cmd
+	switch m.currentView {
+	case TaskManagementView:
+		var updatedModel tea.Model
+		updatedModel, submodelCmd = m.tasksModel.Update(msg) // msg is the original tea.Msg
+		m.tasksModel = updatedModel.(tasks.Model)
+		cmds = append(cmds, submodelCmd)
+		// Handle 'esc' to go back to dashboard
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if !m.tasksModel.IsFocused() { // Check if submodel itself wants to handle Esc
+				m.currentView = DashboardView
+				log.Println("AppModel: Voltando para DashboardView a partir de TaskManagementView.")
+			}
+		}
+	case ClassManagementView:
+		log.Printf("AppModel: Update (delegação) - CurrentView=ClassManagementView, encaminhando msg tipo %T para ClassesModel.Update", msg)
+		var updatedModel tea.Model
+		updatedModel, submodelCmd = m.classesModel.Update(msg) // msg is the original tea.Msg
+		m.classesModel = updatedModel.(classes.Model)
+		cmds = append(cmds, submodelCmd)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if !m.classesModel.IsFocused() {
+				m.currentView = DashboardView
+				log.Println("AppModel: Voltando para DashboardView a partir de ClassManagementView.")
+			}
+		}
+	case AssessmentManagementView:
+		var updatedModel tea.Model
+		updatedModel, submodelCmd = m.assessmentsModel.Update(msg)
+		m.assessmentsModel = updatedModel.(assessments.Model)
+		cmds = append(cmds, submodelCmd)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if !m.assessmentsModel.IsFocused() {
+				m.currentView = DashboardView
+				log.Println("AppModel: Voltando para DashboardView a partir de AssessmentManagementView.")
+			}
+		}
+	case QuestionBankView:
+		var updatedModel tea.Model
+		updatedModel, submodelCmd = m.questionsModel.Update(msg)
+		m.questionsModel = updatedModel.(questions.Model)
+		cmds = append(cmds, submodelCmd)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if !m.questionsModel.IsFocused() {
+				m.currentView = DashboardView
+				log.Println("AppModel: Voltando para DashboardView a partir de QuestionBankView.")
+			}
+		}
+	case ProofGenerationView:
+		var updatedModel tea.Model
+		updatedModel, submodelCmd = m.proofsModel.Update(msg)
+		m.proofsModel = updatedModel.(proofs.Model)
+		cmds = append(cmds, submodelCmd)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if !m.proofsModel.IsFocused() {
+				m.currentView = DashboardView
+				log.Println("AppModel: Voltando para DashboardView a partir de ProofGenerationView.")
+			}
+		}
+		// Note: DashboardView itself doesn't have a submodel Update to call here,
+		// its interactions (list navigation) are handled in the tea.KeyMsg case of the first switch.
+	}
+
+	return m, tea.Batch(cmds...)
 }
 
 // View renders the application's UI.
