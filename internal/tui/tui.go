@@ -70,6 +70,7 @@ type Model struct {
 
 // NewTUIModel creates a new TUI model.
 func NewTUIModel(cs service.ClassService) Model {
+	log.Printf("TUI: NewTUIModel - Chamado. ClassService is nil: %t", cs == nil)
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -81,7 +82,9 @@ func NewTUIModel(cs service.ClassService) Model {
 		currentView:  app.DashboardView, // Start with Dashboard or main menu
 		isLoading:    false,
 	}
+	log.Println("TUI: NewTUIModel - Modelo TUI parcialmente inicializado, chamando loadInitialData.")
 	m.loadInitialData() // Load initial list of items (e.g., main menu options or classes)
+	log.Println("TUI: NewTUIModel - loadInitialData chamado, retornando modelo.")
 	return m
 }
 
@@ -309,11 +312,20 @@ type studentsLoadedMsg []models.Student
 
 // Start runs the TUI.
 func Start(classService service.ClassService) error {
+	log.Printf("TUI: Start - Função Start chamada. ClassService is nil: %t", classService == nil)
 	if classService == nil {
-		log.Fatal("ClassService não pode ser nulo para iniciar a TUI")
+		// Usar log.Fatalf fará com que a aplicação encerre, o que é apropriado aqui.
+		// O log irá para o arquivo de log configurado antes do encerramento.
+		log.Fatalf("TUI: Start - ClassService não pode ser nulo para iniciar a TUI.")
 	}
 	m := NewTUIModel(classService)
 	p := tea.NewProgram(m, tea.WithAltScreen()) // Use AltScreen for better TUI experience
+	log.Println("TUI: Start - Iniciando programa Bubble Tea (p.Run()).")
 	_, err := p.Run()
+	if err != nil {
+		log.Printf("TUI: Start - Erro ao executar o programa Bubble Tea: %v", err)
+	} else {
+		log.Println("TUI: Start - Programa Bubble Tea finalizado sem erros.")
+	}
 	return err
 }
