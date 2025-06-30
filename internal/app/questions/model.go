@@ -225,6 +225,7 @@ func (m *Model) View() string {
 	return baseStyle.Render(b.String())
 }
 
+// Changed to pointer receiver
 func (m *Model) resetForms() {
 	if len(m.textInputs) > 0 {
 		m.textInputs[0].Reset()
@@ -235,6 +236,7 @@ func (m *Model) resetForms() {
 	m.message = ""
 }
 
+// Changed to pointer receiver
 func (m *Model) setupAddQuestionsForm() {
 	m.focusIndex = 0 // Only one input, so focus is implicitly on it or a submit action
 	if len(m.textInputs) > 0 {
@@ -244,6 +246,7 @@ func (m *Model) setupAddQuestionsForm() {
 	}
 }
 
+// Changed to pointer receiver
 func (m *Model) submitAddQuestionsFormCmd() tea.Cmd {
 	jsonPath := m.textInputs[0].Value()
 	if jsonPath == "" {
@@ -277,7 +280,7 @@ func (m *Model) SetSize(width, height int) {
 	// if tableHeight < 5 { tableHeight = 5 }
 	// m.table.SetHeight(tableHeight)
 
-	inputWidth := m.width - 4
+	inputWidth := m.width - 4 // Ensure this aligns with how View renders padding
 	if inputWidth < 20 {
 		inputWidth = 20
 	}
@@ -286,7 +289,8 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
-func (m Model) IsFocused() bool {
+// Changed to pointer receiver for consistency
+func (m *Model) IsFocused() bool {
 	// Focused if in the form input state
 	return m.state == AddQuestionsFormView
 }

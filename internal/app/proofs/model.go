@@ -298,6 +298,7 @@ func (m *Model) View() string {
 	return baseStyle.Render(b.String())
 }
 
+// Changed to pointer receiver (already was, just confirming)
 func (m *Model) resetForm() {
 	for i := range m.textInputs {
 		m.textInputs[i].Reset()
@@ -324,6 +325,7 @@ func (m *Model) updateInputFocusStyle() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// isNumberOrEmpty validator remains a package-level function, no receiver needed.
 func isNumberOrEmpty(s string) error {
 	if s == "" {
 		return nil // Allow empty, implies 0 for counts
@@ -334,19 +336,21 @@ func isNumberOrEmpty(s string) error {
 	return nil
 }
 
+// SetSize method already uses a pointer receiver.
 func (m *Model) SetSize(width, height int) {
 	m.width = width - baseStyle.GetHorizontalFrameSize()
-	m.height = height - baseStyle.GetVerticalFrameSize() - 1
+	m.height = height - baseStyle.GetVerticalFrameSize() - 1 // Adjusted for potential message line
 
-	inputWidth := m.width - 4
-	if inputWidth < 30 { inputWidth = 30 }
+	inputLayoutWidth := m.width - 4 // General padding for input area
+	if inputLayoutWidth < 30 { inputLayoutWidth = 30 } // Min width for placeholders
 
 	for i := range m.textInputs {
-		m.textInputs[i].Width = inputWidth
+		m.textInputs[i].Width = inputLayoutWidth
 	}
 }
 
-func (m Model) IsFocused() bool {
+// Changed to pointer receiver for consistency
+func (m *Model) IsFocused() bool {
 	// The form is always the primary interaction if this model is active,
 	// until a proof is generated. When proof is shown, it's more of a display state.
 	return m.state == FormView

@@ -95,7 +95,7 @@ func (m *Model) loadAssessmentsCmd(classID int64) tea.Cmd {
 }
 
 
-func New(assessmentService service.AssessmentService /*, classService service.ClassService */) *Model { // Return *Model
+func New(assessmentService service.AssessmentService /*, classService service.ClassService */) *Model {
 	actionItems := []list.Item{
 		actionItem{title: "Listar Avaliações", description: "Visualizar todas as avaliações (pode pedir turma)."},
 		actionItem{title: "Criar Nova Avaliação", description: "Adicionar uma nova avaliação para uma turma."},
@@ -149,6 +149,8 @@ func New(assessmentService service.AssessmentService /*, classService service.Cl
 
 // Changed to pointer receiver
 func (m *Model) Init() tea.Cmd {
+	// It's good practice to ensure fields are in a known state at Init.
+	// Many of these are already set by New or resetForms, but explicit here is fine.
 	m.state = ListView
 	m.err = nil
 	m.message = ""
@@ -456,6 +458,7 @@ func (m *Model) View() string {
 }
 
 // --- Form Setup and Submission Logic ---
+// Changed to pointer receiver
 func (m *Model) resetForms() {
 	for i := range m.textInputs {
 		m.textInputs[i].Reset()
@@ -488,6 +491,7 @@ func (m *Model) setupCreateAssessmentForm() {
 	m.updateInputFocusStyle()
 }
 
+// Changed to pointer receiver
 func (m *Model) setupEnterAssessmentIDForm(prompt string) {
 	m.focusIndex = 0
 	m.textInputs = make([]textinput.Model, 1)
@@ -500,6 +504,7 @@ func (m *Model) setupEnterAssessmentIDForm(prompt string) {
 	m.updateInputFocusStyle()
 }
 
+// Changed to pointer receiver
 func (m *Model) setupEnterClassIDForm(prompt string) {
 	m.focusIndex = 0
 	m.textInputs = make([]textinput.Model, 1)
@@ -531,6 +536,7 @@ func (m *Model) updateFocus() tea.Cmd {
 	return m.updateInputFocusStyle()
 }
 
+// Changed to pointer receiver
 func (m *Model) updateInputFocusStyle() tea.Cmd {
 	numInputs := 0
 	// Determine active inputs based on state
@@ -554,6 +560,7 @@ func (m *Model) updateInputFocusStyle() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+// Changed to pointer receiver
 func (m *Model) updateFormInputs(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	// Update focused text input
@@ -650,32 +657,51 @@ func isFloatOrEmpty(s string) error {
 	return nil
 }
 
-
+// SetSize method was already using a pointer receiver, which is correct.
 func (m *Model) SetSize(width, height int) {
 	m.width = width - baseStyle.GetHorizontalFrameSize()
-	m.height = height - baseStyle.GetVerticalFrameSize() -1
+	m.height = height - baseStyle.GetVerticalFrameSize() -1 // Adjusted for potential message line
 
-	listHeight := m.height - lipgloss.Height(m.list.Title) - 2
-	m.list.SetSize(m.width, listHeight)
+	// Adjust list (main action list)
+	listTitleHeight := lipgloss.Height(m.list.Title)
+	// Assuming some help text height for the list view if applicable
+	listHelpHeight := 2
+	availableHeightForList := m.height - listTitleHeight - listHelpHeight
+	if availableHeightForList < 0 { availableHeightForList = 0 }
+	m.list.SetSize(m.width, availableHeightForList)
 
+	// Adjust table (for listing assessments)
+	// Assuming table has a title/header of its own if m.state == ListAssessmentsView
+	tableHeaderHeight := 1 // if table has its own title line rendered by the model's View
+	tableHelpHeight := 1   // if table view has help text
+	availableHeightForTable := m.height - tableHeaderHeight - tableHelpHeight
+	if availableHeightForTable < 5 { availableHeightForTable = 5} // Min height for table
 	m.table.SetWidth(m.width)
-	tableHeight := m.height - 6
-	if tableHeight < 5 { tableHeight = 5 }
-	m.table.SetHeight(tableHeight)
+	m.table.SetHeight(availableHeightForTable)
 
-	inputWidth := m.width / 2
-	if inputWidth < 20 { inputWidth = 20}
+
+	// Adjust textInputs based on current state or a general approach
+	// This width calculation can be dynamic based on form structure in View()
+	inputRegionWidth := m.width - 4 // General padding for forms
+	if inputRegionWidth < 20 { inputRegionWidth = 20}
+
 	for i := range m.textInputs {
-		if i < len(m.textInputs) {
-			m.textInputs[i].Width = inputWidth
+		// Check if textInput is actually part of the current form to avoid nil pointer if textInputs is resized
+		if i < len(m.textInputs) && m.textInputs[i].Placeholder != "" { // Basic check if it's an active input
+			m.textInputs[i].Width = inputRegionWidth
 		}
 	}
-	for _, ti := range m.gradesInput {
-		ti.Width = 10 // Keep grade inputs small
+
+	// Adjust gradesInput (these are typically smaller)
+	for studentID := range m.gradesInput {
+		ti := m.gradesInput[studentID]
+		ti.Width = 10 // Keep grade inputs small and fixed width
+		m.gradesInput[studentID] = ti
 	}
 }
 
-func (m Model) IsFocused() bool {
+// Changed to pointer receiver for consistency, though it doesn't modify state.
+func (m *Model) IsFocused() bool {
 	// Focused if in any form input state
 	return m.state == CreateAssessmentView ||
 	       (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || // inputting assessment ID

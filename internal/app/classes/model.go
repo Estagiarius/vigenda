@@ -391,8 +391,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-// Changed to pointer receiver
-func (m *Model) nextFormInput() {
+func (m *Model) nextFormInput() { // Already a pointer receiver, correct.
 	m.createForm.focusIndex = (m.createForm.focusIndex + 1) % 2 // 2 campos
 	if m.createForm.focusIndex == 0 {
 		m.createForm.nameInput.Focus()
@@ -403,8 +402,7 @@ func (m *Model) nextFormInput() {
 	}
 }
 
-// Changed to pointer receiver
-func (m *Model) prevFormInput() {
+func (m *Model) prevFormInput() { // Already a pointer receiver, correct.
 	m.createForm.focusIndex = (m.createForm.focusIndex - 1 + 2) % 2 // 2 campos
 	if m.createForm.focusIndex == 0 {
 		m.createForm.nameInput.Focus()
@@ -556,7 +554,8 @@ func (m *Model) SetSize(width, height int) {
 }
 
 // IsFocused indica se o modelo de turmas tem algum input focado.
-func (m Model) IsFocused() bool {
+// Changed to pointer receiver
+func (m *Model) IsFocused() bool {
 	return m.state == CreatingView // Se estiver no formulário, considera focado para 'esc' local
 }
 
