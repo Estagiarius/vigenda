@@ -212,7 +212,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case TaskManagementView:
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.tasksModel.Update(msg) // msg is the original tea.Msg
-		m.tasksModel = updatedModel.(*tasks.Model) // Type assertion to pointer
+		m.tasksModel = updatedModel.(*tasks.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		// Handle 'esc' to go back to dashboard
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
@@ -225,7 +225,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		log.Printf("AppModel: Update (delegação) - CurrentView=ClassManagementView, encaminhando msg tipo %T para ClassesModel.Update", msg)
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.classesModel.Update(msg) // msg is the original tea.Msg
-		m.classesModel = updatedModel.(*classes.Model) // Type assertion to pointer
+		m.classesModel = updatedModel.(*classes.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
 			if !m.classesModel.IsFocused() {
@@ -236,7 +236,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case AssessmentManagementView:
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.assessmentsModel.Update(msg)
-		m.assessmentsModel = updatedModel.(*assessments.Model) // Type assertion to pointer
+		m.assessmentsModel = updatedModel.(*assessments.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
 			if !m.assessmentsModel.IsFocused() {
@@ -247,7 +247,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case QuestionBankView:
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.questionsModel.Update(msg)
-		m.questionsModel = updatedModel.(*questions.Model) // Type assertion to pointer
+		m.questionsModel = updatedModel.(*questions.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
 			if !m.questionsModel.IsFocused() {
@@ -258,7 +258,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ProofGenerationView:
 		var updatedModel tea.Model
 		updatedModel, submodelCmd = m.proofsModel.Update(msg)
-		m.proofsModel = updatedModel.(*proofs.Model) // Type assertion to pointer
+		m.proofsModel = updatedModel.(*proofs.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
 			if !m.proofsModel.IsFocused() {
