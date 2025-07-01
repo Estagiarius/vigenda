@@ -52,7 +52,7 @@ type questionsAddedMsg struct {
 // --- Cmds ---
 // (No initial data loading command like loadQuestionsCmd unless we implement listing)
 
-func New(questionService service.QuestionService) Model {
+func New(questionService service.QuestionService) *Model { // Return *Model
 	actionItems := []list.Item{
 		actionItem{title: "Adicionar Questões de JSON", description: "Importar questões de um arquivo JSON."},
 		// actionItem{title: "Listar Questões", description: "Visualizar e filtrar questões do banco."},
@@ -77,7 +77,7 @@ func New(questionService service.QuestionService) Model {
 	ti.Placeholder = "Caminho para o arquivo JSON de questões"
 	inputs[0] = ti
 
-	return Model{
+	return &Model{ // Corrected to return a pointer
 		questionService: questionService,
 		state:           ActionListView,
 		list:            l,
@@ -86,7 +86,8 @@ func New(questionService service.QuestionService) Model {
 	}
 }
 
-func (m Model) Init() tea.Cmd {
+// Changed to pointer receiver
+func (m *Model) Init() tea.Cmd {
 	m.state = ActionListView
 	m.err = nil
 	m.message = ""
@@ -103,7 +104,8 @@ func (i actionItem) Title() string       { return i.title }
 func (i actionItem) Description() string { return i.description }
 func (i actionItem) FilterValue() string { return i.title }
 
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+// Changed to pointer receiver
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -124,8 +126,12 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		switch m.state {
 		case ActionListView:
-			m.list, cmd = m.list.Update(msg)
+			// m.list, cmd = m.list.Update(msg)
+			var updatedList list.Model
+			updatedList, cmd = m.list.Update(msg)
+			m.list = updatedList
 			cmds = append(cmds, cmd)
+
 			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
 				selected, ok := m.list.SelectedItem().(actionItem)
 				if ok {
@@ -147,13 +153,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 		case AddQuestionsFormView:
 			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
-				// Since there's only one input, Enter on the input field or a conceptual "submit"
-				// For simplicity, assume Enter on the input means submit.
-				// A more robust form would have a separate submit button/focus state.
 				m.isLoading = true
 				cmds = append(cmds, m.submitAddQuestionsFormCmd())
 			} else {
-				m.textInputs[0], cmd = m.textInputs[0].Update(msg)
+				// m.textInputs[0], cmd = m.textInputs[0].Update(msg)
+				var updatedInput textinput.Model
+				updatedInput, cmd = m.textInputs[0].Update(msg)
+				m.textInputs[0] = updatedInput
 				cmds = append(cmds, cmd)
 			}
 		}
@@ -175,25 +181,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		m.isLoading = false
 
 	case tea.WindowSizeMsg:
-		m.width = msg.Width - baseStyle.GetHorizontalFrameSize()
-		m.height = msg.Height - baseStyle.GetVerticalFrameSize() - 1
-
-		listHeight := m.height - lipgloss.Height(m.list.Title) - 2
-		m.list.SetSize(m.width, listHeight)
-
-		inputWidth := m.width - 4 // Some padding
-		if inputWidth < 20 {
-			inputWidth = 20
-		}
-		if len(m.textInputs) > 0 {
-			m.textInputs[0].Width = inputWidth
-		}
+		m.SetSize(msg.Width, msg.Height) // Use the SetSize method
 	}
 
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) View() string {
+// Changed to pointer receiver
+func (m *Model) View() string {
 	var b strings.Builder
 
 	if m.isLoading {
@@ -230,6 +225,7 @@ func (m Model) View() string {
 	return baseStyle.Render(b.String())
 }
 
+// Changed to pointer receiver
 func (m *Model) resetForms() {
 	if len(m.textInputs) > 0 {
 		m.textInputs[0].Reset()
@@ -240,6 +236,7 @@ func (m *Model) resetForms() {
 	m.message = ""
 }
 
+// Changed to pointer receiver
 func (m *Model) setupAddQuestionsForm() {
 	m.focusIndex = 0 // Only one input, so focus is implicitly on it or a submit action
 	if len(m.textInputs) > 0 {
@@ -249,6 +246,7 @@ func (m *Model) setupAddQuestionsForm() {
 	}
 }
 
+// Changed to pointer receiver
 func (m *Model) submitAddQuestionsFormCmd() tea.Cmd {
 	jsonPath := m.textInputs[0].Value()
 	if jsonPath == "" {
@@ -282,7 +280,7 @@ func (m *Model) SetSize(width, height int) {
 	// if tableHeight < 5 { tableHeight = 5 }
 	// m.table.SetHeight(tableHeight)
 
-	inputWidth := m.width - 4
+	inputWidth := m.width - 4 // Ensure this aligns with how View renders padding
 	if inputWidth < 20 {
 		inputWidth = 20
 	}
@@ -291,7 +289,8 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
-func (m Model) IsFocused() bool {
+// Changed to pointer receiver for consistency
+func (m *Model) IsFocused() bool {
 	// Focused if in the form input state
 	return m.state == AddQuestionsFormView
 }

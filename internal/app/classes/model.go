@@ -3,6 +3,7 @@ package classes
 import (
 	"context" // Adicionado para chamadas de serviço
 	"fmt"
+	"log" // Adicionado para logging
 	"strconv" // Adicionado para conversão de subjectID
 	"strings" // Adicionado para strings.Builder
 
@@ -70,7 +71,9 @@ type Model struct {
 }
 
 // New cria um novo modelo para a gestão de turmas.
-func New(cs service.ClassService) Model {
+// Changed to return *Model
+func New(cs service.ClassService) *Model {
+	log.Println("ClassesModel: New - Criando novo modelo de classes.")
 	// Tabela para listar turmas
 	classTable := table.New(
 		table.WithColumns([]table.Column{
@@ -121,7 +124,7 @@ func New(cs service.ClassService) Model {
 	subjectIDInput.CharLimit = 10
 	subjectIDInput.Width = 20
 
-	return Model{
+	return &Model{ // Return pointer
 		classService:  cs,
 		state:         ListView, // Estado inicial é a lista
 		table:         classTable,
@@ -141,14 +144,19 @@ func New(cs service.ClassService) Model {
 }
 
 // Init carrega os dados iniciais para a gestão de turmas.
-func (m Model) Init() tea.Cmd {
+// Changed to pointer receiver
+func (m *Model) Init() tea.Cmd {
+	log.Printf("ClassesModel: Init - Chamado. isLoading antes: %t", m.isLoading)
 	m.isLoading = true // Garantir que o estado de carregamento seja ativado
+	log.Printf("ClassesModel: Init - isLoading depois: %t. Retornando fetchClassesCmd.", m.isLoading)
 	return m.fetchClassesCmd
 }
 
 
 // Update lida com mensagens e atualiza o modelo.
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+// Changed to pointer receiver
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	log.Printf("ClassesModel: Update - Recebida msg tipo %T", msg) // Log adicionado anteriormente
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
@@ -197,9 +205,13 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.createForm.subjectIDInput.SetValue("")
 				m.err = nil
 				m.selectedClass = nil // Limpa qualquer seleção anterior
-				return m, textinput.Blink
+				return m, textinput.Blink // Return m directly as it's now *Model
 			default:
-				m.table, cmd = m.table.Update(msg)
+				// m.table, cmd = m.table.Update(msg)
+				// cmds = append(cmds, cmd)
+				var updatedTable table.Model
+				updatedTable, cmd = m.table.Update(msg)
+				m.table = updatedTable
 				cmds = append(cmds, cmd)
 			}
 		// ... outros cases para CreatingView, DetailsView (para 'esc')...
@@ -212,7 +224,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.createForm.nameInput.Blur()
 				m.createForm.subjectIDInput.Blur()
 				m.table.Focus() // Devolve o foco para a tabela de turmas
-				return m, nil
+				return m, nil // Return m directly
 			case key.Matches(msg, key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "salvar"))):
 				if m.createForm.focusIndex == 1 {
 					name := strings.TrimSpace(m.createForm.nameInput.Value())
@@ -220,7 +232,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 					if name == "" || subjectIDStr == "" {
 						m.err = fmt.Errorf("nome da turma e ID da disciplina são obrigatórios")
-						return m, nil
+						return m, nil // Return m directly
 					}
 					m.isLoading = true
 					cmds = append(cmds, m.createClassCmd(name, subjectIDStr))
@@ -279,7 +291,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			default:
 				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
 					var studentsTableCmd tea.Cmd
-					m.studentsTable, studentsTableCmd = m.studentsTable.Update(msg)
+					// m.studentsTable, studentsTableCmd = m.studentsTable.Update(msg)
+					var updatedStudentsTable table.Model
+					updatedStudentsTable, studentsTableCmd = m.studentsTable.Update(msg)
+					m.studentsTable = updatedStudentsTable
 					cmds = append(cmds, studentsTableCmd)
 				}
 				// Lógica para outras teclas se nenhum elemento específico estiver focado
@@ -290,11 +305,14 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	// ... cases para fetchedClassesMsg, classCreatedMsg, errMsg ...
 	case fetchedClassesMsg:
+		log.Printf("ClassesModel: Update - Recebida fetchedClassesMsg. Erro: %v. isLoading antes: %t", msg.err, m.isLoading)
 		m.isLoading = false
+		log.Printf("ClassesModel: Update - fetchedClassesMsg - isLoading depois: %t", m.isLoading)
 		if msg.err != nil {
 			m.err = msg.err
 			m.allClasses = nil
 			m.table.SetRows([]table.Row{}) // Limpa a tabela em caso de erro
+			log.Printf("ClassesModel: Update - fetchedClassesMsg - Erro ao buscar turmas: %v", msg.err)
 		} else {
 			m.err = nil
 			m.allClasses = msg.classes
@@ -307,36 +325,49 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				})
 			}
 			m.table.SetRows(rows)
+			log.Printf("ClassesModel: Update - fetchedClassesMsg - Tabela de turmas atualizada com %d linhas.", len(rows))
 		}
 
 	case classCreatedMsg:
+		log.Printf("ClassesModel: Update - Recebida classCreatedMsg. Erro: %v. isLoading antes: %t", msg.err, m.isLoading)
 		m.isLoading = false
+		log.Printf("ClassesModel: Update - classCreatedMsg - isLoading depois: %t", m.isLoading)
 		if msg.err != nil {
 			m.err = fmt.Errorf("erro ao criar turma: %w", msg.err)
+			log.Printf("ClassesModel: Update - classCreatedMsg - Erro ao criar turma: %v", msg.err)
 		} else {
+			log.Println("ClassesModel: Update - classCreatedMsg - Turma criada com sucesso. Mudando para ListView e recarregando turmas.")
 			m.state = ListView
 			m.err = nil
-			m.isLoading = true
+			m.isLoading = true // Para recarregar a lista
+			log.Printf("ClassesModel: Update - classCreatedMsg - isLoading definido como true para recarregar.")
 			m.table.Focus()
 			cmds = append(cmds, m.fetchClassesCmd)
 		}
 
 	case errMsg:
+		log.Printf("ClassesModel: Update - Recebida errMsg: %v. isLoading antes: %t", msg.err, m.isLoading)
 		m.err = msg.err
 		m.isLoading = false
+		log.Printf("ClassesModel: Update - errMsg - isLoading depois: %t", m.isLoading)
+
 
 	// Novo case para processar os alunos buscados
 	case fetchedClassStudentsMsg:
+		log.Printf("ClassesModel: Update - Recebida fetchedClassStudentsMsg. Erro: %v. isLoading antes: %t", msg.err, m.isLoading)
 		m.isLoading = false // Finaliza o estado de carregamento (de alunos)
+		log.Printf("ClassesModel: Update - fetchedClassStudentsMsg - isLoading depois: %t", m.isLoading)
 		if msg.err != nil {
 			m.err = msg.err // Exibe o erro se a busca de alunos falhar
 			m.classStudents = nil
 			m.studentsTable.SetRows([]table.Row{})
+			log.Printf("ClassesModel: Update - fetchedClassStudentsMsg - Erro ao buscar alunos: %v", msg.err)
 		} else {
 			m.err = nil // Limpa erros anteriores se a busca for bem-sucedida
 			m.classStudents = msg.students
 			var rows []table.Row
 			if len(m.classStudents) == 0 {
+				log.Println("ClassesModel: Update - fetchedClassStudentsMsg - Nenhum aluno encontrado.")
 				// Adiciona uma linha indicando que não há alunos, se desejar
 				// Ou simplesmente deixa a tabela vazia.
 				// rows = append(rows, table.Row{"---", "Nenhum aluno encontrado", "---", "---"})
@@ -349,6 +380,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 						student.Status,
 					})
 				}
+				log.Printf("ClassesModel: Update - fetchedClassStudentsMsg - Tabela de alunos atualizada com %d linhas.", len(rows))
 			}
 			m.studentsTable.SetRows(rows)
 			// Opcionalmente, focar a tabela de alunos aqui se for a próxima interação principal
@@ -359,7 +391,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *Model) nextFormInput() {
+func (m *Model) nextFormInput() { // Already a pointer receiver, correct.
 	m.createForm.focusIndex = (m.createForm.focusIndex + 1) % 2 // 2 campos
 	if m.createForm.focusIndex == 0 {
 		m.createForm.nameInput.Focus()
@@ -370,7 +402,7 @@ func (m *Model) nextFormInput() {
 	}
 }
 
-func (m *Model) prevFormInput() {
+func (m *Model) prevFormInput() { // Already a pointer receiver, correct.
 	m.createForm.focusIndex = (m.createForm.focusIndex - 1 + 2) % 2 // 2 campos
 	if m.createForm.focusIndex == 0 {
 		m.createForm.nameInput.Focus()
@@ -382,7 +414,9 @@ func (m *Model) prevFormInput() {
 }
 
 // View renderiza a UI para a gestão de turmas.
-func (m Model) View() string {
+// Changed to pointer receiver
+func (m *Model) View() string {
+	log.Printf("ClassesModel: View - Chamado. isLoading: %t, State: %v, Error: %v", m.isLoading, m.state, m.err)
 	var b strings.Builder
 
 	if m.isLoading {
@@ -392,12 +426,14 @@ func (m Model) View() string {
 			"Carregando...",
 			lipgloss.WithWhitespaceChars(" "),
 			lipgloss.WithWhitespaceForeground(lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}))
+		log.Println("ClassesModel: View - Exibindo 'Carregando...'.")
 		return loadingView
 	}
 
 	if m.err != nil {
 		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9")).PaddingBottom(1)
 		b.WriteString(errorStyle.Render(fmt.Sprintf("Erro: %v", m.err)))
+		log.Printf("ClassesModel: View - Exibindo erro: %v", m.err)
 	}
 
 	switch m.state {
@@ -518,7 +554,8 @@ func (m *Model) SetSize(width, height int) {
 }
 
 // IsFocused indica se o modelo de turmas tem algum input focado.
-func (m Model) IsFocused() bool {
+// Changed to pointer receiver
+func (m *Model) IsFocused() bool {
 	return m.state == CreatingView // Se estiver no formulário, considera focado para 'esc' local
 }
 
@@ -549,7 +586,8 @@ type fetchedClassStudentsMsg struct {
 	err      error
 }
 
-func (m Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
+// Changed to pointer receiver for consistency
+func (m *Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
 	return func() tea.Msg {
 		if m.classService == nil { // Checagem defensiva
 			return errMsg{fmt.Errorf("classService não inicializado")}
@@ -571,7 +609,9 @@ func (m Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
 }
 
 func (m Model) fetchClassesCmd() tea.Msg {
+	log.Println("ClassesModel: fetchClassesCmd - Iniciando busca de turmas.")
 	if m.classService == nil {
+		log.Println("ClassesModel: fetchClassesCmd - Erro: classService não inicializado.")
 		return errMsg{fmt.Errorf("classService não inicializado em fetchClassesCmd")}
 	}
 
@@ -579,14 +619,18 @@ func (m Model) fetchClassesCmd() tea.Msg {
 	ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
 	defer cancel() // É crucial chamar cancel para liberar recursos
 
+	log.Println("ClassesModel: fetchClassesCmd - Chamando classService.ListAllClasses.")
 	classes, err := m.classService.ListAllClasses(ctx) // Passar o contexto com timeout
 	if err != nil {
+		log.Printf("ClassesModel: fetchClassesCmd - Erro ao buscar turmas do serviço: %v", err)
 		return errMsg{fmt.Errorf("falha ao buscar turmas (pode ter ocorrido timeout): %w", err)}
 	}
+	log.Printf("ClassesModel: fetchClassesCmd - Busca de turmas bem-sucedida. %d turmas encontradas. Retornando fetchedClassesMsg.", len(classes))
 	return fetchedClassesMsg{classes: classes, err: nil}
 }
 
-func (m Model) createClassCmd(name string, subjectIDStr string) tea.Cmd {
+// Changed to pointer receiver for consistency
+func (m *Model) createClassCmd(name string, subjectIDStr string) tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
 		defer cancel()

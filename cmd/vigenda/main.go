@@ -7,7 +7,9 @@ import (
 	"database/sql"
 	"encoding/json" // Added missing import
 	"fmt"
+	"log" // Adicionado para logging
 	"os"
+	"path/filepath" // Adicionado para manipulação de caminhos de arquivo
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +25,7 @@ import (
 )
 
 var db *sql.DB // Global database connection pool
+var logFile *os.File // Global para o arquivo de log, para poder fechar no final
 
 var taskService service.TaskService
 var classService service.ClassService
@@ -52,6 +55,13 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 		app.StartApp(taskService, classService, assessmentService, questionService, proofService)
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Setup logging to file first
+		if err := setupLogging(); err != nil {
+			// Se não conseguir configurar o log, ainda tenta continuar, mas loga no stderr.
+			// Ou pode-se decidir que é um erro fatal: return fmt.Errorf("failed to setup logging: %w", err)
+			fmt.Fprintf(os.Stderr, "Warning: failed to setup file logging: %v. Logging to stderr.\n", err)
+		}
+
 		// This function will run before any command, ensuring DB is initialized.
 		if db == nil { // Initialize only once
 			dbType := os.Getenv("VIGENDA_DB_TYPE")
@@ -65,7 +75,8 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 			dbName := os.Getenv("VIGENDA_DB_NAME")
 			dbSSLMode := os.Getenv("VIGENDA_DB_SSLMODE") // Primarily for PostgreSQL
 
-			config := database.DBConfig{}
+			// Use the non-conflicting DBConfig type from connection.go
+			config := database.DBConfig{} // This should refer to database.DBConfig from connection.go
 
 			if dbType == "" {
 				dbType = "sqlite" // Default to SQLite
@@ -80,6 +91,7 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 					// VIGENDA_DB_PATH is specific to SQLite if VIGENDA_DB_DSN is not used
 					sqlitePath := os.Getenv("VIGENDA_DB_PATH")
 					if sqlitePath == "" {
+						// Use the non-conflicting DefaultSQLitePath from connection.go
 						sqlitePath = database.DefaultSQLitePath()
 					}
 					config.DSN = sqlitePath
@@ -116,6 +128,7 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 			}
 
 			var err error
+			// Use the non-conflicting GetDBConnection from connection.go
 			db, err = database.GetDBConnection(config)
 			if err != nil {
 				return fmt.Errorf("failed to initialize database (type: %s): %w", config.DBType, err)
@@ -387,6 +400,68 @@ func init() {
 	proofCmd.AddCommand(proofGenerateCmd)
 	rootCmd.AddCommand(proofCmd)
 }
+
+// setupLogging configura o logging para um arquivo.
+func setupLogging() error {
+	logDir := ""
+	// Tentar usar o diretório de configuração do usuário
+	userConfigDir, err := os.UserConfigDir()
+	if err == nil {
+		logDir = filepath.Join(userConfigDir, "vigenda")
+	} else {
+		// Fallback para o diretório atual se não conseguir obter o diretório de config
+		cwd, errCwd := os.Getwd()
+		if errCwd == nil {
+			logDir = cwd
+		} else {
+			// Se tudo falhar, não será possível criar um subdiretório de forma confiável
+			// Então apenas tentaremos criar o log no diretório atual.
+			log.Println("Warning: Could not determine user config directory or current working directory for logs. Attempting to log in current directory.")
+		}
+	}
+
+	// Se logDir foi definido (mesmo que seja CWD), tenta criar o subdiretório vigenda se não for CWD direto
+	if logDir != "" && logDir != "." && logDir != mustGetwd() { // mustGetwd para evitar erro em CWD
+		if err := os.MkdirAll(logDir, 0755); err != nil {
+			// Se não conseguir criar o diretório específico, tenta logar no CWD como último recurso
+			logDir = "." // Define para CWD
+			log.Printf("Warning: Could not create log directory %s: %v. Attempting to log in current directory.", filepath.Join(logDir, "vigenda"), err)
+		}
+	}
+	if logDir == "" { // Caso extremo onde nem CWD pode ser determinado
+		logDir = "."
+	}
+
+
+	logFilePath := filepath.Join(logDir, "vigenda.log")
+
+	// Abrir o arquivo de log. Cria se não existir, anexa se existir.
+	var errOpen error
+	logFile, errOpen = os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if errOpen != nil {
+		return fmt.Errorf("failed to open log file %s: %w", logFilePath, errOpen)
+	}
+
+	// Configurar a saída do log para o arquivo
+	log.SetOutput(logFile)
+	// Adicionar flags para incluir data, hora e arquivo:linha no log
+	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds) // Adicionado Lmicroseconds para maior precisão
+
+	log.Println("INFO: Logging initialized to file:", logFilePath)
+	return nil
+}
+
+// mustGetwd é uma helper para obter o CWD ou panic, usado para simplificar a lógica de fallback.
+func mustGetwd() string {
+	cwd, err := os.Getwd()
+	if err != nil {
+		// Em um cenário real, pode-se querer um tratamento mais robusto
+		// mas para a lógica de fallback do log, se CWD falhar, "." é um fallback razoável.
+		return "."
+	}
+	return cwd
+}
+
 
 var classCmd = &cobra.Command{
 	Use:   "turma",
@@ -761,8 +836,27 @@ A prova gerada será exibida no terminal.`,
 }
 
 func main() {
+	// PersistentPreRunE já chama setupLogging.
+	// Precisamos garantir que logFile seja fechado ao final da execução.
+	// rootCmd.Execute() é bloqueante.
+	// Uma forma de garantir o fechamento é adiar para main.
+	// No entanto, setupLogging pode falhar e logFile ser nil.
+
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		// Se Execute falhar, o log já deve ter sido configurado (ou tentado)
+		// e o erro de Execute pode ser logado no arquivo (se o log de arquivo estiver ok)
+		// ou no stderr (se o log de arquivo falhou).
+		log.Printf("CRITICAL: rootCmd.Execute failed: %v", err) // Vai para o arquivo de log se configurado
+		fmt.Fprintln(os.Stderr, "Error executing command:", err) // Também para stderr para visibilidade imediata
+		if logFile != nil {
+			logFile.Close()
+		}
 		os.Exit(1)
+	}
+
+	// Se Execute for bem-sucedido e a aplicação terminar normalmente
+	if logFile != nil {
+		log.Println("INFO: Application finished successfully. Closing log file.")
+		logFile.Close()
 	}
 }
