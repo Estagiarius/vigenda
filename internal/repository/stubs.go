@@ -169,6 +169,20 @@ func (r *StubTaskRepository) MarkTaskCompleted(ctx context.Context, taskID int64
 	return err
 }
 
+func (r *StubTaskRepository) UpdateTask(ctx context.Context, task *models.Task) error {
+	fmt.Printf("[StubTaskRepository] UpdateTask: ID %d, Title: %s\n", task.ID, task.Title)
+	// In a real stub, you might update an in-memory list or simulate DB update.
+	// For now, just log and return nil.
+	return nil
+}
+
+func (r *StubTaskRepository) DeleteTask(ctx context.Context, taskID int64) error {
+	fmt.Printf("[StubTaskRepository] DeleteTask: ID %d\n", taskID)
+	// In a real stub, you might remove from an in-memory list or simulate DB delete.
+	// For now, just log and return nil.
+	return nil
+}
+
 
 // StubClassRepository
 type StubClassRepository struct {

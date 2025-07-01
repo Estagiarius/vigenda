@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"database/sql" // Added for sql.ErrNoRows
 	"errors"
 	"fmt"

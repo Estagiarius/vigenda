@@ -1,15 +1,11 @@
 package tasks
 
 import (
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
 	"context" // Required for service calls
 	"fmt"     // For formatting data into table rows
-	// "time"    // For formatting dates // No longer directly used for formatting here
-
+	"strconv" // For parsing class ID
 	"strings" // For form view
 	"time"    // For parsing due date
-	"strconv" // For parsing class ID
 
 	"github.com/charmbracelet/bubbles/table"
 	"github.com/charmbracelet/bubbles/textinput"
