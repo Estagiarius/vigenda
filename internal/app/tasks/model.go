@@ -362,28 +362,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.isLoading = true
 					m.err = nil
 
+					var submitCmd tea.Cmd
 					if m.formState == CreatingTask {
-						cmds = append(cmds, m.createTaskCmd(title, description, classID, dueDate))
+						submitCmd = m.createTaskCmd(title, description, classID, dueDate)
 					} else if m.formState == EditingTask {
-						// UserID is not directly editable in this form, assume it's set from the original task
-						// or handle it in the service if necessary (e.g. for authorization)
-						// For now, we assume the task loaded for editing has the correct UserID.
-						// The service layer should ensure that UserID cannot be maliciously changed if it's part of the task struct being updated.
-						// A safer approach would be to only pass fields that are editable from the form to the UpdateTask service method.
-						// However, the current UpdateTask in service takes the whole models.Task.
 						updatedTask := &models.Task{
 							ID:          m.editingTaskID,
-							UserID:      m.selectedTaskForDetail.UserID, // Preserve original UserID
+							UserID:      m.selectedTaskForDetail.UserID,
 							Title:       title,
 							Description: description,
 							ClassID:     classID,
 							DueDate:     dueDate,
-							IsCompleted: m.selectedTaskForDetail.IsCompleted, // Preserve original completion status
+							IsCompleted: m.selectedTaskForDetail.IsCompleted,
 						}
-						cmds = append(cmds, m.updateTaskCmd(updatedTask))
+						submitCmd = m.updateTaskCmd(updatedTask)
 					}
-				} else {
+					return m, submitCmd // Return immediately with the submission command
+				} else { // Enter on a field that is not the last one: navigate to next field
 					m.nextInput()
+					// The subsequent input update loop will handle the Enter key for the newly focused input,
+					// which is usually a no-op for value change but might affect cursor/blink.
 				}
 			case "tab", "shift+tab", "up", "down":
 				if msg.String() == "up" || msg.String() == "shift+tab" {
