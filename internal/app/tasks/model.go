@@ -14,45 +14,61 @@ import (
 
 	"vigenda/internal/models"
 	"vigenda/internal/service"
-	// "vigenda/internal/tui" // If using shared prompt, but better to embed form logic here
 )
 
 var baseStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.NormalBorder()).
 	BorderForeground(lipgloss.Color("240"))
 
+var strikethroughStyle = lipgloss.NewStyle().Strikethrough(true)
+
+// ViewState represents the current main view/state within the tasks model.
+type ViewState int
+
+const (
+	TableView ViewState = iota
+	FormView
+	DetailView
+	ConfirmDeleteView
+)
+
 // FormState represents the current state of the task form (creating or editing).
+// This is used when currentView is FormView.
 type FormState int
 
 const (
-	NoForm FormState = iota
-	CreatingTask
-	EditingTask // Future use
-	ViewingDetail
+	CreatingTask FormState = iota
+	EditingTask
+)
+
+// FocusedTable indicates which table (pending or completed) has focus.
+type FocusedTable int
+
+const (
+	PendingTableFocus FocusedTable = iota
+	CompletedTableFocus
 )
 
 type Model struct {
-	taskService service.TaskService
-	table       table.Model
-	isLoading   bool
-	err         error
-	formState   FormState // Used for Create/Edit forms and now ViewDetail state
+	taskService         service.TaskService
+	pendingTasksTable   table.Model
+	completedTasksTable table.Model
+	isLoading           bool
+	err                 error
+	currentView         ViewState
+	formSubState        FormState    // If currentView is FormView, this specifies if creating or editing.
+	focusedTable        FocusedTable
 
-	// Form fields (for creating/editing)
-	// titleInput       textinput.Model // Will be inputs[0]
-	// descriptionInput textinput.Model // Will be inputs[1]
-	// dueDateInput     textinput.Model // Will be inputs[2]
-	// classIDInput     textinput.Model // Will be inputs[3]
 	inputs     []textinput.Model // Holds all form inputs
 	focusIndex int
 
-	selectedTaskForDetail *models.Task // Store the task whose details are being viewed
-	editingTaskID         int64        // ID of the task being edited
-	taskIDToDelete        int64        // ID of the task pending delete confirmation
-	confirmingDelete      bool         // True if waiting for delete confirmation
+	selectedTaskForDetail *models.Task
+	editingTaskID         int64
+	taskIDToDelete        int64
+	// confirmingDelete      bool         // This state is now handled by currentView = ConfirmDeleteView
 
-	width  int // For layout
-	height int // For layout
+	width  int
+	height int
 }
 
 // Define messages for async operations
@@ -60,39 +76,23 @@ type tasksLoadedMsg struct {
 	tasks []models.Task
 	err   error
 }
-
-// fetchedTaskDetailMsg is sent when a single task's details are fetched (for viewing or editing).
 type fetchedTaskDetailMsg struct {
 	task    *models.Task
 	err     error
-	forEdit bool // Indicates if the fetch was for editing
+	forEdit bool
 }
-
-// taskUpdatedMsg is sent when a task is successfully updated.
 type taskUpdatedMsg struct{}
-
-// taskUpdateFailedMsg is sent when task update fails.
 type taskUpdateFailedMsg struct{ err error }
-
-// taskDeletedMsg is sent when a task is successfully deleted.
-type taskDeletedMsg struct{} // Can be empty, success is implied
-
-// taskDeleteFailedMsg is sent when task deletion fails.
+type taskDeletedMsg struct{}
 type taskDeleteFailedMsg struct{ err error }
-
-// taskMarkedCompletedMsg is sent when a task is successfully marked as completed.
-type taskMarkedCompletedMsg struct{} // Can include taskID if needed for specific UI updates
-
-// taskMarkCompleteFailedMsg is sent when marking a task as completed fails.
+type taskMarkedCompletedMsg struct{}
 type taskMarkCompleteFailedMsg struct{ err error }
 
-// loadTasksCmd is a command that fetches tasks from the service.
 func (m *Model) loadTasksCmd() tea.Msg {
-	tasks, err := m.taskService.ListAllActiveTasks(context.Background())
+	tasks, err := m.taskService.ListAllTasks(context.Background())
 	return tasksLoadedMsg{tasks: tasks, err: err}
 }
 
-// fetchTaskForDetailCmd fetches a single task by ID for detail view or editing.
 func (m *Model) fetchTaskForDetailCmd(taskID int64, forEditing bool) tea.Cmd {
 	return func() tea.Msg {
 		task, err := m.taskService.GetTaskByID(context.Background(), taskID)
@@ -100,7 +100,6 @@ func (m *Model) fetchTaskForDetailCmd(taskID int64, forEditing bool) tea.Cmd {
 	}
 }
 
-// updateTaskCmd updates an existing task.
 func (m *Model) updateTaskCmd(taskToUpdate *models.Task) tea.Cmd {
 	return func() tea.Msg {
 		err := m.taskService.UpdateTask(context.Background(), taskToUpdate)
@@ -111,7 +110,6 @@ func (m *Model) updateTaskCmd(taskToUpdate *models.Task) tea.Cmd {
 	}
 }
 
-// deleteTaskCmd deletes a task by its ID.
 func (m *Model) deleteTaskCmd(taskID int64) tea.Cmd {
 	return func() tea.Msg {
 		err := m.taskService.DeleteTask(context.Background(), taskID)
@@ -122,7 +120,6 @@ func (m *Model) deleteTaskCmd(taskID int64) tea.Cmd {
 	}
 }
 
-// markTaskCompleteCmd marks a task as completed.
 func (m *Model) markTaskCompleteCmd(taskID int64) tea.Cmd {
 	return func() tea.Msg {
 		err := m.taskService.MarkTaskAsCompleted(context.Background(), taskID)
@@ -133,21 +130,18 @@ func (m *Model) markTaskCompleteCmd(taskID int64) tea.Cmd {
 	}
 }
 
-// New creates a new task management model.
 func New(taskService service.TaskService) *Model {
-	columns := []table.Column{
+	pendingColumns := []table.Column{
 		{Title: "ID", Width: 4},
 		{Title: "Título", Width: 30},
 		{Title: "Prazo", Width: 10},
 		{Title: "ID Turma", Width: 8},
 	}
-
-	t := table.New(
-		table.WithColumns(columns),
+	pendingTable := table.New(
+		table.WithColumns(pendingColumns),
 		table.WithFocused(true),
 		table.WithHeight(10),
 	)
-
 	s := table.DefaultStyles()
 	s.Header = s.Header.
 		BorderStyle(lipgloss.NormalBorder()).
@@ -158,34 +152,42 @@ func New(taskService service.TaskService) *Model {
 		Foreground(lipgloss.Color("229")).
 		Background(lipgloss.Color("57")).
 		Bold(false)
-	t.SetStyles(s)
+	pendingTable.SetStyles(s)
 
-	// Form inputs
+	completedColumns := []table.Column{ // Columns are same, content will be styled
+		{Title: "ID", Width: 4},
+		{Title: "Título", Width: 30},
+		{Title: "Prazo", Width: 10},
+		{Title: "ID Turma", Width: 8},
+	}
+	completedTable := table.New(
+		table.WithColumns(completedColumns),
+		table.WithFocused(false),
+		table.WithHeight(5),
+	)
+	completedTable.SetStyles(s)
+
 	ti := textinput.New()
 	ti.Placeholder = "Título da Tarefa"
 	ti.Focus()
 	ti.CharLimit = 156
 	ti.Width = 50
 	ti.Prompt = "Título: "
-
 	di := textinput.New()
 	di.Placeholder = "Descrição (opcional)"
 	di.CharLimit = 256
 	di.Width = 50
 	di.Prompt = "Descrição: "
-
 	ddi := textinput.New()
-	ddi.Placeholder = "DD/MM/YYYY (opcional)" // Changed placeholder
+	ddi.Placeholder = "DD/MM/YYYY (opcional)"
 	ddi.CharLimit = 10
 	ddi.Width = 20
 	ddi.Prompt = "Prazo: "
-
 	ci := textinput.New()
 	ci.Placeholder = "ID da Turma (opcional, numérico)"
 	ci.CharLimit = 10
 	ci.Width = 20
 	ci.Prompt = "ID Turma: "
-
 	inputs := make([]textinput.Model, 4)
 	inputs[0] = ti
 	inputs[1] = di
@@ -194,46 +196,30 @@ func New(taskService service.TaskService) *Model {
 
 	return &Model{
 		taskService:           taskService,
-		table:                 t,
+		pendingTasksTable:     pendingTable,
+		completedTasksTable:   completedTable,
 		isLoading:             true,
-		formState:             NoForm,
+		currentView:           TableView,
+		formSubState:          CreatingTask,
+		focusedTable:          PendingTableFocus,
 		inputs:                inputs,
 		focusIndex:            0,
 		selectedTaskForDetail: nil,
 		editingTaskID:         0,
 		taskIDToDelete:        0,
-		confirmingDelete:      false,
+		// confirmingDelete:      false, // Handled by currentView
 	}
 }
 
-// Init is called when the model becomes active.
 func (m *Model) Init() tea.Cmd {
 	m.isLoading = true
 	m.err = nil
-	m.formState = NoForm // Reset form, detail view, and edit state
+	m.currentView = TableView
+	m.focusedTable = PendingTableFocus
 	m.selectedTaskForDetail = nil
 	m.editingTaskID = 0
 	m.taskIDToDelete = 0
-	m.confirmingDelete = false
-	// m.resetFormInputs() // resetFormInputs will be called when entering form state
 	return m.loadTasksCmd
-}
-
-// taskCreatedMsg is sent when a task is successfully created.
-type taskCreatedMsg struct{ task models.Task }
-
-// taskCreationFailedMsg is sent when task creation fails.
-type taskCreationFailedMsg struct{ err error }
-
-// createTaskCmd creates a new task.
-func (m *Model) createTaskCmd(title, description string, classID *int64, dueDate *time.Time) tea.Cmd {
-	return func() tea.Msg {
-		task, err := m.taskService.CreateTask(context.Background(), title, description, classID, dueDate)
-		if err != nil {
-			return taskCreationFailedMsg{err}
-		}
-		return taskCreatedMsg{task}
-	}
 }
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -245,8 +231,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isLoading = false
 		m.err = msg.err
 		if msg.err == nil {
-			rows := make([]table.Row, len(msg.tasks))
-			for i, task := range msg.tasks {
+			pendingRows := []table.Row{}
+			completedRows := []table.Row{}
+			for _, task := range msg.tasks {
 				dueDate := "N/A"
 				if task.DueDate != nil {
 					dueDate = task.DueDate.Format("02/01/2006")
@@ -255,93 +242,103 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if task.ClassID != nil && *task.ClassID != 0 {
 					classIDStr = fmt.Sprintf("%d", *task.ClassID)
 				}
-				rows[i] = table.Row{fmt.Sprintf("%d", task.ID), task.Title, dueDate, classIDStr}
+
+				titleCell := task.Title
+				if task.IsCompleted {
+					titleCell = strikethroughStyle.Render(task.Title)
+				}
+				row := table.Row{fmt.Sprintf("%d", task.ID), titleCell, dueDate, classIDStr}
+
+				if task.IsCompleted {
+					completedRows = append(completedRows, row)
+				} else {
+					pendingRows = append(pendingRows, row)
+				}
 			}
-			m.table.SetRows(rows)
+			m.pendingTasksTable.SetRows(pendingRows)
+			m.completedTasksTable.SetRows(completedRows)
+		} else {
+			m.pendingTasksTable.SetRows([]table.Row{})
+			m.completedTasksTable.SetRows([]table.Row{})
 		}
 		return m, nil
 
 	case taskCreatedMsg:
-		m.formState = NoForm
+		m.currentView = TableView
 		m.resetFormInputs()
-		m.err = nil // Clear any previous form error
-		return m, m.loadTasksCmd // Refresh list
+		m.err = nil
+		return m, m.loadTasksCmd
 
 	case taskCreationFailedMsg:
-		m.err = msg.err // Display error, keep form open for correction
-		// Don't reset form or change state, user might want to correct input
+		m.err = msg.err
 		return m, nil
 
 	case taskUpdatedMsg:
-		m.formState = NoForm
+		m.currentView = TableView
 		m.resetFormInputs()
 		m.editingTaskID = 0
 		m.err = nil
-		return m, m.loadTasksCmd // Refresh list
+		return m, m.loadTasksCmd
 
 	case taskUpdateFailedMsg:
-		m.err = msg.err // Display error, keep form open for correction
+		m.err = msg.err
 		return m, nil
 
 	case taskDeletedMsg:
 		m.isLoading = false
-		m.confirmingDelete = false
+		m.currentView = TableView
 		m.taskIDToDelete = 0
 		m.err = nil
-		return m, m.loadTasksCmd // Refresh list
+		return m, m.loadTasksCmd
 
 	case taskDeleteFailedMsg:
 		m.isLoading = false
-		m.confirmingDelete = false // Keep confirmation context or clear based on UX choice
 		m.err = msg.err
 		return m, nil
 
 	case taskMarkedCompletedMsg:
 		m.isLoading = false
 		m.err = nil
-		// Potentially add a temporary success message here if desired
-		// e.g., m.statusMessage = "Tarefa marcada como concluída!"
-		// then clear statusMessage after a short delay or on next key press.
-		return m, m.loadTasksCmd // Refresh list to remove it from active tasks
+		return m, m.loadTasksCmd
 
 	case taskMarkCompleteFailedMsg:
 		m.isLoading = false
-		m.err = msg.err // Display error to the user
+		m.err = msg.err
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.confirmingDelete {
+		switch m.currentView {
+		case ConfirmDeleteView:
 			switch msg.String() {
 			case "s", "S":
 				m.isLoading = true
 				m.err = nil
 				cmds = append(cmds, m.deleteTaskCmd(m.taskIDToDelete))
-				// confirmingDelete will be reset by taskDeletedMsg or taskDeleteFailedMsg
 				return m, tea.Batch(cmds...)
 			case "n", "N", "esc":
-				m.confirmingDelete = false
+				m.currentView = TableView
 				m.taskIDToDelete = 0
 				m.err = nil
 				return m, nil
 			}
-		} else if m.formState == CreatingTask || m.formState == EditingTask {
+		case FormView:
 			switch msg.String() {
 			case "ctrl+c", "esc":
-				m.formState = NoForm
+				m.currentView = TableView
 				m.resetFormInputs()
 				m.editingTaskID = 0
 				m.err = nil
 				return m, nil
 			case "enter":
-				if m.focusIndex == len(m.inputs)-1 { // Last input, submit
-					title := m.inputs[0].Value() // Title from inputs[0]
+				if m.focusIndex == len(m.inputs)-1 {
+					title := m.inputs[0].Value()
 					if title == "" {
 						m.err = fmt.Errorf("título não pode ser vazio")
 						return m, nil
 					}
-					description := m.inputs[1].Value() // Description from inputs[1]
+					description := m.inputs[1].Value()
 					var classID *int64
-					if m.inputs[3].Value() != "" { // ClassID from inputs[3]
+					if m.inputs[3].Value() != "" {
 						cid, err := strconv.ParseInt(m.inputs[3].Value(), 10, 64)
 						if err != nil {
 							m.err = fmt.Errorf("ID da turma inválido: %v", err)
@@ -350,10 +347,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						classID = &cid
 					}
 					var dueDate *time.Time
-					if m.inputs[2].Value() != "" { // DueDate from inputs[2]
-						parsedDate, err := time.Parse("02/01/2006", m.inputs[2].Value()) // Changed format string
+					if m.inputs[2].Value() != "" {
+						parsedDate, err := time.Parse("02/01/2006", m.inputs[2].Value())
 						if err != nil {
-							m.err = fmt.Errorf("formato de data inválido (use DD/MM/YYYY): %v", err) // Changed error message
+							m.err = fmt.Errorf("formato de data inválido (use DD/MM/YYYY): %v", err)
 							return m, nil
 						}
 						dueDate = &parsedDate
@@ -363,9 +360,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.err = nil
 
 					var submitCmd tea.Cmd
-					if m.formState == CreatingTask {
+					if m.formSubState == CreatingTask {
 						submitCmd = m.createTaskCmd(title, description, classID, dueDate)
-					} else if m.formState == EditingTask {
+					} else if m.formSubState == EditingTask {
+						// Ensure selectedTaskForDetail is not nil if editing
+						if m.selectedTaskForDetail == nil {
+							m.err = fmt.Errorf("erro interno: dados da tarefa original não encontrados para edição")
+							m.isLoading = false
+							return m, nil
+						}
 						updatedTask := &models.Task{
 							ID:          m.editingTaskID,
 							UserID:      m.selectedTaskForDetail.UserID,
@@ -377,11 +380,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						submitCmd = m.updateTaskCmd(updatedTask)
 					}
-					return m, submitCmd // Return immediately with the submission command
-				} else { // Enter on a field that is not the last one: navigate to next field
+					return m, submitCmd
+				} else {
 					m.nextInput()
-					// The subsequent input update loop will handle the Enter key for the newly focused input,
-					// which is usually a no-op for value change but might affect cursor/blink.
 				}
 			case "tab", "shift+tab", "up", "down":
 				if msg.String() == "up" || msg.String() == "shift+tab" {
@@ -390,50 +391,54 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.nextInput()
 				}
 			}
+			tmpCmds := []tea.Cmd{}
 			for i := range m.inputs {
 				if i == m.focusIndex {m.inputs[i].Focus()} else {m.inputs[i].Blur()}
+				var updatedInput textinput.Model
+				updatedInput, cmd = m.inputs[i].Update(msg)
+				m.inputs[i] = updatedInput
+				tmpCmds = append(tmpCmds, cmd)
 			}
-			newInputs := make([]textinput.Model, len(m.inputs))
-			for i := range m.inputs {
-				newInputs[i], cmd = m.inputs[i].Update(msg)
-				cmds = append(cmds, cmd)
-			}
-			m.inputs = newInputs
+			cmds = append(cmds, tmpCmds...)
 			return m, tea.Batch(cmds...)
 
-		} else if m.formState == ViewingDetail {
+		case DetailView:
 			switch msg.String() {
 			case "ctrl+c", "esc", "q":
-				m.formState = NoForm
+				m.currentView = TableView
 				m.selectedTaskForDetail = nil
 				m.err = nil
 				return m, nil
 			}
-		} else { // NoForm state (table view)
+		case TableView:
+			activeTable := &m.pendingTasksTable
+			if m.focusedTable == CompletedTableFocus {
+				activeTable = &m.completedTasksTable
+			}
+
 			switch msg.String() {
 			case "a":
-				m.formState = CreatingTask
-				m.resetFormInputs()
-				m.focusIndex = 0
-				if len(m.inputs) > 0 {m.inputs[m.focusIndex].Focus()}
+				m.currentView = FormView
+				m.formSubState = CreatingTask
+				m.resetFormInputs() // This focuses inputs[0]
 				m.err = nil
 				return m, textinput.Blink
-			case "e": // Edit selected task
-				if len(m.table.Rows()) > 0 && m.table.Cursor() >= 0 && m.table.Cursor() < len(m.table.Rows()) {
-					selectedRow := m.table.SelectedRow()
+			case "e":
+				if m.focusedTable == PendingTableFocus && len(activeTable.Rows()) > 0 && activeTable.Cursor() >= 0 && activeTable.Cursor() < len(activeTable.Rows()) {
+					selectedRow := activeTable.SelectedRow()
 					taskIDStr := selectedRow[0]
 					taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
 					if err != nil {
 						m.err = fmt.Errorf("erro ao parsear ID da tarefa para editar: %v", err)
 						return m, nil
 					}
-					cmds = append(cmds, m.fetchTaskForDetailCmd(taskID, true)) // Fetch for editing
+					cmds = append(cmds, m.fetchTaskForDetailCmd(taskID, true))
 					m.isLoading = true
 				}
-			case "c": // Mark task as completed
-				if len(m.table.Rows()) > 0 && m.table.Cursor() >= 0 && m.table.Cursor() < len(m.table.Rows()) {
-					selectedRow := m.table.SelectedRow()
-					taskIDStr := selectedRow[0] // Assuming ID is the first column
+			case "c":
+				if m.focusedTable == PendingTableFocus && len(m.pendingTasksTable.Rows()) > 0 && m.pendingTasksTable.Cursor() < len(m.pendingTasksTable.Rows()) {
+					selectedRow := m.pendingTasksTable.SelectedRow()
+					taskIDStr := selectedRow[0]
 					taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
 					if err != nil {
 						m.err = fmt.Errorf("erro ao parsear ID da tarefa para completar: %v", err)
@@ -443,31 +448,51 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cmds = append(cmds, m.markTaskCompleteCmd(taskID))
 					}
 				}
-			case "d": // Delete selected task
-				if len(m.table.Rows()) > 0 && m.table.Cursor() >= 0 && m.table.Cursor() < len(m.table.Rows()) {
-					selectedRow := m.table.SelectedRow()
-					taskIDStr := selectedRow[0] // Assuming ID is the first column
+			case "d":
+				if len(activeTable.Rows()) > 0 && activeTable.Cursor() >= 0 && activeTable.Cursor() < len(activeTable.Rows()) {
+					selectedRow := activeTable.SelectedRow()
+					taskIDStr := selectedRow[0]
 					taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
 					if err != nil {
 						m.err = fmt.Errorf("erro ao parsear ID da tarefa para excluir: %v", err)
 					} else {
 						m.taskIDToDelete = taskID
-						m.confirmingDelete = true
-						m.err = nil // Clear previous errors before showing confirmation
+						m.currentView = ConfirmDeleteView
+						m.err = nil
 					}
 				}
 			case "v", "enter":
-				if len(m.table.Rows()) > 0 && m.table.Cursor() >= 0 && m.table.Cursor() < len(m.table.Rows()) {
-					selectedRow := m.table.SelectedRow()
+				if len(activeTable.Rows()) > 0 && activeTable.Cursor() >= 0 && activeTable.Cursor() < len(activeTable.Rows()) {
+					selectedRow := activeTable.SelectedRow()
 					taskIDStr := selectedRow[0]
 					taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
 					if err != nil {
 						m.err = fmt.Errorf("erro ao parsear ID da tarefa selecionada: %v", err)
 						return m, nil
 					}
-					cmds = append(cmds, m.fetchTaskForDetailCmd(taskID, false)) // Fetch for viewing
+					cmds = append(cmds, m.fetchTaskForDetailCmd(taskID, false))
 					m.isLoading = true
 				}
+			case "tab":
+				if m.focusedTable == PendingTableFocus {
+					m.focusedTable = CompletedTableFocus
+					m.pendingTasksTable.Blur()
+					m.completedTasksTable.Focus()
+				} else {
+					m.focusedTable = PendingTableFocus
+					m.completedTasksTable.Blur()
+					m.pendingTasksTable.Focus()
+				}
+			case "up", "k", "down", "j":
+				var updatedTeaModel tea.Model
+				if m.focusedTable == PendingTableFocus {
+					updatedTeaModel, cmd = m.pendingTasksTable.Update(msg)
+					m.pendingTasksTable = updatedTeaModel.(table.Model)
+				} else {
+					updatedTeaModel, cmd = m.completedTasksTable.Update(msg)
+					m.completedTasksTable = updatedTeaModel.(table.Model)
+				}
+				cmds = append(cmds, cmd)
 			}
 		}
 
@@ -475,35 +500,40 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isLoading = false
 		if msg.err != nil {
 			m.err = msg.err
-			m.formState = NoForm
+			m.currentView = TableView
 		} else {
-			m.selectedTaskForDetail = msg.task // Store for reference (e.g., UserID, IsCompleted)
+			if msg.task == nil { // Should not happen if err is nil, but defensive check
+				m.err = fmt.Errorf("detalhes da tarefa não encontrados, mas nenhum erro reportado")
+				m.currentView = TableView
+				return m, nil
+			}
+			m.selectedTaskForDetail = msg.task
 			if msg.forEdit {
 				m.editingTaskID = msg.task.ID
-				m.inputs[0].SetValue(msg.task.Title)             // Title
-				m.inputs[1].SetValue(msg.task.Description)       // Description
+				m.inputs[0].SetValue(msg.task.Title)
+				m.inputs[1].SetValue(msg.task.Description)
 				if msg.task.DueDate != nil {
-					m.inputs[2].SetValue(msg.task.DueDate.Format("02/01/2006")) // DueDate - Changed format
+					m.inputs[2].SetValue(msg.task.DueDate.Format("02/01/2006"))
 				} else {
 					m.inputs[2].SetValue("")
 				}
 				if msg.task.ClassID != nil {
-					m.inputs[3].SetValue(strconv.FormatInt(*msg.task.ClassID, 10)) // ClassID
+					m.inputs[3].SetValue(strconv.FormatInt(*msg.task.ClassID, 10))
 				} else {
 					m.inputs[3].SetValue("")
 				}
-				m.formState = EditingTask
-				m.focusIndex = 0 // Start focus on the first field
+				m.currentView = FormView
+				m.formSubState = EditingTask
+				m.focusIndex = 0
 				if len(m.inputs) > 0 { m.inputs[0].Focus() }
 				m.err = nil
 				cmds = append(cmds, textinput.Blink)
-			} else { // For viewing
-				m.formState = ViewingDetail
+			} else {
+				m.currentView = DetailView
 				m.err = nil
 			}
 		}
 		return m, tea.Batch(cmds...)
-
 
 	case error:
 		m.isLoading = false
@@ -511,35 +541,50 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	if m.formState == NoForm {
-		var updatedTable table.Model
-		updatedTable, cmd = m.table.Update(msg) // This handles table navigation (up/down keys)
-		m.table = updatedTable
-		cmds = append(cmds, cmd)
+	// This part of the original code for table updates seemed problematic.
+	// Table navigation (up/down) is now handled within the TableView KeyMsg case.
+	// Other messages for tables (like WindowSizeMsg) are passed directly.
+	// if m.currentView == TableView && msg.(tea.KeyMsg).String() == "" {
+	// For non-KeyMsg messages or KeyMsg not handled by specific cases above:
+	if m.currentView == TableView {
+		// Check if msg is tea.KeyMsg; if so, it means it wasn't one of the handled string keys
+		// For other types of messages (like WindowSizeMsg, or custom msgs if any), pass to tables.
+		if _, ok := msg.(tea.KeyMsg); !ok {
+			var updatedPendTable, updatedCompTable tea.Model
+			var pendCmd, compCmd tea.Cmd
+
+			updatedPendTable, pendCmd = m.pendingTasksTable.Update(msg)
+			m.pendingTasksTable = updatedPendTable.(table.Model)
+			cmds = append(cmds, pendCmd)
+
+			updatedCompTable, compCmd = m.completedTasksTable.Update(msg)
+			m.completedTasksTable = updatedCompTable.(table.Model)
+			cmds = append(cmds, compCmd)
+		}
 	}
 	return m, tea.Batch(cmds...)
 }
 
 // View renders the task management UI.
 func (m *Model) View() string {
-	if m.confirmingDelete {
-		if m.isLoading { // Loading during delete operation itself
+	if m.currentView == ConfirmDeleteView {
+		if m.isLoading {
 			return fmt.Sprintf("Excluindo tarefa ID %d...", m.taskIDToDelete)
 		}
-		if m.err != nil { // Error occurred during delete attempt
+		if m.err != nil {
 			return fmt.Sprintf("Erro ao excluir tarefa ID %d: %v\n\nPressione Esc para voltar à lista.", m.taskIDToDelete, m.err)
 		}
 		return fmt.Sprintf("Tem certeza que deseja excluir a tarefa ID %d? (s/n)", m.taskIDToDelete)
 	}
 
-	if m.err != nil && m.formState != CreatingTask && m.formState != ViewingDetail && m.formState != EditingTask {
+	if m.err != nil && m.currentView != FormView && m.currentView != DetailView {
 		return fmt.Sprintf("Erro: %v\n\nPressione 'a' para adicionar, 'e' para editar, 'd' para excluir, 'v' para ver detalhes, 'esc' para sair desta tela.", m.err)
 	}
 
-	switch m.formState {
-	case CreatingTask, EditingTask:
+	switch m.currentView {
+	case FormView:
 		return m.viewForm()
-	case ViewingDetail:
+	case DetailView:
 		if m.isLoading {
 			return "Carregando detalhes da tarefa..."
 		}
@@ -547,19 +592,31 @@ func (m *Model) View() string {
 			return fmt.Sprintf("Erro ao ver detalhes: %v\n\nPressione 'esc' para voltar.", m.err)
 		}
 		return m.viewTaskDetail()
-	default: // NoForm (Table view)
+	default: // TableView
 		if m.isLoading {
 			return "Carregando tarefas..."
 		}
+		pendingHeader := "Tarefas Pendentes"
+		if m.focusedTable == PendingTableFocus {
+			pendingHeader = lipgloss.NewStyle().Bold(true).SetString(pendingHeader).String()
+		}
+		completedHeader := "Tarefas Concluídas"
+		if m.focusedTable == CompletedTableFocus {
+			completedHeader = lipgloss.NewStyle().Bold(true).SetString(completedHeader).String()
+		}
+
+		tablesView := lipgloss.JoinVertical(lipgloss.Left,
+			pendingHeader,
+			baseStyle.Render(m.pendingTasksTable.View()),
+			"\n"+completedHeader,
+			baseStyle.Render(m.completedTasksTable.View()),
+		)
+
 		var help strings.Builder
 		help.WriteString("\n\n")
-		help.WriteString("  'a': Adicionar Nova Tarefa\n")
-		help.WriteString("  'e': Editar Tarefa Selecionada\n")
-		help.WriteString("  'd': Excluir Tarefa Selecionada\n")
-		help.WriteString("  'c': Concluir Tarefa Selecionada\n")
-		help.WriteString("  'v' ou Enter: Ver Detalhes da Tarefa")
-		// 'esc' to go back is handled by the main app model.
-		return baseStyle.Render(m.table.View()) + help.String()
+		help.WriteString("  'a': Adicionar | 'e': Editar (pendentes) | 'd': Excluir | 'c': Concluir (pendentes)\n")
+		help.WriteString("  'v'|Enter: Detalhes | Tab: Mudar Tabela Focada")
+		return tablesView + help.String()
 	}
 }
 
@@ -567,7 +624,7 @@ func (m *Model) View() string {
 func (m *Model) viewForm() string {
 	var b strings.Builder
 	formTitle := "Nova Tarefa"
-	if m.formState == EditingTask {
+	if m.formSubState == EditingTask {
 		formTitle = fmt.Sprintf("Editando Tarefa (ID: %d)", m.editingTaskID)
 	}
 	b.WriteString(fmt.Sprintf("%s (Pressione Enter para avançar, Esc para cancelar)\n\n", formTitle))
@@ -575,12 +632,12 @@ func (m *Model) viewForm() string {
 	for i := range m.inputs {
 		b.WriteString(m.inputs[i].View())
 		if m.focusIndex == i {
-			b.WriteString(" <") // Indicator for focused field
+			b.WriteString(" <")
 		}
 		b.WriteString("\n")
 	}
 	b.WriteString("\nPressione Enter no último campo para Salvar.")
-	if m.err != nil { // Display form-specific errors
+	if m.err != nil {
 		b.WriteString(fmt.Sprintf("\n\nErro: %v", m.err))
 	}
 	return baseStyle.Render(b.String())
@@ -595,40 +652,44 @@ func (m *Model) viewTaskDetail() string {
 	var b strings.Builder
 	task := m.selectedTaskForDetail
 
-	b.WriteString(fmt.Sprintf("Detalhes da Tarefa (ID: %d)\n", task.ID))
-	b.WriteString(strings.Repeat("-", 30) + "\n") // Separator
-
-	b.WriteString(fmt.Sprintf("Título: %s\n", task.Title))
-	b.WriteString(fmt.Sprintf("Descrição: %s\n", task.Description)) // Display full description
-
+	title := task.Title
+	desc := task.Description
 	dueDateStr := "N/A"
 	if task.DueDate != nil {
 		dueDateStr = task.DueDate.Format("02/01/2006")
 	}
-	b.WriteString(fmt.Sprintf("Prazo: %s\n", dueDateStr))
-
 	classIDStr := "N/A (Tarefa Geral)"
 	if task.ClassID != nil && *task.ClassID != 0 {
 		classIDStr = fmt.Sprintf("%d", *task.ClassID)
 	}
+	statusStr := "Pendente"
+	if task.IsCompleted {
+		statusStr = "Concluída"
+		title = strikethroughStyle.Render(title) // Apply strikethrough for detail view too
+		// Consider striking through other fields if desired
+	}
+
+
+	b.WriteString(fmt.Sprintf("Detalhes da Tarefa (ID: %d)\n", task.ID))
+	b.WriteString(strings.Repeat("-", 30) + "\n")
+
+	b.WriteString(fmt.Sprintf("Título: %s\n", title))
+	b.WriteString(fmt.Sprintf("Descrição: %s\n", desc))
+
+	b.WriteString(fmt.Sprintf("Prazo: %s\n", dueDateStr))
 	b.WriteString(fmt.Sprintf("ID Turma: %s\n", classIDStr))
-	b.WriteString(fmt.Sprintf("Concluída: %t\n", task.IsCompleted)) // Show completion status
+	b.WriteString(fmt.Sprintf("Status: %s\n", statusStr))
 
 	b.WriteString(strings.Repeat("-", 30) + "\n")
 	b.WriteString("\nPressione Esc para voltar à lista.")
 
-	// Apply some styling. The content can be wrapped if too long.
-	// For simplicity, direct rendering. For complex layouts, consider lipgloss.JoinVertical/Horizontal.
 	detailStyle := lipgloss.NewStyle().Padding(1, 2).Border(lipgloss.RoundedBorder(), true).BorderForeground(lipgloss.Color("63"))
-	contentWidth := m.width - detailStyle.GetHorizontalFrameSize() - 4 // Extra padding for content
+	contentWidth := m.width - detailStyle.GetHorizontalFrameSize() - 4
 
-	// Word wrap for description if it's too long
-	// This is a basic implementation. For more robust wrapping, a library might be better.
 	descLines := strings.Split(task.Description, "\n")
 	wrappedDesc := ""
 	for _, line := range descLines {
 		if contentWidth > 0 && len(line) > contentWidth {
-			// Simple wrap logic
 			for len(line) > contentWidth {
 				wrappedDesc += line[:contentWidth] + "\n"
 				line = line[contentWidth:]
@@ -637,19 +698,16 @@ func (m *Model) viewTaskDetail() string {
 		wrappedDesc += line + "\n"
 	}
 
-
 	finalView := fmt.Sprintf("Detalhes da Tarefa (ID: %d)\n%s\n", task.ID, strings.Repeat("-", 30))
-	finalView += fmt.Sprintf("Título: %s\n", task.Title)
+	finalView += fmt.Sprintf("Título: %s\n", title) // title already styled if completed
 	finalView += fmt.Sprintf("Descrição:\n%s\n", strings.TrimSpace(wrappedDesc))
 	finalView += fmt.Sprintf("Prazo: %s\n", dueDateStr)
 	finalView += fmt.Sprintf("ID Turma: %s\n", classIDStr)
-	finalView += fmt.Sprintf("Concluída: %t\n", task.IsCompleted)
+	finalView += fmt.Sprintf("Status: %s\n", statusStr)
 	finalView += fmt.Sprintf("%s\n\nPressione Esc para voltar à lista.", strings.Repeat("-", 30))
-
 
 	return detailStyle.Render(finalView)
 }
-
 
 // nextInput moves focus to the next text input field
 func (m *Model) nextInput() {
@@ -671,58 +729,55 @@ func (m *Model) prevInput() {
 // resetFormInputs clears all input fields and resets focus.
 func (m *Model) resetFormInputs() {
 	if len(m.inputs) < 4 {
-		// This case should ideally not happen if New() initializes inputs correctly.
-		// Log an error or handle appropriately if it does.
-		// For now, let's ensure it doesn't panic.
-		// This might indicate a need to re-initialize inputs if they are ever nil or too short.
-		// However, New() should prevent this.
 		return
 	}
 	m.inputs[0].Reset() // Title
 	m.inputs[1].Reset() // Description
 	m.inputs[2].Reset() // DueDate
 	m.inputs[3].Reset() // ClassID
-	// No need to reassign m.inputs if they are just being reset.
-	// m.inputs = []textinput.Model{m.titleInput, m.descriptionInput, m.dueDateInput, m.classIDInput}
 	m.focusIndex = 0
-	if len(m.inputs) > 0 { // Ensure inputs slice is not empty before focusing
+	if len(m.inputs) > 0 {
 		m.inputs[0].Focus()
 	}
 	m.err = nil
 }
 
-
 // SetSize allows the main app model to adjust the size of this component.
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
-	// Adjust table size
-	// The baseStyle adds 2 for horizontal and 2 for vertical borders.
-	// The trailing newline in View() for table takes 1 line.
-	// The help text ("Pressione 'a'...") takes about 2 lines.
-	// Effective table height = height - borderV - helpTextLines - viewNewline
+
+	availableHeight := height - baseStyle.GetVerticalFrameSize() - 5 // Approx for headers, gap, help
+	if availableHeight < 2 { availableTableHeight = 2}
+
+	pendingTableHeight := availableHeight / 2
+	if m.completedTasksTable.TotalRows() == 0 { // Give more space to pending if completed is empty
+	    pendingTableHeight = availableHeight -1 // Leave 1 for completed header
+	}
+	completedTableHeight := availableHeight - pendingTableHeight
+
+	if pendingTableHeight < 1 { pendingTableHeight = 1}
+	if completedTableHeight < 1 { completedTableHeight = 1}
+
 	tableWidth := width - baseStyle.GetHorizontalFrameSize()
-	tableHeight := height - baseStyle.GetVerticalFrameSize() - 3 // Approximation for help text + newline
-	if tableHeight < 1 { tableHeight = 1 } // Minimum height for table
-	m.table.SetWidth(tableWidth)
-	m.table.SetHeight(tableHeight)
+	m.pendingTasksTable.SetWidth(tableWidth)
+	m.pendingTasksTable.SetHeight(pendingTableHeight)
+	m.completedTasksTable.SetWidth(tableWidth)
+	m.completedTasksTable.SetHeight(completedTableHeight)
 
-
-	// Adjust form input sizes (can be fixed or relative to width)
-	inputWidth := width - baseStyle.GetHorizontalFrameSize() - 10 // Some padding
+	inputWidth := width - baseStyle.GetHorizontalFrameSize() - 10
 	if inputWidth < 20 { inputWidth = 20 }
 	for i := range m.inputs {
 		m.inputs[i].Width = inputWidth
 	}
 }
 
-// IsFocused returns true if the model is currently in a form input state,
-// which might mean it wants to trap 'esc' locally.
+// IsFocused returns true if the model is currently in a state that should trap Esc.
 func (m *Model) IsFocused() bool {
-	return m.formState != NoForm
+	return m.currentView != TableView
 }
 
-// IsLoading returns true if the model is currently loading data (e.g. tasks list)
+// IsLoading returns true if the model is currently loading data.
 func (m *Model) IsLoading() bool {
     return m.isLoading
 }

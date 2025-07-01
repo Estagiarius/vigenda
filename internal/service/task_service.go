@@ -219,27 +219,20 @@ func (s *taskServiceImpl) ListActiveTasksByClass(ctx context.Context, classID in
 	return activeTasks, nil
 }
 
-// ListAllActiveTasks recupera todas as tarefas ativas (não concluídas) de todos os usuários.
+// ListAllTasks recupera todas as tarefas (pendentes e concluídas) de todos os usuários.
 // TODO: Em um sistema multiusuário, isso deveria ser filtrado pelo UserID do contexto.
 // Em caso de falha na listagem, loga o erro e tenta criar uma tarefa de bug.
 //
-// Retorna uma lista de todas as tarefas ativas ou um erro.
-func (s *taskServiceImpl) ListAllActiveTasks(ctx context.Context) ([]models.Task, error) {
+// Retorna uma lista de todas as tarefas ou um erro.
+func (s *taskServiceImpl) ListAllTasks(ctx context.Context) ([]models.Task, error) {
 	// TODO: Adicionar filtragem por UserID quando a autenticação estiver implementada.
-	// Por enquanto, busca todas as tarefas, o que pode não ser ideal.
-	tasks, err := s.repo.GetAllTasks(ctx) // Assumindo que GetAllTasks existe no repositório.
+	tasks, err := s.repo.GetAllTasks(ctx)
 	if err != nil {
 		s.handleErrorAndCreateBugTask(ctx, err, "Global Task Listing Failure", "Attempted to list all tasks")
 		return nil, err
 	}
-
-	activeTasks := make([]models.Task, 0, len(tasks))
-	for _, task := range tasks {
-		if !task.IsCompleted {
-			activeTasks = append(activeTasks, task)
-		}
-	}
-	return activeTasks, nil
+	// Retorna todas as tarefas, a filtragem entre pendentes/concluídas será feita no frontend/TUI.
+	return tasks, nil
 }
 
 // MarkTaskAsCompleted marca uma tarefa específica como concluída.

@@ -12,8 +12,8 @@ import (
 // TaskService define os métodos para a gestão de tarefas.
 type TaskService interface {
 	CreateTask(ctx context.Context, title, description string, classID *int64, dueDate *time.Time) (models.Task, error)
-	ListActiveTasksByClass(ctx context.Context, classID int64) ([]models.Task, error)
-	ListAllActiveTasks(ctx context.Context) ([]models.Task, error) // New method for listing all tasks
+	ListActiveTasksByClass(ctx context.Context, classID int64) ([]models.Task, error) // Returns only active tasks for a class
+	ListAllTasks(ctx context.Context) ([]models.Task, error)             // Fetches ALL tasks (pending and completed)
 	MarkTaskAsCompleted(ctx context.Context, taskID int64) error
 	GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error) // Added for viewing details
 	// UpdateTask updates an existing task.

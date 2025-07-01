@@ -79,19 +79,14 @@ func (s *stubTaskService) MarkTaskAsCompleted(ctx context.Context, taskID int64)
 	return s.taskRepo.MarkTaskCompleted(ctx, taskID)
 }
 
-func (s *stubTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task, error) {
-	fmt.Printf("[StubTaskService] ListAllActiveTasks called\n")
+func (s *stubTaskService) ListAllTasks(ctx context.Context) ([]models.Task, error) { // Renamed
+	fmt.Printf("[StubTaskService] ListAllTasks called\n")
 	allTasks, err := s.taskRepo.GetAllTasks(ctx)
 	if err != nil {
 		return nil, err
 	}
-	activeTasks := []models.Task{}
-	for _, task := range allTasks {
-		if !task.IsCompleted {
-			activeTasks = append(activeTasks, task)
-		}
-	}
-	return activeTasks, nil
+	// No longer filtering here, service returns all tasks.
+	return allTasks, nil
 }
 
 // StubClassService
