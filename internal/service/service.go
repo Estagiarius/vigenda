@@ -15,6 +15,11 @@ type TaskService interface {
 	ListActiveTasksByClass(ctx context.Context, classID int64) ([]models.Task, error)
 	ListAllActiveTasks(ctx context.Context) ([]models.Task, error) // New method for listing all tasks
 	MarkTaskAsCompleted(ctx context.Context, taskID int64) error
+	GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error) // Added for viewing details
+	// UpdateTask updates an existing task.
+	UpdateTask(ctx context.Context, task *models.Task) error             // Added for updating tasks
+	// DeleteTask removes a task by its ID.
+	DeleteTask(ctx context.Context, taskID int64) error                  // Added for deleting tasks
 }
 
 // ClassService define os métodos para a gestão de turmas e alunos.

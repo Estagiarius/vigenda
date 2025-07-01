@@ -4,7 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"database/sql" // Added for sql.ErrNoRows
+	"errors"
+	"fmt"
 	"os"
+	"strings" // Added for strings.Contains
 	"time"
 	"vigenda/internal/models"
 	"vigenda/internal/repository" // Added import
@@ -144,6 +148,55 @@ func (s *taskServiceImpl) CreateTask(ctx context.Context, title, description str
 	return task, nil
 }
 
+// UpdateTask atualiza uma tarefa existente no sistema.
+// Valida se o título da tarefa não está vazio.
+// Em caso de falha na atualização (ex: erro no banco de dados), loga o erro e
+// tenta criar uma tarefa de bug para rastreamento.
+//
+// Retorna um erro se a atualização falhar.
+func (s *taskServiceImpl) UpdateTask(ctx context.Context, task *models.Task) error {
+	if task.Title == "" {
+		err := errors.New("task title cannot be empty for update")
+		logError("UpdateTask validation failed for Task ID %d: %v", task.ID, err)
+		return err
+	}
+
+	// UserID should ideally be checked against the authenticated user,
+	// but for now, we assume the task object carries the correct UserID from when it was fetched.
+	// Or, it could be re-fetched here to ensure integrity if UserID is part of the update logic.
+
+	err := s.repo.UpdateTask(ctx, task)
+	if err != nil {
+		// Check if the error is due to "not found" or "no change" which might not warrant a bug task.
+		if strings.Contains(err.Error(), "no task found") || strings.Contains(err.Error(), "no values changed") {
+			logError("UpdateTask: Failed to update task ID %d: %v", task.ID, err)
+		} else {
+			// For other unexpected errors.
+			s.handleErrorAndCreateBugTask(ctx, err, "Task Update Failure", "Attempted to update task with ID %d, Title '%s'. UserID: %d", task.ID, task.Title, task.UserID)
+		}
+		return err // Retorna o erro original para o chamador.
+	}
+	return nil
+}
+
+// DeleteTask remove uma tarefa do sistema.
+// Em caso de falha (ex: tarefa não encontrada ou erro no DB), loga o erro
+// e tenta criar uma tarefa de bug, a menos que o erro seja simplesmente "não encontrado".
+//
+// Retorna um erro se a operação falhar.
+func (s *taskServiceImpl) DeleteTask(ctx context.Context, taskID int64) error {
+	err := s.repo.DeleteTask(ctx, taskID)
+	if err != nil {
+		if strings.Contains(err.Error(), "no task found") { // Check for specific error text from repo
+			logError("DeleteTask: Failed to delete task ID %d: %v", taskID, err)
+		} else {
+			s.handleErrorAndCreateBugTask(ctx, err, "Task Deletion Failure", "Attempted to delete taskID %d", taskID)
+		}
+		return err // Retorna o erro original.
+	}
+	return nil
+}
+
 // ListActiveTasksByClass recupera todas as tarefas ativas (não concluídas)
 // associadas a um ID de turma específico.
 // Em caso de falha na listagem, loga o erro e tenta criar uma tarefa de bug.
@@ -206,4 +259,26 @@ func (s *taskServiceImpl) MarkTaskAsCompleted(ctx context.Context, taskID int64)
 		return err // Retorna o erro original.
 	}
 	return nil
+}
+
+// GetTaskByID recupera uma tarefa específica pelo seu ID.
+// Em caso de falha (ex: tarefa não encontrada ou erro no DB), loga o erro
+// e tenta criar uma tarefa de bug.
+//
+// Retorna a tarefa encontrada ou um erro.
+func (s *taskServiceImpl) GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error) {
+	task, err := s.repo.GetTaskByID(ctx, taskID)
+	if err != nil {
+		// Tratar erro de "não encontrado" de forma diferente de outros erros de DB.
+		// Não criar bug task se for apenas "não encontrado" pois pode ser um ID inválido fornecido pelo usuário.
+		if errors.Is(err, sql.ErrNoRows) || strings.Contains(err.Error(), "no task found") { // Check for specific error text from repo
+			logError("GetTaskByID: Task not found with ID %d: %v", taskID, err)
+			// Retornar um erro específico que a camada de TUI possa interpretar como "não encontrado"
+			return nil, fmt.Errorf("tarefa com ID %d não encontrada: %w", taskID, err)
+		}
+		// Para outros erros (inesperados), criar bug task.
+		s.handleErrorAndCreateBugTask(ctx, err, "Task Retrieval Failure", "Attempted to retrieve taskID %d", taskID)
+		return nil, err // Retorna o erro original.
+	}
+	return task, nil
 }

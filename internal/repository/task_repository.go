@@ -194,3 +194,53 @@ func (r *taskRepository) MarkTaskCompleted(ctx context.Context, taskID int64) er
 	}
 	return nil
 }
+
+func (r *taskRepository) DeleteTask(ctx context.Context, taskID int64) error {
+	query := `DELETE FROM tasks WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, taskID)
+	if err != nil {
+		return fmt.Errorf("taskRepository.DeleteTask: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("taskRepository.DeleteTask: checking rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("taskRepository.DeleteTask: no task found with ID %d", taskID)
+	}
+	return nil
+}
+
+func (r *taskRepository) UpdateTask(ctx context.Context, task *models.Task) error {
+	query := `UPDATE tasks SET user_id = ?, class_id = ?, title = ?, description = ?, due_date = ?, is_completed = ?
+              WHERE id = ?`
+
+	var classID sql.NullInt64
+	if task.ClassID != nil {
+		classID.Int64 = *task.ClassID
+		classID.Valid = true
+	} else {
+		classID.Valid = false // Ensure it's explicitly NULL if task.ClassID is nil
+	}
+
+	var dueDate sql.NullTime
+	if task.DueDate != nil {
+		dueDate.Time = *task.DueDate
+		dueDate.Valid = true
+	} else {
+		dueDate.Valid = false // Ensure it's explicitly NULL if task.DueDate is nil
+	}
+
+	result, err := r.db.ExecContext(ctx, query, task.UserID, classID, task.Title, task.Description, dueDate, task.IsCompleted, task.ID)
+	if err != nil {
+		return fmt.Errorf("taskRepository.UpdateTask: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("taskRepository.UpdateTask: checking rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("taskRepository.UpdateTask: no task found with ID %d, or no values changed", task.ID)
+	}
+	return nil
+}
