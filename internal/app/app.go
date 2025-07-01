@@ -3,7 +3,7 @@ package app
 import (
 	"fmt"
 	"log" // Adicionado para logging
-	"os"
+	// "os" // Removido import não utilizado
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -116,7 +116,7 @@ func (i menuItem) Description() string { return "" } // Could add descriptions l
 // Changed to pointer receiver
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	log.Printf("AppModel: Update GLOBAL - Recebida msg tipo %T Valor: %v", msg, msg)
-	var cmd tea.Cmd
+	// var cmd tea.Cmd // Removida declaração no escopo da função
 	var cmds []tea.Cmd // Use a slice to collect commands
 
 	// First switch for messages that AppModel handles directly or globally
@@ -208,10 +208,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Second stage: Delegate message to the active submodel if not handled above
 	// This is where messages like `classes.fetchedClassesMsg` should be handled.
-	var submodelCmd tea.Cmd
+	// var submodelCmd tea.Cmd // Declarar localmente dentro de cada case se necessário
 	switch m.currentView {
 	case TaskManagementView:
 		var updatedModel tea.Model
+		var submodelCmd tea.Cmd // Declarar localmente
 		updatedModel, submodelCmd = m.tasksModel.Update(msg) // msg is the original tea.Msg
 		m.tasksModel = updatedModel.(*tasks.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
@@ -225,6 +226,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ClassManagementView:
 		log.Printf("AppModel: Update (delegação) - CurrentView=ClassManagementView, encaminhando msg tipo %T para ClassesModel.Update", msg)
 		var updatedModel tea.Model
+		var submodelCmd tea.Cmd // Declarar localmente
 		updatedModel, submodelCmd = m.classesModel.Update(msg) // msg is the original tea.Msg
 		m.classesModel = updatedModel.(*classes.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
@@ -236,6 +238,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case AssessmentManagementView:
 		var updatedModel tea.Model
+		var submodelCmd tea.Cmd // Declarar localmente
 		updatedModel, submodelCmd = m.assessmentsModel.Update(msg)
 		m.assessmentsModel = updatedModel.(*assessments.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
@@ -247,6 +250,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case QuestionBankView:
 		var updatedModel tea.Model
+		var submodelCmd tea.Cmd // Declarar localmente
 		updatedModel, submodelCmd = m.questionsModel.Update(msg)
 		m.questionsModel = updatedModel.(*questions.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
@@ -258,6 +262,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case ProofGenerationView:
 		var updatedModel tea.Model
+		var submodelCmd tea.Cmd // Declarar localmente
 		updatedModel, submodelCmd = m.proofsModel.Update(msg)
 		m.proofsModel = updatedModel.(*proofs.Model) // Corrected type assertion to pointer
 		cmds = append(cmds, submodelCmd)
