@@ -131,24 +131,25 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var subCmd tea.Cmd
 		// We don't strictly need to capture the updated models here if WindowSizeMsg only affects size
 		// and doesn't return a new model instance, but it's safer if it might.
-		updatedTasksModel, subCmd := m.tasksModel.Update(msg)
-		m.tasksModel = updatedTasksModel.(tasks.Model) // Assuming Update might change the model type or state
+		var tempModel tea.Model
+		tempModel, subCmd = m.tasksModel.Update(msg)
+		m.tasksModel = tempModel.(*tasks.Model) // Corrected
 		cmds = append(cmds, subCmd)
 
-		updatedClassesModel, subCmd := m.classesModel.Update(msg)
-		m.classesModel = updatedClassesModel.(classes.Model)
+		tempModel, subCmd = m.classesModel.Update(msg)
+		m.classesModel = tempModel.(*classes.Model) // Corrected
 		cmds = append(cmds, subCmd)
 
-		updatedAssessmentsModel, subCmd := m.assessmentsModel.Update(msg)
-		m.assessmentsModel = updatedAssessmentsModel.(assessments.Model)
+		tempModel, subCmd = m.assessmentsModel.Update(msg)
+		m.assessmentsModel = tempModel.(*assessments.Model) // Corrected
 		cmds = append(cmds, subCmd)
 
-		updatedQuestionsModel, subCmd := m.questionsModel.Update(msg)
-		m.questionsModel = updatedQuestionsModel.(questions.Model)
+		tempModel, subCmd = m.questionsModel.Update(msg)
+		m.questionsModel = tempModel.(*questions.Model) // Corrected
 		cmds = append(cmds, subCmd)
 
-		updatedProofsModel, subCmd := m.proofsModel.Update(msg)
-		m.proofsModel = updatedProofsModel.(proofs.Model)
+		tempModel, subCmd = m.proofsModel.Update(msg)
+		m.proofsModel = tempModel.(*proofs.Model) // Corrected
 		cmds = append(cmds, subCmd)
 		return m, tea.Batch(cmds...)
 
