@@ -335,9 +335,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// 	m.list.SetSize(msg.Width-h, msg.Height-v-lipgloss.Height(m.headerView())-lipgloss.Height(m.footerView()))
 	}
 
-	// Handle list updates if not loading and no specific key handled above
-	if !m.isLoading {
+	// Handle list updates if not loading and no specific key handled above,
+	// ONLY if the current view actually uses the list.
+	if m.currentViewUsesList() && !m.isLoading {
 		var listCmd tea.Cmd
+		// Ensure m.list is not nil before calling Update.
+		// Though, if currentViewUsesList is true, m.list should have been initialized
+		// when transitioning to that view (e.g., in classesLoadedMsg or studentsLoadedMsg).
+		// However, a defensive check or ensuring list is always initialized might be good.
+		// For now, assuming it's initialized if currentViewUsesList() is true.
 		m.list, listCmd = m.list.Update(msg)
 		cmds = append(cmds, listCmd)
 	}
