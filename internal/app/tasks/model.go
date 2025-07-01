@@ -39,12 +39,12 @@ type Model struct {
 	formState   FormState // Used for Create/Edit forms and now ViewDetail state
 
 	// Form fields (for creating/editing)
-	titleInput       textinput.Model
-	descriptionInput textinput.Model
-	dueDateInput     textinput.Model // Store as string, parse on submit
-	classIDInput     textinput.Model // Store as string, parse on submit
-	inputs           []textinput.Model
-	focusIndex       int
+	// titleInput       textinput.Model // Will be inputs[0]
+	// descriptionInput textinput.Model // Will be inputs[1]
+	// dueDateInput     textinput.Model // Will be inputs[2]
+	// classIDInput     textinput.Model // Will be inputs[3]
+	inputs     []textinput.Model // Holds all form inputs
+	focusIndex int
 
 	selectedTaskForDetail *models.Task // Store the task whose details are being viewed
 	editingTaskID         int64        // ID of the task being edited
@@ -175,7 +175,7 @@ func New(taskService service.TaskService) *Model {
 	di.Prompt = "Descrição: "
 
 	ddi := textinput.New()
-	ddi.Placeholder = "YYYY-MM-DD (opcional)"
+	ddi.Placeholder = "DD/MM/YYYY (opcional)" // Changed placeholder
 	ddi.CharLimit = 10
 	ddi.Width = 20
 	ddi.Prompt = "Prazo: "
@@ -186,21 +186,23 @@ func New(taskService service.TaskService) *Model {
 	ci.Width = 20
 	ci.Prompt = "ID Turma: "
 
+	inputs := make([]textinput.Model, 4)
+	inputs[0] = ti
+	inputs[1] = di
+	inputs[2] = ddi
+	inputs[3] = ci
+
 	return &Model{
 		taskService:           taskService,
 		table:                 t,
 		isLoading:             true,
 		formState:             NoForm,
-		titleInput:            ti,
-		descriptionInput:      di,
-		dueDateInput:          ddi,
-		classIDInput:          ci,
-		inputs:                []textinput.Model{ti, di, ddi, ci},
+		inputs:                inputs,
 		focusIndex:            0,
 		selectedTaskForDetail: nil,
 		editingTaskID:         0,
-		taskIDToDelete:        0,        // Initialize
-		confirmingDelete:      false,    // Initialize
+		taskIDToDelete:        0,
+		confirmingDelete:      false,
 	}
 }
 
@@ -213,7 +215,7 @@ func (m *Model) Init() tea.Cmd {
 	m.editingTaskID = 0
 	m.taskIDToDelete = 0
 	m.confirmingDelete = false
-	m.resetFormInputs() // Ensure form is clean on init
+	// m.resetFormInputs() // resetFormInputs will be called when entering form state
 	return m.loadTasksCmd
 }
 
@@ -332,15 +334,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case "enter":
 				if m.focusIndex == len(m.inputs)-1 { // Last input, submit
-					title := m.titleInput.Value()
+					title := m.inputs[0].Value() // Title from inputs[0]
 					if title == "" {
 						m.err = fmt.Errorf("título não pode ser vazio")
 						return m, nil
 					}
-					description := m.descriptionInput.Value()
+					description := m.inputs[1].Value() // Description from inputs[1]
 					var classID *int64
-					if m.classIDInput.Value() != "" {
-						cid, err := strconv.ParseInt(m.classIDInput.Value(), 10, 64)
+					if m.inputs[3].Value() != "" { // ClassID from inputs[3]
+						cid, err := strconv.ParseInt(m.inputs[3].Value(), 10, 64)
 						if err != nil {
 							m.err = fmt.Errorf("ID da turma inválido: %v", err)
 							return m, nil
@@ -348,10 +350,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						classID = &cid
 					}
 					var dueDate *time.Time
-					if m.dueDateInput.Value() != "" {
-						parsedDate, err := time.Parse("2006-01-02", m.dueDateInput.Value())
+					if m.inputs[2].Value() != "" { // DueDate from inputs[2]
+						parsedDate, err := time.Parse("02/01/2006", m.inputs[2].Value()) // Changed format string
 						if err != nil {
-							m.err = fmt.Errorf("formato de data inválido (use YYYY-MM-DD): %v", err)
+							m.err = fmt.Errorf("formato de data inválido (use DD/MM/YYYY): %v", err) // Changed error message
 							return m, nil
 						}
 						dueDate = &parsedDate
@@ -480,17 +482,17 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.selectedTaskForDetail = msg.task // Store for reference (e.g., UserID, IsCompleted)
 			if msg.forEdit {
 				m.editingTaskID = msg.task.ID
-				m.titleInput.SetValue(msg.task.Title)
-				m.descriptionInput.SetValue(msg.task.Description)
+				m.inputs[0].SetValue(msg.task.Title)             // Title
+				m.inputs[1].SetValue(msg.task.Description)       // Description
 				if msg.task.DueDate != nil {
-					m.dueDateInput.SetValue(msg.task.DueDate.Format("2006-01-02"))
+					m.inputs[2].SetValue(msg.task.DueDate.Format("02/01/2006")) // DueDate - Changed format
 				} else {
-					m.dueDateInput.SetValue("")
+					m.inputs[2].SetValue("")
 				}
 				if msg.task.ClassID != nil {
-					m.classIDInput.SetValue(strconv.FormatInt(*msg.task.ClassID, 10))
+					m.inputs[3].SetValue(strconv.FormatInt(*msg.task.ClassID, 10)) // ClassID
 				} else {
-					m.classIDInput.SetValue("")
+					m.inputs[3].SetValue("")
 				}
 				m.formState = EditingTask
 				m.focusIndex = 0 // Start focus on the first field
@@ -670,13 +672,24 @@ func (m *Model) prevInput() {
 
 // resetFormInputs clears all input fields and resets focus.
 func (m *Model) resetFormInputs() {
-	m.titleInput.Reset()
-	m.descriptionInput.Reset()
-	m.dueDateInput.Reset()
-	m.classIDInput.Reset()
-	m.inputs = []textinput.Model{m.titleInput, m.descriptionInput, m.dueDateInput, m.classIDInput} // Reassign to ensure they are fresh
+	if len(m.inputs) < 4 {
+		// This case should ideally not happen if New() initializes inputs correctly.
+		// Log an error or handle appropriately if it does.
+		// For now, let's ensure it doesn't panic.
+		// This might indicate a need to re-initialize inputs if they are ever nil or too short.
+		// However, New() should prevent this.
+		return
+	}
+	m.inputs[0].Reset() // Title
+	m.inputs[1].Reset() // Description
+	m.inputs[2].Reset() // DueDate
+	m.inputs[3].Reset() // ClassID
+	// No need to reassign m.inputs if they are just being reset.
+	// m.inputs = []textinput.Model{m.titleInput, m.descriptionInput, m.dueDateInput, m.classIDInput}
 	m.focusIndex = 0
-	m.inputs[0].Focus() // Focus the first input
+	if len(m.inputs) > 0 { // Ensure inputs slice is not empty before focusing
+		m.inputs[0].Focus()
+	}
 	m.err = nil
 }
 

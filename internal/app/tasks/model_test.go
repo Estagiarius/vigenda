@@ -37,6 +37,14 @@ func (m *MockTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task
 	return nil, args.Error(1)
 }
 
+func (m *MockTaskService) ListActiveTasksByClass(ctx context.Context, classID int64) ([]models.Task, error) {
+	args := m.Called(ctx, classID)
+	if tasks, ok := args.Get(0).([]models.Task); ok {
+		return tasks, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *MockTaskService) MarkTaskAsCompleted(ctx context.Context, taskID int64) error {
 	args := m.Called(ctx, taskID)
 	return args.Error(0)
@@ -91,8 +99,8 @@ func TestTasksModel_CreateTask_SubmitForm(t *testing.T) {
 
 	// Setup model to be in creating state with some input values
 	model.formState = CreatingTask
-	model.titleInput.SetValue("New Task Title")
-	model.descriptionInput.SetValue("New Task Description")
+	model.inputs[0].SetValue("New Task Title")        // Title
+	model.inputs[1].SetValue("New Task Description")  // Description
 	// Optional fields like dueDate and classID can be empty or set
 	model.focusIndex = len(model.inputs) -1 // Simulate focus on the last input for submission
 
@@ -136,8 +144,8 @@ func TestTasksModel_UpdateTask_SubmitForm(t *testing.T) {
 	model.editingTaskID = originalTask.ID
 	model.selectedTaskForDetail = originalTask // Store original task to preserve UserID, IsCompleted
 
-	model.titleInput.SetValue("Updated Title")
-	model.descriptionInput.SetValue("Updated Desc")
+	model.inputs[0].SetValue("Updated Title")       // Title
+	model.inputs[1].SetValue("Updated Desc") // Description
 	model.focusIndex = len(model.inputs) - 1
 
 	// Expected task to be sent to UpdateTask service method
@@ -190,10 +198,12 @@ func TestTasksModel_KeyBindings_InTableView(t *testing.T) {
 	mockService.On("ListAllActiveTasks", mock.Anything).Return(initialTasks, nil).Once()
 	model := New(mockService)
 	setupCmd := model.Init()
+	// Simulate WindowSizeMsg because SetSize might be called by app model before table is used
+	model.SetSize(80, 24)
 	setupMsg := setupCmd()
 	model.Update(setupMsg) // Populate table for selection
 
-	model.table.Select(0) // Select the first row
+	model.table.SetCursor(0) // Select the first row
 
 	// Test 'a' -> CreatingTask
 	m, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}})
