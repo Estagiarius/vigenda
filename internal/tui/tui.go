@@ -97,6 +97,9 @@ func NewTUIModel(cs service.ClassService) Model {
 		isLoading:               false,
 		dashboardMainMenuItems:  mainMenuItems,
 		dashboardMainMenuCursor: 0,
+		// Inicializar m.list para evitar pânico se Update/View for chamado antes de uma view de lista ser ativada.
+		// Usamos um delegate vazio e sem itens por enquanto.
+		list: list.New(nil, list.NewDefaultDelegate(), 0, 0),
 	}
 	log.Printf("TUI: NewTUIModel - Modelo TUI antes de loadInitialData. currentView: %s", m.currentView.String())
 	m.loadInitialData() // Load initial data (primarily for Dashboard now)
@@ -433,8 +436,21 @@ func (m Model) footerView() string {
 }
 
 func (m Model) renderDashboardView() string {
+	log.Printf("TUI: renderDashboardView - INÍCIO. Width: %d, Height: %d", m.width, m.height)
+
+	// Garantir dimensões mínimas para evitar pânico/renderização vazia do lipgloss
+	effectiveWidth := m.width
+	if effectiveWidth <= 0 {
+		effectiveWidth = 80 // Um valor padrão razoável se o tamanho real ainda não chegou
+		log.Printf("TUI: renderDashboardView - m.width era 0, usando default: %d", effectiveWidth)
+	}
+	// effectiveHeight := m.height (não usado diretamente para altura total dos painéis ainda)
+
 	// 1. Renderizar o Menu Lateral Esquerdo
 	menuWidth := 25 // Largura do menu lateral (aumentada para nomes completos)
+	if menuWidth > effectiveWidth/2 { // Evitar que o menu seja muito grande em telas pequenas
+		menuWidth = effectiveWidth/3
+	}
 	menuItemsContent := []string{}
 
 	// Adiciona um título ao menu
@@ -458,12 +474,14 @@ func (m Model) renderDashboardView() string {
 	menuPanel := menuPanelStyle.Render(lipgloss.JoinVertical(lipgloss.Left, menuItemsContent...))
 
 	// 2. Renderizar os Painéis de Conteúdo da Dashboard (Placeholder por enquanto)
-	contentWidth := m.width - menuWidth - docStyle.GetHorizontalFrameSize() - 2 // -2 for potential spacing between panels
+	// Usar effectiveWidth para o cálculo
+	contentWidth := effectiveWidth - menuWidth - docStyle.GetHorizontalFrameSize() - 2 // -2 for potential spacing between panels
 	if contentWidth < 10 {
 		contentWidth = 10 // Minimum content width
+		log.Printf("TUI: renderDashboardView - contentWidth calculado era < 10, usando mínimo: %d", contentWidth)
 	}
 
-	placeholderContent := fmt.Sprintf("Conteúdo da Dashboard Principal.\n\nLargura disponível para conteúdo: %d\n\nFuturos painéis:\n- Foco Atual\n- Agenda do Dia\n- Pendências Urgentes", contentWidth)
+	placeholderContent := fmt.Sprintf("Conteúdo da Dashboard Principal.\n\nLargura disponível para conteúdo: %d\n(effectiveWidth: %d, menuWidth: %d)\n\nFuturos painéis:\n- Foco Atual\n- Agenda do Dia\n- Pendências Urgentes", contentWidth, effectiveWidth, menuWidth)
 	contentPanelStyle := lipgloss.NewStyle().
 		Width(contentWidth).
 		// Height(m.height - lipgloss.Height(m.headerView()) - lipgloss.Height(m.footerView()) - 2). // Match menu height approx.
