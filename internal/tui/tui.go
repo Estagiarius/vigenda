@@ -75,7 +75,7 @@ type Model struct {
 
 // NewTUIModel creates a new TUI model.
 func NewTUIModel(cs service.ClassService) Model {
-	log.Printf("TUI: NewTUIModel - Chamado. ClassService is nil: %t", cs == nil)
+	log.Println("TUI: NewTUIModel - INÍCIO")
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -98,19 +98,21 @@ func NewTUIModel(cs service.ClassService) Model {
 		dashboardMainMenuItems:  mainMenuItems,
 		dashboardMainMenuCursor: 0,
 	}
-	log.Println("TUI: NewTUIModel - Modelo TUI inicializado, chamando loadInitialData.")
+	log.Printf("TUI: NewTUIModel - Modelo TUI antes de loadInitialData. currentView: %s", m.currentView.String())
 	m.loadInitialData() // Load initial data (primarily for Dashboard now)
-	log.Println("TUI: NewTUIModel - loadInitialData chamado, retornando modelo.")
+	log.Printf("TUI: NewTUIModel - Modelo TUI após loadInitialData. currentView: %s", m.currentView.String())
+	log.Println("TUI: NewTUIModel - FIM")
 	return m
 }
 
 func (m *Model) loadInitialData() {
+	log.Printf("TUI: loadInitialData - INÍCIO. currentView: %s", m.currentView.String())
 	// This function will be responsible for loading initial data for the Dashboard.
 	// For now, it can be a no-op or load some mock data for dashboard panels if we add them.
 	// If DashboardView needs to load something asynchronously, this is where it would start.
 	// m.isLoading = true
 	// cmds = append(cmds, m.loadDashboardDataCmd())
-	log.Println("TUI: loadInitialData - Atualmente, nenhuma ação de carregamento específica para Dashboard.")
+	log.Printf("TUI: loadInitialData - FIM. currentView: %s. Nenhuma ação de carregamento específica para Dashboard.", m.currentView.String())
 }
 
 // loadDashboardDataCmd would be a tea.Cmd to load dashboard specific data.
@@ -154,9 +156,11 @@ func (m *Model) loadStudentsForClass(classID int64) tea.Cmd {
 
 // Init initializes the TUI model.
 func (m Model) Init() tea.Cmd {
+	log.Printf("TUI: Init - INÍCIO. currentView: %s", m.currentView.String())
 	// return m.spinner.Tick // Start spinner if initially loading
 	// No initial data loading command for dashboard yet, can be added later.
 	// If dashboard needs async data: return tea.Batch(m.spinner.Tick, m.loadDashboardDataCmd())
+	log.Printf("TUI: Init - FIM. currentView: %s", m.currentView.String())
 	return m.spinner.Tick
 }
 
@@ -177,8 +181,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
+	log.Printf("TUI: Update - INÍCIO. currentView: %s. Mensagem: %T", m.currentView.String(), msg)
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg: // Always handle window size changes
+		log.Printf("TUI: Update - Recebido tea.WindowSizeMsg. Width: %d, Height: %d", msg.Width, msg.Height)
 		m.width = msg.Width
 		m.height = msg.Height
 		// If we are in a list-based view, update the list size
@@ -353,29 +360,42 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View renders the TUI.
 func (m Model) View() string {
+	log.Printf("TUI: View - INÍCIO. currentView: %s, isLoading: %t, err: %v", m.currentView.String(), m.isLoading, m.err)
+
 	if m.err != nil {
+		log.Println("TUI: View - Renderizando erro.")
 		// Simplified error view
 		return docStyle.Render(fmt.Sprintf("Ocorreu um erro: %v\n\nPressione qualquer tecla para sair.", m.err))
 	}
 
+	// Temporariamente, vamos remover o isLoading da condição de forçar a dashboard para ver se é isso.
+	// if m.isLoading {
+	// 	log.Printf("TUI: View - Renderizando tela de carregamento para %s.", m.currentView.String())
+	// 	loadingText := fmt.Sprintf("%s Carregando...", m.spinner.View())
+	// 	if m.currentView == app.ClassManagementView && len(m.classes) == 0 {
+	// 		loadingText += "\n\nNenhuma turma encontrada ainda."
+	// 	} else if m.currentView == app.View(99) && len(m.students) == 0 && m.selectedClass != nil {
+	// 		loadingText += fmt.Sprintf("\n\nNenhum aluno encontrado para a turma %s.", m.selectedClass.Name)
+	// 	} else if m.currentView == app.DashboardView && m.isLoading { // Specific loading for dashboard if any
+	// 		loadingText = fmt.Sprintf("%s Carregando Dashboard...", m.spinner.View())
+	// 	}
+	// 	return docStyle.Render(loadingText)
+	// }
+
+	if m.currentView == app.DashboardView {
+		log.Println("TUI: View - Chamando renderDashboardView().")
+		return m.renderDashboardView()
+	}
+
+	// Se não for DashboardView, verificar isLoading para outras views
 	if m.isLoading {
-		loadingText := fmt.Sprintf("%s Carregando...", m.spinner.View())
-		if m.currentView == app.ClassManagementView && len(m.classes) == 0 {
-			loadingText += "\n\nNenhuma turma encontrada ainda."
-		} else if m.currentView == app.View(99) && len(m.students) == 0 && m.selectedClass != nil {
-			loadingText += fmt.Sprintf("\n\nNenhum aluno encontrado para a turma %s.", m.selectedClass.Name)
-		} else if m.currentView == app.DashboardView && m.isLoading { // Specific loading for dashboard if any
-			loadingText = fmt.Sprintf("%s Carregando Dashboard...", m.spinner.View())
-		}
+		log.Printf("TUI: View - Renderizando tela de carregamento para %s.", m.currentView.String())
+		loadingText := fmt.Sprintf("%s Carregando %s...", m.spinner.View(), m.currentView.String())
+		// Adicionar condições específicas de texto de carregamento se necessário
 		return docStyle.Render(loadingText)
 	}
 
-	// If not loading and no error, render the current view
-	if m.currentView == app.DashboardView {
-		// No docStyle wrapping here as renderDashboardView will handle its own root style.
-		return m.renderDashboardView()
-	}
-	// For other views that use the list component:
+	log.Printf("TUI: View - Renderizando view de lista para %s.", m.currentView.String())
 	return docStyle.Render(m.headerView() + "\n" + m.list.View() + "\n" + m.footerView())
 }
 
