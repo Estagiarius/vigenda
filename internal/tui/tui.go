@@ -330,9 +330,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Potentially return m, tea.Quit or display error to user
 		return m, tea.Quit // For now, quit on error
 
-	case tea.WindowSizeMsg:
-		h, v := docStyle.GetFrameSize()
-		m.list.SetSize(msg.Width-h, msg.Height-v-lipgloss.Height(m.headerView())-lipgloss.Height(m.footerView()))
+	// case tea.WindowSizeMsg: // MOVED to the top of the switch
+	// 	h, v := docStyle.GetFrameSize()
+	// 	m.list.SetSize(msg.Width-h, msg.Height-v-lipgloss.Height(m.headerView())-lipgloss.Height(m.footerView()))
 	}
 
 	// Handle list updates if not loading and no specific key handled above
