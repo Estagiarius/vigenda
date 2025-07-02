@@ -235,6 +235,27 @@ func (s *taskServiceImpl) ListAllTasks(ctx context.Context) ([]models.Task, erro
 	return tasks, nil
 }
 
+// ListAllActiveTasks recupera todas as tarefas ativas (não concluídas) de todos os usuários.
+// Em caso de falha na listagem, loga o erro e tenta criar uma tarefa de bug.
+//
+// Retorna uma lista de todas as tarefas ativas ou um erro.
+func (s *taskServiceImpl) ListAllActiveTasks(ctx context.Context) ([]models.Task, error) {
+	// TODO: Adicionar filtragem por UserID quando a autenticação estiver implementada, se necessário.
+	allTasks, err := s.repo.GetAllTasks(ctx)
+	if err != nil {
+		s.handleErrorAndCreateBugTask(ctx, err, "Global Active Task Listing Failure", "Attempted to list all active tasks")
+		return nil, err
+	}
+
+	activeTasks := make([]models.Task, 0, len(allTasks))
+	for _, task := range allTasks {
+		if !task.IsCompleted {
+			activeTasks = append(activeTasks, task)
+		}
+	}
+	return activeTasks, nil
+}
+
 // MarkTaskAsCompleted marca uma tarefa específica como concluída.
 // O ID da tarefa é usado para identificar a tarefa a ser atualizada.
 // Em caso de falha (ex: tarefa não encontrada ou erro no DB), loga o erro

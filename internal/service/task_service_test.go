@@ -220,54 +220,47 @@ func TestTaskService_ListActiveTasksByClass(t *testing.T) {
 	})
 }
 
-func TestTaskService_ListAllActiveTasks(t *testing.T) {
+func TestTaskService_ListAllTasks(t *testing.T) {
 	mockRepo := &MockTaskRepository{}
 	taskService := NewTaskService(mockRepo)
 	ctx := context.Background()
 
-	t.Run("successful listing all", func(t *testing.T) {
+	t.Run("successful listing all tasks (active and completed)", func(t *testing.T) {
 		mockRepo.CreatedBugTasks = []models.Task{}
 		nilClassID := (*int64)(nil)
 		classID1 := int64(1)
 		mockTasks := []models.Task{
-			{ID: 1, Title: "Task 1", IsCompleted: false, ClassID: &classID1},
-			{ID: 2, Title: "System Task (Bug)", IsCompleted: false, ClassID: nilClassID, UserID: 0},
+			{ID: 1, Title: "Task 1 Active", IsCompleted: false, ClassID: &classID1},
+			{ID: 2, Title: "System Task Active (Bug)", IsCompleted: false, ClassID: nilClassID, UserID: 0},
 			{ID: 3, Title: "Task 3 Completed", IsCompleted: true, ClassID: &classID1},
+			{ID: 4, Title: "Task 4 Active", IsCompleted: false, ClassID: &classID1},
 		}
 		mockRepo.GetAllTasksFunc = func(ctx context.Context) ([]models.Task, error) {
 			return mockTasks, nil
 		}
 
-		tasks, err := taskService.ListAllTasks(ctx) // Renamed
+		tasks, err := taskService.ListAllTasks(ctx)
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
-		if len(tasks) != 2 {
-			t.Errorf("Expected 2 active tasks, got %d (tasks: %+v)", len(tasks), tasks)
+		if len(tasks) != 4 { // Should return all tasks, filtering is up to caller
+			t.Errorf("Expected 4 tasks, got %d (tasks: %+v)", len(tasks), tasks)
 		}
-		// Check titles to ensure correct tasks are returned
-		titles := []string{}
-		for _, task := range tasks {
-			titles = append(titles, task.Title)
-		}
-		if !contains(titles, "Task 1") || !contains(titles, "System Task (Bug)") {
-			t.Errorf("Expected 'Task 1' and 'System Task (Bug)', got %v", titles)
-		}
-
 		if len(mockRepo.CreatedBugTasks) != 0 {
 			t.Errorf("Expected no bug tasks, got %d", len(mockRepo.CreatedBugTasks))
 		}
 	})
 
-	t.Run("repository error on listing all", func(t *testing.T) {
+	t.Run("repository error on listing all tasks", func(t *testing.T) {
 		mockRepo.CreatedBugTasks = []models.Task{}
 		repoError := errors.New("repo list all error")
 		mockRepo.GetAllTasksFunc = func(ctx context.Context) ([]models.Task, error) {
 			return nil, repoError
 		}
-		mockRepo.CreateTaskFunc = func(ctx context.Context, task *models.Task) (int64, error) { return 101, nil } // Bug task creation
+		// Simulate bug task creation success
+		mockRepo.CreateTaskFunc = func(ctx context.Context, task *models.Task) (int64, error) { return 101, nil }
 
-		_, err := taskService.ListAllTasks(ctx) // Renamed
+		_, err := taskService.ListAllTasks(ctx)
 		if err == nil {
 			t.Errorf("Expected an error, got nil")
 		}
@@ -276,7 +269,77 @@ func TestTaskService_ListAllActiveTasks(t *testing.T) {
 		}
 		if len(mockRepo.CreatedBugTasks) == 0 {
 			t.Errorf("Expected a bug task to be created")
-		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Task Listing Failure") {
+		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Global Task Listing Failure") { // Adjusted title
+			t.Errorf("Incorrect bug task title: %s", mockRepo.CreatedBugTasks[0].Title)
+		}
+	})
+}
+
+func TestTaskService_ListAllActiveTasks(t *testing.T) {
+	mockRepo := &MockTaskRepository{}
+	taskService := NewTaskService(mockRepo)
+	ctx := context.Background()
+
+	t.Run("successful listing all active tasks", func(t *testing.T) {
+		mockRepo.CreatedBugTasks = []models.Task{}
+		nilClassID := (*int64)(nil)
+		classID1 := int64(1)
+		mockTasksFromRepo := []models.Task{
+			{ID: 1, Title: "Task 1 Active", IsCompleted: false, ClassID: &classID1},
+			{ID: 2, Title: "System Task Active (Bug)", IsCompleted: false, ClassID: nilClassID, UserID: 0},
+			{ID: 3, Title: "Task 3 Completed", IsCompleted: true, ClassID: &classID1}, // Should be filtered out
+			{ID: 4, Title: "Task 4 Active", IsCompleted: false, ClassID: &classID1},
+			{ID: 5, Title: "Task 5 Completed", IsCompleted: true, ClassID: nilClassID, UserID: 0}, // Should be filtered out
+		}
+		mockRepo.GetAllTasksFunc = func(ctx context.Context) ([]models.Task, error) {
+			return mockTasksFromRepo, nil
+		}
+
+		tasks, err := taskService.ListAllActiveTasks(ctx)
+		if err != nil {
+			t.Errorf("Expected no error, got %v", err)
+		}
+		if len(tasks) != 3 {
+			t.Errorf("Expected 3 active tasks, got %d (tasks: %+v)", len(tasks), tasks)
+		}
+		// Check titles to ensure correct tasks are returned
+		titles := []string{}
+		for _, task := range tasks {
+			titles = append(titles, task.Title)
+		}
+		expectedTitles := []string{"Task 1 Active", "System Task Active (Bug)", "Task 4 Active"}
+		for _, et := range []string{"Task 1 Active", "System Task Active (Bug)", "Task 4 Active"} {
+			if !contains(titles, et) {
+				t.Errorf("Expected title '%s' to be in active tasks, but not found. Got: %v", et, titles)
+			}
+		}
+		if contains(titles, "Task 3 Completed") || contains(titles, "Task 5 Completed") {
+			t.Errorf("Completed tasks should not be in the active list. Got: %v", titles)
+		}
+
+		if len(mockRepo.CreatedBugTasks) != 0 {
+			t.Errorf("Expected no bug tasks, got %d", len(mockRepo.CreatedBugTasks))
+		}
+	})
+
+	t.Run("repository error on listing all active tasks", func(t *testing.T) {
+		mockRepo.CreatedBugTasks = []models.Task{}
+		repoError := errors.New("repo list all active error")
+		mockRepo.GetAllTasksFunc = func(ctx context.Context) ([]models.Task, error) {
+			return nil, repoError
+		}
+		mockRepo.CreateTaskFunc = func(ctx context.Context, task *models.Task) (int64, error) { return 101, nil } // Bug task creation
+
+		_, err := taskService.ListAllActiveTasks(ctx)
+		if err == nil {
+			t.Errorf("Expected an error, got nil")
+		}
+		if !errors.Is(err, repoError) {
+			t.Errorf("Expected error %v, got %v", repoError, err)
+		}
+		if len(mockRepo.CreatedBugTasks) == 0 {
+			t.Errorf("Expected a bug task to be created")
+		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Global Active Task Listing Failure") { // Corrected expected bug title
 			t.Errorf("Incorrect bug task title: %s", mockRepo.CreatedBugTasks[0].Title)
 		}
 	})

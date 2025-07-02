@@ -89,6 +89,21 @@ func (s *stubTaskService) ListAllTasks(ctx context.Context) ([]models.Task, erro
 	return allTasks, nil
 }
 
+func (s *stubTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task, error) {
+	fmt.Printf("[StubTaskService] ListAllActiveTasks called\n")
+	allTasks, err := s.taskRepo.GetAllTasks(ctx)
+	if err != nil {
+		return nil, err
+	}
+	activeTasks := []models.Task{}
+	for _, task := range allTasks {
+		if !task.IsCompleted {
+			activeTasks = append(activeTasks, task)
+		}
+	}
+	return activeTasks, nil
+}
+
 // StubClassService
 type stubClassService struct {
 	classRepo repository.ClassRepository
