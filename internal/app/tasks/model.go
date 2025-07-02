@@ -81,6 +81,12 @@ type fetchedTaskDetailMsg struct {
 	err     error
 	forEdit bool
 }
+// taskCreatedMsg is sent when a task is successfully created.
+type taskCreatedMsg struct{ task models.Task }
+
+// taskCreationFailedMsg is sent when task creation fails.
+type taskCreationFailedMsg struct{ err error }
+
 type taskUpdatedMsg struct{}
 type taskUpdateFailedMsg struct{ err error }
 type taskDeletedMsg struct{}
@@ -97,6 +103,17 @@ func (m *Model) fetchTaskForDetailCmd(taskID int64, forEditing bool) tea.Cmd {
 	return func() tea.Msg {
 		task, err := m.taskService.GetTaskByID(context.Background(), taskID)
 		return fetchedTaskDetailMsg{task: task, err: err, forEdit: forEditing}
+	}
+}
+
+// createTaskCmd creates a new task.
+func (m *Model) createTaskCmd(title, description string, classID *int64, dueDate *time.Time) tea.Cmd {
+	return func() tea.Msg {
+		task, err := m.taskService.CreateTask(context.Background(), title, description, classID, dueDate)
+		if err != nil {
+			return taskCreationFailedMsg{err: err}
+		}
+		return taskCreatedMsg{task: task}
 	}
 }
 
@@ -154,7 +171,7 @@ func New(taskService service.TaskService) *Model {
 		Bold(false)
 	pendingTable.SetStyles(s)
 
-	completedColumns := []table.Column{ // Columns are same, content will be styled
+	completedColumns := []table.Column{
 		{Title: "ID", Width: 4},
 		{Title: "Título", Width: 30},
 		{Title: "Prazo", Width: 10},
@@ -207,7 +224,6 @@ func New(taskService service.TaskService) *Model {
 		selectedTaskForDetail: nil,
 		editingTaskID:         0,
 		taskIDToDelete:        0,
-		// confirmingDelete:      false, // Handled by currentView
 	}
 }
 
@@ -339,18 +355,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					description := m.inputs[1].Value()
 					var classID *int64
 					if m.inputs[3].Value() != "" {
-						cid, err := strconv.ParseInt(m.inputs[3].Value(), 10, 64)
-						if err != nil {
-							m.err = fmt.Errorf("ID da turma inválido: %v", err)
+						cid, errConv := strconv.ParseInt(m.inputs[3].Value(), 10, 64)
+						if errConv != nil {
+							m.err = fmt.Errorf("ID da turma inválido: %v", errConv)
 							return m, nil
 						}
 						classID = &cid
 					}
 					var dueDate *time.Time
 					if m.inputs[2].Value() != "" {
-						parsedDate, err := time.Parse("02/01/2006", m.inputs[2].Value())
-						if err != nil {
-							m.err = fmt.Errorf("formato de data inválido (use DD/MM/YYYY): %v", err)
+						parsedDate, errConv := time.Parse("02/01/2006", m.inputs[2].Value())
+						if errConv != nil {
+							m.err = fmt.Errorf("formato de data inválido (use DD/MM/YYYY): %v", errConv)
 							return m, nil
 						}
 						dueDate = &parsedDate
@@ -363,7 +379,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.formSubState == CreatingTask {
 						submitCmd = m.createTaskCmd(title, description, classID, dueDate)
 					} else if m.formSubState == EditingTask {
-						// Ensure selectedTaskForDetail is not nil if editing
 						if m.selectedTaskForDetail == nil {
 							m.err = fmt.Errorf("erro interno: dados da tarefa original não encontrados para edição")
 							m.isLoading = false
@@ -420,16 +435,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "a":
 				m.currentView = FormView
 				m.formSubState = CreatingTask
-				m.resetFormInputs() // This focuses inputs[0]
+				m.resetFormInputs()
 				m.err = nil
 				return m, textinput.Blink
 			case "e":
 				if m.focusedTable == PendingTableFocus && len(activeTable.Rows()) > 0 && activeTable.Cursor() >= 0 && activeTable.Cursor() < len(activeTable.Rows()) {
 					selectedRow := activeTable.SelectedRow()
 					taskIDStr := selectedRow[0]
-					taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
-					if err != nil {
-						m.err = fmt.Errorf("erro ao parsear ID da tarefa para editar: %v", err)
+					taskID, errConv := strconv.ParseInt(taskIDStr, 10, 64)
+					if errConv != nil {
+						m.err = fmt.Errorf("erro ao parsear ID da tarefa para editar: %v", errConv)
 						return m, nil
 					}
 					cmds = append(cmds, m.fetchTaskForDetailCmd(taskID, true))
@@ -439,9 +454,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.focusedTable == PendingTableFocus && len(m.pendingTasksTable.Rows()) > 0 && m.pendingTasksTable.Cursor() < len(m.pendingTasksTable.Rows()) {
 					selectedRow := m.pendingTasksTable.SelectedRow()
 					taskIDStr := selectedRow[0]
-					taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
-					if err != nil {
-						m.err = fmt.Errorf("erro ao parsear ID da tarefa para completar: %v", err)
+					taskID, errConv := strconv.ParseInt(taskIDStr, 10, 64)
+					if errConv != nil {
+						m.err = fmt.Errorf("erro ao parsear ID da tarefa para completar: %v", errConv)
 					} else {
 						m.isLoading = true
 						m.err = nil
@@ -452,9 +467,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(activeTable.Rows()) > 0 && activeTable.Cursor() >= 0 && activeTable.Cursor() < len(activeTable.Rows()) {
 					selectedRow := activeTable.SelectedRow()
 					taskIDStr := selectedRow[0]
-					taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
-					if err != nil {
-						m.err = fmt.Errorf("erro ao parsear ID da tarefa para excluir: %v", err)
+					taskID, errConv := strconv.ParseInt(taskIDStr, 10, 64)
+					if errConv != nil {
+						m.err = fmt.Errorf("erro ao parsear ID da tarefa para excluir: %v", errConv)
 					} else {
 						m.taskIDToDelete = taskID
 						m.currentView = ConfirmDeleteView
@@ -465,9 +480,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(activeTable.Rows()) > 0 && activeTable.Cursor() >= 0 && activeTable.Cursor() < len(activeTable.Rows()) {
 					selectedRow := activeTable.SelectedRow()
 					taskIDStr := selectedRow[0]
-					taskID, err := strconv.ParseInt(taskIDStr, 10, 64)
-					if err != nil {
-						m.err = fmt.Errorf("erro ao parsear ID da tarefa selecionada: %v", err)
+					taskID, errConv := strconv.ParseInt(taskIDStr, 10, 64)
+					if errConv != nil {
+						m.err = fmt.Errorf("erro ao parsear ID da tarefa selecionada: %v", errConv)
 						return m, nil
 					}
 					cmds = append(cmds, m.fetchTaskForDetailCmd(taskID, false))
@@ -484,13 +499,13 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.pendingTasksTable.Focus()
 				}
 			case "up", "k", "down", "j":
-				var updatedTeaModel tea.Model
+				var updatedTableModel table.Model // Corrected type
 				if m.focusedTable == PendingTableFocus {
-					updatedTeaModel, cmd = m.pendingTasksTable.Update(msg)
-					m.pendingTasksTable = updatedTeaModel.(table.Model)
+					updatedTableModel, cmd = m.pendingTasksTable.Update(msg)
+					m.pendingTasksTable = updatedTableModel // Corrected assignment
 				} else {
-					updatedTeaModel, cmd = m.completedTasksTable.Update(msg)
-					m.completedTasksTable = updatedTeaModel.(table.Model)
+					updatedTableModel, cmd = m.completedTasksTable.Update(msg)
+					m.completedTasksTable = updatedTableModel // Corrected assignment
 				}
 				cmds = append(cmds, cmd)
 			}
@@ -502,7 +517,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = msg.err
 			m.currentView = TableView
 		} else {
-			if msg.task == nil { // Should not happen if err is nil, but defensive check
+			if msg.task == nil {
 				m.err = fmt.Errorf("detalhes da tarefa não encontrados, mas nenhum erro reportado")
 				m.currentView = TableView
 				return m, nil
@@ -541,24 +556,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// This part of the original code for table updates seemed problematic.
-	// Table navigation (up/down) is now handled within the TableView KeyMsg case.
-	// Other messages for tables (like WindowSizeMsg) are passed directly.
-	// if m.currentView == TableView && msg.(tea.KeyMsg).String() == "" {
-	// For non-KeyMsg messages or KeyMsg not handled by specific cases above:
 	if m.currentView == TableView {
-		// Check if msg is tea.KeyMsg; if so, it means it wasn't one of the handled string keys
-		// For other types of messages (like WindowSizeMsg, or custom msgs if any), pass to tables.
-		if _, ok := msg.(tea.KeyMsg); !ok {
-			var updatedPendTable, updatedCompTable tea.Model
+		if keyMsg, ok := msg.(tea.KeyMsg); !ok || (ok && keyMsg.String() == "") { // Process non-string KeyMsgs or other Msgs for tables
 			var pendCmd, compCmd tea.Cmd
-
-			updatedPendTable, pendCmd = m.pendingTasksTable.Update(msg)
-			m.pendingTasksTable = updatedPendTable.(table.Model)
+			// Pass the original msg to both tables; they'll decide if it's relevant.
+			// This handles WindowSizeMsg and other potential messages.
+			m.pendingTasksTable, pendCmd = m.pendingTasksTable.Update(msg)
 			cmds = append(cmds, pendCmd)
 
-			updatedCompTable, compCmd = m.completedTasksTable.Update(msg)
-			m.completedTasksTable = updatedCompTable.(table.Model)
+			m.completedTasksTable, compCmd = m.completedTasksTable.Update(msg)
 			cmds = append(cmds, compCmd)
 		}
 	}
@@ -665,10 +671,8 @@ func (m *Model) viewTaskDetail() string {
 	statusStr := "Pendente"
 	if task.IsCompleted {
 		statusStr = "Concluída"
-		title = strikethroughStyle.Render(title) // Apply strikethrough for detail view too
-		// Consider striking through other fields if desired
+		title = strikethroughStyle.Render(title)
 	}
-
 
 	b.WriteString(fmt.Sprintf("Detalhes da Tarefa (ID: %d)\n", task.ID))
 	b.WriteString(strings.Repeat("-", 30) + "\n")
@@ -699,7 +703,7 @@ func (m *Model) viewTaskDetail() string {
 	}
 
 	finalView := fmt.Sprintf("Detalhes da Tarefa (ID: %d)\n%s\n", task.ID, strings.Repeat("-", 30))
-	finalView += fmt.Sprintf("Título: %s\n", title) // title already styled if completed
+	finalView += fmt.Sprintf("Título: %s\n", title)
 	finalView += fmt.Sprintf("Descrição:\n%s\n", strings.TrimSpace(wrappedDesc))
 	finalView += fmt.Sprintf("Prazo: %s\n", dueDateStr)
 	finalView += fmt.Sprintf("ID Turma: %s\n", classIDStr)
@@ -747,17 +751,18 @@ func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
 
-	availableHeight := height - baseStyle.GetVerticalFrameSize() - 5 // Approx for headers, gap, help
-	if availableHeight < 2 { availableTableHeight = 2}
+	availableHeight := height - baseStyle.GetVerticalFrameSize() - 5
+	if availableHeight < 2 { availableHeight = 2} // Corrected variable name typo
 
 	pendingTableHeight := availableHeight / 2
-	if m.completedTasksTable.TotalRows() == 0 { // Give more space to pending if completed is empty
-	    pendingTableHeight = availableHeight -1 // Leave 1 for completed header
+	if len(m.completedTasksTable.Rows()) == 0 && availableHeight > 1 { // Changed TotalRows to len(Rows)
+	    pendingTableHeight = availableHeight -1
+		if pendingTableHeight < 1 { pendingTableHeight = 1 }
 	}
 	completedTableHeight := availableHeight - pendingTableHeight
 
-	if pendingTableHeight < 1 { pendingTableHeight = 1}
-	if completedTableHeight < 1 { completedTableHeight = 1}
+	if pendingTableHeight < 1 { pendingTableHeight = 1 }
+	if completedTableHeight < 1 { completedTableHeight = 1 }
 
 	tableWidth := width - baseStyle.GetHorizontalFrameSize()
 	m.pendingTasksTable.SetWidth(tableWidth)

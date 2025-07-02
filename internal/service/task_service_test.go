@@ -238,7 +238,7 @@ func TestTaskService_ListAllActiveTasks(t *testing.T) {
 			return mockTasks, nil
 		}
 
-		tasks, err := taskService.ListAllActiveTasks(ctx)
+		tasks, err := taskService.ListAllTasks(ctx) // Renamed
 		if err != nil {
 			t.Errorf("Expected no error, got %v", err)
 		}
@@ -267,7 +267,7 @@ func TestTaskService_ListAllActiveTasks(t *testing.T) {
 		}
 		mockRepo.CreateTaskFunc = func(ctx context.Context, task *models.Task) (int64, error) { return 101, nil } // Bug task creation
 
-		_, err := taskService.ListAllActiveTasks(ctx)
+		_, err := taskService.ListAllTasks(ctx) // Renamed
 		if err == nil {
 			t.Errorf("Expected an error, got nil")
 		}
@@ -342,11 +342,10 @@ func contains(slice []string, item string) bool {
 }
 
 // Helper function to set up a temporary DB for tests that might need it (though most use mocks)
+// This function is not currently used by the tests above as they use mocks primarily.
+// It's kept for potential future tests or if stubs required more complex DB interactions.
 func setupTestDB(t *testing.T) *sql.DB {
 	t.Helper()
-	// Use in-memory SQLite for testing; ensure a unique name if tests run in parallel
-	// or ensure cleanup. For simple sequential tests, "file::memory:" is often fine.
-	// For parallel, "file::memory:?cache=shared" or unique temp files.
 	db, err := sql.Open("sqlite3", "file::memory:?cache=shared")
 	if err != nil {
 		t.Fatalf("Failed to open in-memory database: %v", err)
