@@ -16,7 +16,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/table" // Reativado para columns e rows
 	"github.com/spf13/cobra"
-	"vigenda/internal/app" // Import for the new BubbleTea app
+	// "vigenda/internal/app" // Removed as it's no longer used directly by main.go
 	"vigenda/internal/database"
 	"vigenda/internal/models" // Added import for models package
 	"vigenda/internal/repository"
