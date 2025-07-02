@@ -68,14 +68,24 @@ func TestProofService_GenerateProof(t *testing.T) {
 		mediumQ := []models.Question{{ID: 2, Difficulty: "media", SubjectID: 1, Topic: topic}}
 		hardQ := []models.Question{{ID: 3, Difficulty: "dificil", SubjectID: 1, Topic: topic}}
 
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 1, Topic: &topic, Difficulty: "facil", Limit: 1}).Return(easyQ, nil).Once()
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 1, Topic: &topic, Difficulty: "media", Limit: 1}).Return(mediumQ, nil).Once()
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 1, Topic: &topic, Difficulty: "dificil", Limit: 1}).Return(hardQ, nil).Once()
+		allExpectedQuestions := append(easyQ, mediumQ...)
+		allExpectedQuestions = append(allExpectedQuestions, hardQ...)
+
+		// Expect a single call to GetQuestionsByCriteriaProofGeneration
+		mockRepo.On("GetQuestionsByCriteriaProofGeneration", ctx, repository.ProofCriteria{
+			SubjectID:   1,
+			Topic:       &topic,
+			EasyCount:   1,
+			MediumCount: 1,
+			HardCount:   1,
+		}).Return(allExpectedQuestions, nil).Once()
 
 		questions, err := proofService.GenerateProof(ctx, criteria)
 
 		assert.NoError(t, err)
 		assert.Len(t, questions, 3)
+		// Individual contains assertions are still good if the order is not guaranteed by the mock return,
+		// but if allExpectedQuestions are returned in a specific order, direct comparison might be possible.
 		assert.Contains(t, questions, easyQ[0])
 		assert.Contains(t, questions, mediumQ[0])
 		assert.Contains(t, questions, hardQ[0])
@@ -98,11 +108,19 @@ func TestProofService_GenerateProof(t *testing.T) {
 		topic := "Geometry"
 		criteria := service.ProofCriteria{SubjectID: 1, Topic: &topic, EasyCount: 1}
 
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 1, Topic: &topic, Difficulty: "facil", Limit: 1}).Return(nil, errors.New("db error")).Once()
+		// Simulate an error when the repository's GetQuestionsByCriteriaProofGeneration is called
+		mockRepo.On("GetQuestionsByCriteriaProofGeneration", ctx, repository.ProofCriteria{
+			SubjectID:   1,
+			Topic:       &topic,
+			EasyCount:   1,
+			MediumCount: 0, // Assuming 0 for other counts if not specified in this test case
+			HardCount:   0,
+		}).Return(nil, errors.New("db error general fetch")).Once()
 
 		_, err := proofService.GenerateProof(ctx, criteria)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "erro ao buscar questões fáceis: db error")
+		// The service wraps the error from GetQuestionsByCriteriaProofGeneration
+		assert.Contains(t, err.Error(), "erro ao buscar questões para a prova: db error general fetch")
 		mockRepo.AssertExpectations(t)
 	})
 
@@ -112,12 +130,21 @@ func TestProofService_GenerateProof(t *testing.T) {
 		topic := "History"
 		criteria := service.ProofCriteria{SubjectID: 1, Topic: &topic, EasyCount: 2}
 
+		// Simulate returning only one easy question when two were requested.
+		// Other difficulties (medium, hard) are not requested in this specific criteria.
 		easyQ := []models.Question{{ID: 1, Difficulty: "facil", SubjectID: 1, Topic: topic}}
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 1, Topic: &topic, Difficulty: "facil", Limit: 2}).Return(easyQ, nil).Once()
+		mockRepo.On("GetQuestionsByCriteriaProofGeneration", ctx, repository.ProofCriteria{
+			SubjectID:   1,
+			Topic:       &topic,
+			EasyCount:   2,
+			MediumCount: 0,
+			HardCount:   0,
+		}).Return(easyQ, nil).Once() // Return only one easy question
 
 		_, err := proofService.GenerateProof(ctx, criteria)
 		assert.Error(t, err)
-		assert.EqualError(t, err, "não há questões fáceis suficientes para o critério (solicitado: 2, disponível: 1)")
+		// The service logic should detect this discrepancy.
+		assert.EqualError(t, err, "não há questões fáceis suficientes (solicitado: 2, disponível: 1)")
 		mockRepo.AssertExpectations(t)
 	})
 
@@ -134,7 +161,13 @@ func TestProofService_GenerateProof(t *testing.T) {
 			{ID: 11, Difficulty: "media", SubjectID: 2},
 		}
 
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 2, Topic: nil, Difficulty: "media", Limit: 2}).Return(mediumQ, nil).Once()
+		mockRepo.On("GetQuestionsByCriteriaProofGeneration", ctx, repository.ProofCriteria{
+			SubjectID:   2,
+			Topic:       nil,
+			EasyCount:   0,
+			MediumCount: 2,
+			HardCount:   0,
+		}).Return(mediumQ, nil).Once()
 
 		questions, err := proofService.GenerateProof(ctx, criteria)
 
@@ -150,11 +183,17 @@ func TestProofService_GenerateProof(t *testing.T) {
 		proofService := service.NewProofService(mockRepo)
 		criteria := service.ProofCriteria{SubjectID: 1, MediumCount: 1}
 
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 1, Topic: nil, Difficulty: "media", Limit: 1}).Return(nil, errors.New("db error medium")).Once()
+		mockRepo.On("GetQuestionsByCriteriaProofGeneration", ctx, repository.ProofCriteria{
+			SubjectID:   1,
+			Topic:       nil,
+			EasyCount:   0,
+			MediumCount: 1,
+			HardCount:   0,
+		}).Return(nil, errors.New("db error medium fetch")).Once()
 
 		_, err := proofService.GenerateProof(ctx, criteria)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "erro ao buscar questões médias: db error medium")
+		assert.Contains(t, err.Error(), "erro ao buscar questões para a prova: db error medium fetch")
 		mockRepo.AssertExpectations(t)
 	})
 
@@ -164,11 +203,17 @@ func TestProofService_GenerateProof(t *testing.T) {
 		criteria := service.ProofCriteria{SubjectID: 1, MediumCount: 2}
 
 		mediumQ := []models.Question{{ID: 1, Difficulty: "media", SubjectID: 1}}
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 1, Topic: nil, Difficulty: "media", Limit: 2}).Return(mediumQ, nil).Once()
+		mockRepo.On("GetQuestionsByCriteriaProofGeneration", ctx, repository.ProofCriteria{
+			SubjectID:   1,
+			Topic:       nil,
+			EasyCount:   0,
+			MediumCount: 2,
+			HardCount:   0,
+		}).Return(mediumQ, nil).Once()
 
 		_, err := proofService.GenerateProof(ctx, criteria)
 		assert.Error(t, err)
-		assert.EqualError(t, err, "não há questões médias suficientes para o critério (solicitado: 2, disponível: 1)")
+		assert.EqualError(t, err, "não há questões médias suficientes (solicitado: 2, disponível: 1)")
 		mockRepo.AssertExpectations(t)
 	})
 
@@ -177,11 +222,17 @@ func TestProofService_GenerateProof(t *testing.T) {
 		proofService := service.NewProofService(mockRepo)
 		criteria := service.ProofCriteria{SubjectID: 1, HardCount: 1}
 
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 1, Topic: nil, Difficulty: "dificil", Limit: 1}).Return(nil, errors.New("db error hard")).Once()
+		mockRepo.On("GetQuestionsByCriteriaProofGeneration", ctx, repository.ProofCriteria{
+			SubjectID:   1,
+			Topic:       nil,
+			EasyCount:   0,
+			MediumCount: 0,
+			HardCount:   1,
+		}).Return(nil, errors.New("db error hard fetch")).Once()
 
 		_, err := proofService.GenerateProof(ctx, criteria)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "erro ao buscar questões difíceis: db error hard")
+		assert.Contains(t, err.Error(), "erro ao buscar questões para a prova: db error hard fetch")
 		mockRepo.AssertExpectations(t)
 	})
 
@@ -191,11 +242,17 @@ func TestProofService_GenerateProof(t *testing.T) {
 		criteria := service.ProofCriteria{SubjectID: 1, HardCount: 2}
 
 		hardQ := []models.Question{{ID: 1, Difficulty: "dificil", SubjectID: 1}}
-		mockRepo.On("GetQuestionsByCriteria", ctx, repository.QuestionQueryCriteria{SubjectID: 1, Topic: nil, Difficulty: "dificil", Limit: 2}).Return(hardQ, nil).Once()
+		mockRepo.On("GetQuestionsByCriteriaProofGeneration", ctx, repository.ProofCriteria{
+			SubjectID:   1,
+			Topic:       nil,
+			EasyCount:   0,
+			MediumCount: 0,
+			HardCount:   2,
+		}).Return(hardQ, nil).Once()
 
 		_, err := proofService.GenerateProof(ctx, criteria)
 		assert.Error(t, err)
-		assert.EqualError(t, err, "não há questões difíceis suficientes para o critério (solicitado: 2, disponível: 1)")
+		assert.EqualError(t, err, "não há questões difíceis suficientes (solicitado: 2, disponível: 1)")
 		mockRepo.AssertExpectations(t)
 	})
 
