@@ -49,10 +49,15 @@ Funcionalidades Principais:
 
 Use "vigenda [comando] --help" para mais informações sobre um comando específico.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Launch the BubbleTea application
-		// PersistentPreRunE ensures all necessary services are initialized.
-		// Pass the initialized services to the TUI application.
-		app.StartApp(taskService, classService, assessmentService, questionService, proofService)
+		// Launch the new TUI dashboard application directly.
+		// PersistentPreRunE ensures all necessary services (taskService, classService, assessmentService) are initialized.
+		log.Println("Main: rootCmd.Run - Launching TUI dashboard.")
+		if err := tui.Start(classService, taskService, assessmentService); err != nil {
+			log.Fatalf("Error starting TUI: %v", err)
+			// fmt.Fprintf(os.Stderr, "Error starting TUI: %v\n", err) // Log.Fatalf will print and exit
+			// os.Exit(1)
+		}
+		log.Println("Main: rootCmd.Run - TUI finished.")
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Setup logging to file first
