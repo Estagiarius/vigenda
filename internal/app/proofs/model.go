@@ -51,6 +51,9 @@ type proofGeneratedMsg struct {
 	err   error
 }
 
+// GoBackToDashboardMsg signals the main app model to switch to the dashboard view.
+type GoBackToDashboardMsg struct{}
+
 // --- Cmds ---
 func (m *Model) generateProofCmd() tea.Cmd {
 	subjectIDStr := m.textInputs[0].Value()
@@ -159,8 +162,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// No need to explicitly return focus cmd here as resetForm handles it.
 				return m, nil // Return m directly
 			}
-			// If in FormView, Esc is handled by parent model to go to main menu
-			return m, nil // Return m directly
+			// If in FormView, signal parent to go back to the dashboard
+			cmds = append(cmds, func() tea.Msg { return GoBackToDashboardMsg{} })
+			return m, tea.Batch(cmds...)
 		}
 
 		switch m.state {
