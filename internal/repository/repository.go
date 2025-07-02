@@ -54,6 +54,10 @@ type TaskRepository interface {
 	GetTasksByClassID(ctx context.Context, classID int64) ([]models.Task, error) // Added for listing tasks
 	GetAllTasks(ctx context.Context) ([]models.Task, error)                       // New method
 	MarkTaskCompleted(ctx context.Context, taskID int64) error                   // Added for completing tasks
+	// UpdateTask updates an existing task in the database.
+	UpdateTask(ctx context.Context, task *models.Task) error                     // Added for updating tasks
+	// DeleteTask removes a task from the database by its ID.
+	DeleteTask(ctx context.Context, taskID int64) error                          // Added for deleting tasks
 	// ... outros métodos
 }
 

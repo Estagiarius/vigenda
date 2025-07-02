@@ -281,7 +281,7 @@ type listItemClass struct {
 }
 
 func (lic listItemClass) Title() string       { return lic.Name }
-func (lic listItemClass) Description() string { return fmt.Sprintf("ID: %d, Disciplina ID: %d", lic.ID, lic.SubjectID) }
+func (lic listItemClass) Description() string { return fmt.Sprintf("ID: %d, Disciplina ID: %d", lic.Class.ID, lic.SubjectID) } // Use lic.Class.ID
 func (lic listItemClass) FilterValue() string { return lic.Name }
 func (lic listItemClass) ID() int64           { return lic.Class.ID }
 

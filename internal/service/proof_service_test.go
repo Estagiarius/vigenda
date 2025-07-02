@@ -30,6 +30,24 @@ func (m *MockQuestionRepository) AddQuestion(ctx context.Context, question *mode
 	return args.Get(0).(int64), args.Error(1)
 }
 
+// GetQuestionsByCriteriaProofGeneration is the mock implementation
+func (m *MockQuestionRepository) GetQuestionsByCriteriaProofGeneration(ctx context.Context, criteria repository.ProofCriteria) ([]models.Question, error) {
+	// This mock implementation needs to be smart based on criteria, or tests need to set up different On().Return() calls.
+	// For now, let's assume tests will use .On to specify behavior for different criteria.
+	// The `GetQuestionsByCriteria` is already used by tests for this, which is fine.
+	// This method is on the interface, so the mock needs it.
+	// It can delegate to GetQuestionsByCriteria or have its own mock logic if the service calls it distinctly.
+	// The service `GenerateProof` actually calls `GetQuestionsByCriteria` multiple times with different `QuestionQueryCriteria`.
+	// So, this specific mock method might not be directly "called" by the tests if the tests mock `GetQuestionsByCriteria`.
+	// However, to satisfy the interface, it must exist.
+	args := m.Called(ctx, criteria)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Question), args.Error(1)
+}
+
+
 func TestProofService_GenerateProof(t *testing.T) {
 	ctx := context.Background()
 

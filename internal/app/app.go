@@ -26,11 +26,11 @@ var (
 type Model struct {
 	list             list.Model
 	currentView      View
-	tasksModel       *tasks.Model       // Changed to pointer
-	classesModel     *classes.Model     // Changed to pointer
-	assessmentsModel *assessments.Model // Changed to pointer
-	questionsModel   *questions.Model   // Changed to pointer
-	proofsModel      *proofs.Model      // Changed to pointer
+	tasksModel       *tasks.Model
+	classesModel     *classes.Model
+	assessmentsModel *assessments.Model
+	questionsModel   *questions.Model
+	proofsModel      *proofs.Model
 	// Add other sub-models here as they are developed
 	width    int
 	height   int

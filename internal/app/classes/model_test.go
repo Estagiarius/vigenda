@@ -21,12 +21,11 @@ type mockClassService struct {
 	ListAllClassesFunc        func(ctx context.Context) ([]models.Class, error)
 	CreateClassFunc           func(ctx context.Context, name string, subjectID int64) (models.Class, error)
 	GetClassByIDFunc          func(ctx context.Context, id int64) (models.Class, error)
-	GetStudentsByClassIDFunc  func(ctx context.Context, classID int64) ([]models.Student, error) // Novo
+	GetStudentsByClassIDFunc  func(ctx context.Context, classID int64) ([]models.Student, error)
 	ImportStudentsFromCSVFunc func(ctx context.Context, classID int64, csvData []byte) (int, error)
 	UpdateStudentStatusFunc   func(ctx context.Context, studentID int64, newStatus string) error
 }
 
-// ... implementações dos métodos do mock ...
 func (m *mockClassService) ListAllClasses(ctx context.Context) ([]models.Class, error) {
 	if m.ListAllClassesFunc != nil {
 		return m.ListAllClassesFunc(ctx)
@@ -41,14 +40,17 @@ func (m *mockClassService) CreateClass(ctx context.Context, name string, subject
 	return models.Class{ID: 1, Name: name, SubjectID: subjectID}, nil
 }
 
+// Corrected mock to match interface: service.ClassService expects models.Class, not *models.Class
 func (m *mockClassService) GetClassByID(ctx context.Context, classID int64) (models.Class, error) {
 	if m.GetClassByIDFunc != nil {
 		return m.GetClassByIDFunc(ctx, classID)
 	}
-	return models.Class{ID: classID}, nil
+	// Return a value type, potentially an empty struct if not found, or handle error
+	return models.Class{ID: classID, Name: "Mocked Class"}, nil // Example value
 }
 
-func (m *mockClassService) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) { // Novo
+
+func (m *mockClassService) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {
 	if m.GetStudentsByClassIDFunc != nil {
 		return m.GetStudentsByClassIDFunc(ctx, classID)
 	}
@@ -91,19 +93,16 @@ func TestClassesModel_InitCmd(t *testing.T) {
 	model := New(mockService)
 	cmd := model.Init()
 	require.NotNil(t, cmd, "Init deve retornar um comando")
+	assert.True(t, model.isLoading, "isLoading deve ser true após Init ser chamado")
 
-	msg := cmd() // Executa o comando
+	msg := cmd()
 	_, ok := msg.(fetchedClassesMsg)
 	if !ok {
-		_, okErrMsg := msg.(errMsg)
-		assert.True(t, okErrMsg, "Comando Init deve produzir fetchedClassesMsg ou errMsg, obteve %T", msg)
+		errMsg, okErrMsg := msg.(errMsg)
+		require.True(t, okErrMsg, "Comando Init deve produzir fetchedClassesMsg ou errMsg, obteve %T: %v", msg, errMsg)
 	} else {
 		assert.True(t, ok, "Comando Init deve produzir fetchedClassesMsg ou errMsg, obteve %T", msg)
 	}
-
-	newModelForInit := New(mockService)
-	_ = newModelForInit.Init()
-	assert.True(t, newModelForInit.isLoading, "isLoading deve ser true após Init ser chamado")
 }
 
 func TestClassesModel_Update_KeyN_SwitchesToCreatingView(t *testing.T) {
@@ -113,10 +112,8 @@ func TestClassesModel_Update_KeyN_SwitchesToCreatingView(t *testing.T) {
 	model.isLoading = false
 
 	keyN := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}
-	updatedModel, cmd := model.Update(keyN)
-
-	m, ok := updatedModel.(Model)
-	require.True(t, ok, "updatedModel deve ser do tipo Model")
+	updatedModelTea, cmd := model.Update(keyN)
+	m := updatedModelTea.(*Model)
 
 	assert.Equal(t, CreatingView, m.state, "Estado deve mudar para CreatingView após 'n'")
 	assert.True(t, m.createForm.nameInput.Focused(), "Campo de nome deve estar focado")
@@ -125,9 +122,9 @@ func TestClassesModel_Update_KeyN_SwitchesToCreatingView(t *testing.T) {
 	assert.Nil(t, m.err, "Erro deve ser nil ao mudar para CreatingView")
 
 	require.NotNil(t, cmd, "Um comando (para textinput.Blink) deve ser retornado")
-	blinkMsg := cmd()
-	_, isBlink := blinkMsg.(textinput.BlinkMsg)
-	assert.True(t, isBlink, "O comando retornado deve ser textinput.Blink")
+	blinkResultMsg := cmd()
+	_, isBlinkMsg := blinkResultMsg.(textinput.BlinkMsg)
+	assert.True(t, isBlinkMsg, "O comando retornado deve produzir textinput.BlinkMsg")
 }
 
 func TestClassesModel_Update_CreatingView_EscSwitchesToListView(t *testing.T) {
@@ -137,8 +134,8 @@ func TestClassesModel_Update_CreatingView_EscSwitchesToListView(t *testing.T) {
 	model.err = errors.New("erro anterior")
 
 	keyEsc := tea.KeyMsg{Type: tea.KeyEscape}
-	updatedModel, _ := model.Update(keyEsc)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, _ := model.Update(keyEsc)
+	m := updatedModelTea.(*Model)
 
 	assert.Equal(t, ListView, m.state, "Estado deve mudar para ListView após 'esc'")
 	assert.Nil(t, m.err, "Erro deve ser limpo após 'esc'")
@@ -151,8 +148,8 @@ func TestClassesModel_Update_FetchedClassesMsg_Success(t *testing.T) {
 
 	testClasses := []models.Class{{ID: 1, Name: "Turma Teste", SubjectID: 101}}
 	msg := fetchedClassesMsg{classes: testClasses, err: nil}
-	updatedModel, _ := model.Update(msg)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, _ := model.Update(msg)
+	m := updatedModelTea.(*Model)
 
 	assert.False(t, m.isLoading, "isLoading deve ser false após fetchedClassesMsg")
 	assert.Nil(t, m.err, "Erro deve ser nil em caso de sucesso")
@@ -169,8 +166,8 @@ func TestClassesModel_Update_FetchedClassesMsg_Error(t *testing.T) {
 
 	fetchErr := errors.New("falha ao buscar")
 	msg := fetchedClassesMsg{classes: nil, err: fetchErr}
-	updatedModel, _ := model.Update(msg)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, _ := model.Update(msg)
+	m := updatedModelTea.(*Model)
 
 	assert.False(t, m.isLoading, "isLoading deve ser false após fetchedClassesMsg com erro")
 	assert.Equal(t, fetchErr, m.err, "Erro deve ser definido")
@@ -200,8 +197,8 @@ func TestClassesModel_Update_CreateClass_Success(t *testing.T) {
 	model.createForm.focusIndex = 1
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
-	updatedModel, cmdCreate := model.Update(keyEnter)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, cmdCreate := model.Update(keyEnter)
+	m := updatedModelTea.(*Model)
 
 	require.NotNil(t, cmdCreate, "Comando createClassCmd deve ser retornado")
 	assert.True(t, m.isLoading, "isLoading deve ser true enquanto cria")
@@ -210,9 +207,8 @@ func TestClassesModel_Update_CreateClass_Success(t *testing.T) {
 	require.Nil(t, createdMsg.err, "Erro na criação da turma não esperado")
 	assert.Equal(t, finalClassID, createdMsg.createdClass.ID)
 
-
-	updatedModelAfterCreate, cmdFetch := m.Update(createdMsg)
-	m, _ = updatedModelAfterCreate.(Model)
+	updatedModelTea, cmdFetch := m.Update(createdMsg)
+	m = updatedModelTea.(*Model)
 
 	assert.True(t, m.isLoading, "isLoading deve ser true para o fetch após classCreatedMsg")
 	assert.Equal(t, ListView, m.state, "Estado deve voltar para ListView após criação bem-sucedida")
@@ -220,8 +216,8 @@ func TestClassesModel_Update_CreateClass_Success(t *testing.T) {
 	require.NotNil(t, cmdFetch, "Comando fetchClassesCmd deve ser retornado após criação")
 
 	fetchMsg := cmdFetch().(fetchedClassesMsg)
-	updatedModelAfterFetch, _ := m.Update(fetchMsg)
-	m, _ = updatedModelAfterFetch.(Model)
+	updatedModelTea, _ = m.Update(fetchMsg)
+	m = updatedModelTea.(*Model)
 
 	assert.False(t, m.isLoading, "isLoading deve ser false após fetch bem-sucedido")
 	require.Len(t, m.table.Rows(), 1, "Tabela deve ter a nova turma")
@@ -243,13 +239,13 @@ func TestClassesModel_Update_CreateClass_ServiceError(t *testing.T) {
 	model.createForm.focusIndex = 1
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
-	updatedModel, cmd := model.Update(keyEnter)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, cmd := model.Update(keyEnter)
+	m := updatedModelTea.(*Model)
 	assert.True(t, m.isLoading)
 
 	createdMsg := cmd().(classCreatedMsg)
-	updatedModel, _ = m.Update(createdMsg)
-	m, _ = updatedModel.(Model)
+	updatedModelTea, _ = m.Update(createdMsg)
+	m = updatedModelTea.(*Model)
 
 	assert.False(t, m.isLoading, "isLoading deve ser false após erro na criação")
 	assert.Equal(t, CreatingView, m.state, "Estado deve permanecer CreatingView após erro")
@@ -266,8 +262,8 @@ func TestClassesModel_Update_CreateClass_InvalidSubjectID(t *testing.T) {
 	model.createForm.focusIndex = 1
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
-	updatedModel, cmd := model.Update(keyEnter)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, cmd := model.Update(keyEnter)
+	m := updatedModelTea.(*Model)
 	assert.True(t, m.isLoading)
 
 	cmdResultMsg := cmd()
@@ -279,9 +275,8 @@ func TestClassesModel_Update_CreateClass_InvalidSubjectID(t *testing.T) {
 		errMsgFromCmd = errMsg{err: createdMsgWithErr.err}
 	}
 
-	updatedModelAfterCmd, _ := m.Update(errMsgFromCmd)
-	m2, _ := updatedModelAfterCmd.(Model)
-
+	updatedModelTea, _ = m.Update(errMsgFromCmd)
+	m2 := updatedModelTea.(*Model)
 
 	assert.False(t, m2.isLoading, "isLoading deve ser false após erro de ID inválido")
 	assert.Equal(t, CreatingView, m2.state, "Estado deve permanecer CreatingView")
@@ -299,8 +294,8 @@ func TestClassesModel_Update_CreateClass_EmptyFields(t *testing.T) {
 	model.createForm.focusIndex = 1
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
-	updatedModel, cmd := model.Update(keyEnter)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, cmd := model.Update(keyEnter)
+	m := updatedModelTea.(*Model)
 
 	assert.Nil(t, cmd, "Comando de criação não deve ser retornado se campos estiverem vazios na validação do Update")
 	assert.False(t, m.isLoading, "isLoading não deve mudar se a validação falhar no local")
@@ -328,27 +323,27 @@ func TestClassesModel_FormNavigation(t *testing.T) {
 	model.createForm.focusIndex = 0
 
 	keyTab := tea.KeyMsg{Type: tea.KeyTab}
-	updatedModel, _ := model.Update(keyTab)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, _ := model.Update(keyTab)
+	m := updatedModelTea.(*Model)
 	assert.Equal(t, 1, m.createForm.focusIndex, "Foco deve mudar para subjectIDInput (índice 1)")
 	assert.True(t, m.createForm.subjectIDInput.Focused(), "subjectIDInput deve estar focado")
 	assert.False(t, m.createForm.nameInput.Focused(), "nameInput não deve estar focado")
 
-	updatedModel, _ = m.Update(keyTab)
-	m, _ = updatedModel.(Model)
+	updatedModelTea, _ = m.Update(keyTab)
+	m = updatedModelTea.(*Model)
 	assert.Equal(t, 0, m.createForm.focusIndex, "Foco deve voltar para nameInput (índice 0)")
 	assert.True(t, m.createForm.nameInput.Focused(), "nameInput deve estar focado")
 	assert.False(t, m.createForm.subjectIDInput.Focused(), "subjectIDInput não deve estar focado")
 
 	keyShiftTab := tea.KeyMsg{Type: tea.KeyTab, Shift: true}
-	updatedModel, _ = m.Update(keyShiftTab)
-	m, _ = updatedModel.(Model)
+	updatedModelTea, _ = m.Update(keyShiftTab)
+	m = updatedModelTea.(*Model)
 	assert.Equal(t, 1, m.createForm.focusIndex, "Foco deve ir para subjectIDInput (índice 1) com Shift+Tab a partir do índice 0")
 	assert.True(t, m.createForm.subjectIDInput.Focused(), "subjectIDInput deve estar focado após Shift+Tab")
 	assert.False(t, m.createForm.nameInput.Focused(), "nameInput não deve estar focado após Shift+Tab")
 
-	updatedModel, _ = m.Update(keyShiftTab)
-	m, _ = updatedModel.(Model)
+	updatedModelTea, _ = m.Update(keyShiftTab)
+	m = updatedModelTea.(*Model)
 	assert.Equal(t, 0, m.createForm.focusIndex, "Foco deve voltar para nameInput (índice 0) com Shift+Tab a partir do índice 1")
 	assert.True(t, m.createForm.nameInput.Focused(), "nameInput deve estar focado após Shift+Tab")
 	assert.False(t, m.createForm.subjectIDInput.Focused(), "subjectIDInput não deve estar focado após Shift+Tab")
@@ -383,14 +378,15 @@ func TestClassesModel_Update_ListView_EnterSelectsClassAndFetchesStudents(t *tes
 	}
 
 	model := New(mockSvc)
-	model, _ = model.Update(fetchedClassesMsg{classes: initialClasses, err: nil})
+	// Simulate receiving fetchedClassesMsg
+	modelInterface, _ := model.Update(fetchedClassesMsg{classes: initialClasses, err: nil})
+	model = modelInterface.(*Model)
 	model.isLoading = false
 	model.table.SetCursor(0)
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
-	updatedModel, cmd := model.Update(keyEnter)
-	m, ok := updatedModel.(Model)
-	require.True(t, ok)
+	updatedModelTea, cmd := model.Update(keyEnter)
+	m := updatedModelTea.(*Model)
 
 	assert.Equal(t, DetailsView, m.state, "Estado deve mudar para DetailsView")
 	require.NotNil(t, m.selectedClass, "selectedClass não deve ser nil")
@@ -404,7 +400,7 @@ func TestClassesModel_Update_ListView_EnterSelectsClassAndFetchesStudents(t *tes
 	_, isFetchedStudentsMsg := msg.(fetchedClassStudentsMsg)
 	if !isFetchedStudentsMsg {
 		errMsg, isErrMsg := msg.(errMsg)
-		require.True(t, isErrMsg, "Comando deve produzir fetchedClassStudentsMsg ou errMsg, obteve %T", msg)
+		require.True(t, isErrMsg, "Comando deve produzir fetchedClassStudentsMsg ou errMsg, obteve %T: %v", msg, errMsg)
 		assert.Fail(t, "Esperado fetchedClassStudentsMsg, mas obteve errMsg: "+errMsg.Error())
 	}
 	assert.True(t, isFetchedStudentsMsg, "Comando deve produzir fetchedClassStudentsMsg ou errMsg")
@@ -423,8 +419,8 @@ func TestClassesModel_Update_FetchedClassStudentsMsg_Success(t *testing.T) {
 		{ID: 2, ClassID: 1, EnrollmentID: "002", FullName: "Bob", Status: "inativo"},
 	}
 	msg := fetchedClassStudentsMsg{students: testStudents, err: nil}
-	updatedModel, _ := model.Update(msg)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, _ := model.Update(msg)
+	m := updatedModelTea.(*Model)
 
 	assert.False(t, m.isLoading, "isLoading deve ser false após fetchedClassStudentsMsg")
 	assert.Nil(t, m.err, "Erro deve ser nil em caso de sucesso")
@@ -444,8 +440,8 @@ func TestClassesModel_Update_FetchedClassStudentsMsg_Error(t *testing.T) {
 
 	fetchErr := errors.New("falha ao buscar alunos")
 	msg := fetchedClassStudentsMsg{students: nil, err: fetchErr}
-	updatedModel, _ := model.Update(msg)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, _ := model.Update(msg)
+	m := updatedModelTea.(*Model)
 
 	assert.False(t, m.isLoading, "isLoading deve ser false após erro")
 	assert.Equal(t, fetchErr, m.err, "Erro deve ser definido no modelo")
@@ -468,8 +464,8 @@ func TestClassesModel_Update_FetchClassStudentsCmd_ReturnsErrMsg(t *testing.T) {
 	cmd := model.fetchClassStudentsCmd(selectedClass.ID)
 	msg := cmd()
 
-	updatedModel, _ := model.Update(msg)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, _ := model.Update(msg)
+	m := updatedModelTea.(*Model)
 
 	assert.False(t, m.isLoading, "isLoading deve ser false após errMsg")
 	require.NotNil(t, m.err, "Erro deve ser definido no modelo")
@@ -490,8 +486,8 @@ func TestClassesModel_Update_DetailsView_EscReturnsToListView(t *testing.T) {
 	model.err = errors.New("erro anterior")
 
 	keyEsc := tea.KeyMsg{Type: tea.KeyEscape}
-	updatedModel, _ := model.Update(keyEsc)
-	m, _ := updatedModel.(Model)
+	updatedModelTea, _ := model.Update(keyEsc)
+	m := updatedModelTea.(*Model)
 
 	assert.Equal(t, ListView, m.state, "Estado deve mudar para ListView")
 	assert.Nil(t, m.selectedClass, "selectedClass deve ser nil após voltar")
@@ -508,3 +504,6 @@ func TestClassesModel_IsFocused_ForDetailsView(t *testing.T) {
 	model.state = DetailsView
 	assert.False(t, model.IsFocused(), "Não deve estar focado (para fins de 'esc' global) na DetailsView, a menos que um input interno esteja ativo")
 }
+
+// Ensure mockClassService implements service.ClassService
+var _ service.ClassService = (*mockClassService)(nil)
