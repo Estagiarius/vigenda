@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time" // Added for dashboard item descriptions
+	// "time" // Removed as it was imported but not used
 	"vigenda/internal/app"
 	"vigenda/internal/models"
 	"vigenda/internal/service"

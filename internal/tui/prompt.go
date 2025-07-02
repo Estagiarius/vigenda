@@ -27,9 +27,9 @@ var (
 	focusedStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 	blurredStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	noStyle         = lipgloss.NewStyle()
-	helpStyle       = blurredStyle.Copy()
+	// helpStyle is now defined in tui.go and accessible within the package.
 	errorStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("9")) // Red for errors
-	cursorModeHelp  = helpStyle.Render("cursor mode is enabled")
+	cursorModeHelp  = helpStyle.Render("cursor mode is enabled") // This will use helpStyle from tui.go
 	focusedButton   = focusedStyle.Copy().Render("[ Submit ]")
 	blurredButton   = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
 )
