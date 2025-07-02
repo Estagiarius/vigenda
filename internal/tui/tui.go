@@ -40,12 +40,12 @@ type KeyMap struct {
 
 // DefaultKeyMap provides the default keybindings.
 var DefaultKeyMap = KeyMap{
-	Up:     key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "move up")),
-	Down:   key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "move down")),
-	Select: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "select")),
-	Back:   key.NewBinding(key.WithKeys("esc", "backspace"), key.WithHelp("esc/bksp", "back")),
-	Quit:   key.NewBinding(key.WithKeys("ctrl+c", "q"), key.WithHelp("q/ctrl+c", "quit")),
-	Help:   key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "toggle help")),
+	Up:     key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "navegar para cima")),
+	Down:   key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "navegar para baixo")),
+	Select: key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "selecionar")),
+	Back:   key.NewBinding(key.WithKeys("esc", "backspace"), key.WithHelp("esc/bksp", "voltar")),
+	Quit:   key.NewBinding(key.WithKeys("ctrl+c", "q"), key.WithHelp("q/ctrl+c", "sair")),
+	Help:   key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "ajuda")),
 }
 
 // Model represents the state of the TUI.
@@ -66,26 +66,37 @@ type Model struct {
 	err         error
 
 	// Data for views
+	mainMenuItems     []list.Item // For MainMenuView
 	classes           []models.Class
 	students          []models.Student
-	dashboardItems    []list.Item // Holds items for the dashboard list
+	dashboardItems    []list.Item
 	upcomingTasks     []models.Task
-	recentAssessments []models.Assessment // Example, not yet loaded
+	recentAssessments []models.Assessment
 
-	// selectedClass stores the currently selected class when navigating to students view
 	selectedClass *models.Class
 }
 
+// mainMenuItem defines an item in the main navigation menu.
+type mainMenuItem struct {
+	title       string
+	targetView  app.View
+	description string
+}
+
+func (mmi mainMenuItem) Title() string       { return mmi.title }
+func (mmi mainMenuItem) Description() string { return mmi.description }
+func (mmi mainMenuItem) FilterValue() string { return mmi.title }
+
 // NewTUIModel creates a new TUI model.
 func NewTUIModel(cs service.ClassService, ts service.TaskService, as service.AssessmentService) Model {
-	log.Printf("TUI: NewTUIModel - Chamado. ClassService: %t, TaskService: %t, AssessmentService: %t", cs != nil, ts != nil, as != nil)
+	log.Printf("TUI: NewTUIModel - Chamado. Services Initialized - Class: %t, Task: %t, Assessment: %t", cs != nil, ts != nil, as != nil)
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	delegate := list.NewDefaultDelegate()
-	mainList := list.New(nil, delegate, 0, 0) // Items will be set in Update
-	mainList.SetShowHelp(false)               // Using custom footer for help
+	mainList := list.New(nil, delegate, 0, 0)
+	mainList.SetShowHelp(false)
 
 	m := Model{
 		classService:      cs,
@@ -93,26 +104,46 @@ func NewTUIModel(cs service.ClassService, ts service.TaskService, as service.Ass
 		assessmentService: as,
 		spinner:           s,
 		keys:              DefaultKeyMap,
-		currentView:       app.DashboardView, // Start with DashboardView
-		isLoading:         true,              // Start in loading state for initial data
+		currentView:       app.MainMenuView, // Start with MainMenuView
+		isLoading:         false,            // Menu items are loaded synchronously
 		list:              mainList,
 	}
-	log.Println("TUI: NewTUIModel - Modelo TUI inicializado.")
+	log.Println("TUI: NewTUIModel - Modelo TUI inicializado, currentView:", m.currentView.String())
+	// Initial items (main menu) are loaded by Init() -> loadMainMenuItemsCmd()
 	return m
 }
 
-// loadDashboardData fetches data for the dashboard.
+// loadMainMenuItemsCmd prepares the main menu items and returns a command that sends them.
+func (m *Model) loadMainMenuItemsCmd() tea.Cmd {
+	// This is synchronous, but we wrap it in a Cmd to fit the pattern
+	// and allow isLoading to be true briefly if we wanted a spinner for menu generation.
+	// For static items, direct setting in Init or a simple message is also fine.
+	m.isLoading = true // Set true briefly
+	return func() tea.Msg {
+		items := []list.Item{
+			mainMenuItem{title: app.DashboardView.String(), targetView: app.DashboardView, description: "Visão geral e tarefas."},
+			mainMenuItem{title: app.ClassManagementView.String(), targetView: app.ClassManagementView, description: "Gerenciar turmas e alunos."},
+			// Add other main menu items here as their views become available
+			// mainMenuItem{title: app.AssessmentManagementView.String(), targetView: app.AssessmentManagementView, description: "Gerenciar avaliações e notas."},
+			// mainMenuItem{title: app.QuestionBankView.String(), targetView: app.QuestionBankView, description: "Acessar banco de questões."},
+			// mainMenuItem{title: app.ProofGenerationView.String(), targetView: app.ProofGenerationView, description: "Gerar provas."},
+		}
+		log.Printf("TUI: loadMainMenuItemsCmd - Itens do menu principal preparados: %d", len(items))
+		return mainMenuLoadedMsg(items)
+	}
+}
+
 func (m *Model) loadDashboardData() tea.Cmd {
 	m.isLoading = true
 	log.Println("TUI: loadDashboardData - Iniciando carregamento de dados do dashboard.")
 	return func() tea.Msg {
-		log.Println("TUI: loadDashboardData (async) - Tentando carregar tarefas ativas para o dashboard.")
+		log.Println("TUI: loadDashboardData (async) - Tentando carregar tarefas ativas.")
 		tasks, err := m.taskService.ListAllActiveTasks(context.Background())
 		if err != nil {
-			log.Printf("TUI: loadDashboardData (async) - Erro ao carregar tarefas: %v", err)
+			log.Printf("TUI: loadDashboardData (async) - Erro: %v", err)
 			return errMsg{err: err, context: "loading dashboard tasks"}
 		}
-		log.Printf("TUI: loadDashboardData (async) - Tarefas do dashboard carregadas: %d tarefas.", len(tasks))
+		log.Printf("TUI: loadDashboardData (async) - Tarefas carregadas: %d.", len(tasks))
 		return dashboardTasksLoadedMsg(tasks)
 	}
 }
@@ -121,25 +152,25 @@ func (m *Model) loadClasses() tea.Cmd {
 	m.isLoading = true
 	log.Println("TUI: loadClasses - Iniciando carregamento de turmas.")
 	return func() tea.Msg {
-		log.Println("TUI: loadClasses (async) - Tentando carregar turmas do serviço.")
+		log.Println("TUI: loadClasses (async) - Tentando carregar turmas.")
 		classes, err := m.classService.ListAllClasses(context.Background())
 		if err != nil {
-			log.Printf("TUI: loadClasses (async) - Erro ao carregar turmas: %v", err)
+			log.Printf("TUI: loadClasses (async) - Erro: %v", err)
 			return errMsg{err: err, context: "loading classes"}
 		}
-		log.Printf("TUI: loadClasses (async) - Turmas carregadas com sucesso: %d turmas.", len(classes))
+		log.Printf("TUI: loadClasses (async) - Turmas carregadas: %d.", len(classes))
 		return classesLoadedMsg(classes)
 	}
 }
 
 func (m *Model) loadStudentsForClass(classID int64) tea.Cmd {
 	m.isLoading = true
-	log.Printf("TUI: loadStudentsForClass - Iniciando carregamento de alunos para a turma ID %d.", classID)
+	log.Printf("TUI: loadStudentsForClass - Carregando alunos para turma ID %d.", classID)
 	return func() tea.Msg {
-		log.Printf("TUI: loadStudentsForClass (async) - Tentando carregar alunos para a turma ID %d.", classID)
+		log.Printf("TUI: loadStudentsForClass (async) - Tentando carregar alunos para turma %d.", classID)
 		students, err := m.classService.GetStudentsByClassID(context.Background(), classID)
 		if err != nil {
-			log.Printf("TUI: loadStudentsForClass (async) - Erro ao carregar alunos: %v", err)
+			log.Printf("TUI: loadStudentsForClass (async) - Erro: %v", err)
 			return errMsg{err: err, context: fmt.Sprintf("loading students for class %d", classID)}
 		}
 		log.Printf("TUI: loadStudentsForClass (async) - Alunos carregados: %d.", len(students))
@@ -149,15 +180,18 @@ func (m *Model) loadStudentsForClass(classID int64) tea.Cmd {
 
 // Init initializes the TUI model.
 func (m Model) Init() tea.Cmd {
+	log.Printf("TUI: Init - Current View: %s", m.currentView.String())
 	var initialCmd tea.Cmd
 	switch m.currentView {
-	case app.DashboardView:
+	case app.MainMenuView:
+		initialCmd = m.loadMainMenuItemsCmd()
+	case app.DashboardView: // Should not be initial view anymore, but handle defensively
 		initialCmd = m.loadDashboardData()
-	case app.ClassManagementView:
+	case app.ClassManagementView: // Should not be initial view
 		initialCmd = m.loadClasses()
 	default:
-		log.Printf("TUI: Init - Unknown initial view: %s. Defaulting to loadDashboardData.", m.currentView.String())
-		initialCmd = m.loadDashboardData()
+		log.Printf("TUI: Init - Visão inicial desconhecida ou não configurada para carregamento: %s. Carregando menu principal.", m.currentView.String())
+		initialCmd = m.loadMainMenuItemsCmd() // Default to loading main menu
 	}
 	return tea.Batch(m.spinner.Tick, initialCmd)
 }
@@ -174,6 +208,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		switch m.currentView {
+		case app.MainMenuView:
+			switch {
+			case key.Matches(msg, m.keys.Up):
+				m.list.CursorUp()
+			case key.Matches(msg, m.keys.Down):
+				m.list.CursorDown()
+			case key.Matches(msg, m.keys.Select):
+				selected, ok := m.list.SelectedItem().(mainMenuItem)
+				if ok {
+					m.currentView = selected.targetView
+					m.list.Title = selected.targetView.String() // Update list title
+					m.list.SetItems(nil)                         // Clear menu items
+					log.Printf("TUI: MainMenu - Selecionado: %s, Navegando para: %s", selected.title, selected.targetView.String())
+
+					switch selected.targetView {
+					case app.DashboardView:
+						cmds = append(cmds, m.loadDashboardData())
+					case app.ClassManagementView:
+						cmds = append(cmds, m.loadClasses())
+					// Add cases for other views from main menu
+					default:
+						log.Printf("TUI: MainMenu - Navegação para %s ainda não implementada.", selected.targetView.String())
+						// Potentially show a placeholder or message for unimplemented views
+						m.list.SetItems([]list.Item{placeholderItem{title: fmt.Sprintf("Visão %s não implementada.", selected.targetView.String())}})
+						m.isLoading = false // Ensure loading stops if view is not implemented
+					}
+				}
+			case key.Matches(msg, m.keys.Back): // Esc/Backspace on MainMenu quits
+				return m, tea.Quit
+			default:
+				if !m.isLoading {
+					m.list, cmd = m.list.Update(msg)
+					cmds = append(cmds, cmd)
+				}
+			}
 		case app.DashboardView:
 			switch {
 			case key.Matches(msg, m.keys.Up):
@@ -181,21 +250,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, m.keys.Down):
 				m.list.CursorDown()
 			case key.Matches(msg, m.keys.Select):
-				selectedListItem := m.list.SelectedItem()
-				if selectedListItem != nil {
-					log.Printf("Dashboard item selected: %s", selectedListItem.FilterValue())
-					// Future: Navigate based on item type.
-					// For example, if item is dashboardTaskItem, switch to TaskManagementView.
-					// if taskItem, ok := selectedListItem.(dashboardTaskItem); ok {
-					// m.currentView = app.TaskManagementView
-					// Call a method to load data for taskItem.Task.ID
-					// cmds = append(cmds, m.loadTaskDetailsCmd(taskItem.Task.ID))
-					// }
-				}
-			case key.Matches(msg, m.keys.Back):
-				return m, tea.Quit // On Dashboard, 'Back' quits.
+				// log.Printf("Dashboard item selected: %s", m.list.SelectedItem().FilterValue())
+				// Navigation from dashboard items not yet implemented
+			case key.Matches(msg, m.keys.Back): // Esc/Backspace on Dashboard goes to MainMenu
+				m.currentView = app.MainMenuView
+				m.list.Title = app.MainMenuView.String()
+				m.dashboardItems = nil // Clear dashboard specific data
+				cmds = append(cmds, m.loadMainMenuItemsCmd())
 			default:
-				if !m.isLoading { // Pass unhandled keys to list
+				if !m.isLoading {
 					m.list, cmd = m.list.Update(msg)
 					cmds = append(cmds, cmd)
 				}
@@ -207,41 +270,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case key.Matches(msg, m.keys.Down):
 				m.list.CursorDown()
 			case key.Matches(msg, m.keys.Select):
-				selectedItem := m.list.SelectedItem()
-				if class, ok := selectedItem.(listItemClass); ok {
-					m.selectedClass = &class.Class
-					m.currentView = app.View(99) // Temporary view for students
-					m.list.Title = fmt.Sprintf("Alunos da Turma: %s", m.selectedClass.Name)
-					m.list.SetItems(nil) // Clear current items
-					m.students = nil     // Clear student data
-					cmds = append(cmds, m.loadStudentsForClass(class.ID()))
+				selected, ok := m.list.SelectedItem().(listItemClass)
+				if ok {
+					m.selectedClass = &selected.Class
+					m.currentView = app.StudentListView
+					m.list.Title = fmt.Sprintf("%s - %s", app.StudentListView.String(), m.selectedClass.Name)
+					m.list.SetItems(nil)
+					m.students = nil
+					cmds = append(cmds, m.loadStudentsForClass(selected.ID()))
 				}
 			case key.Matches(msg, m.keys.Back):
-				m.currentView = app.DashboardView
-				m.list.Title = "Dashboard"
-				m.list.SetItems(nil)     // Clear current items
-				m.dashboardItems = nil   // Clear dashboard data
-				cmds = append(cmds, m.loadDashboardData())
+				m.currentView = app.MainMenuView
+				m.list.Title = app.MainMenuView.String()
+				m.classes = nil // Clear class specific data
+				cmds = append(cmds, m.loadMainMenuItemsCmd())
 			default:
 				if !m.isLoading {
 					m.list, cmd = m.list.Update(msg)
 					cmds = append(cmds, cmd)
 				}
 			}
-		case app.View(99): // Student view (temporary)
+		case app.StudentListView: // Was app.View(99)
 			switch {
 			case key.Matches(msg, m.keys.Up):
 				m.list.CursorUp()
 			case key.Matches(msg, m.keys.Down):
 				m.list.CursorDown()
 			case key.Matches(msg, m.keys.Select):
-				// Student selection logic here
+				// Student selection logic (if any)
 			case key.Matches(msg, m.keys.Back):
 				m.currentView = app.ClassManagementView
-				m.list.Title = "Turmas"
+				m.list.Title = app.ClassManagementView.String()
 				m.selectedClass = nil
-				m.list.SetItems(nil) // Clear student items
-				m.classes = nil      // Clear class data to force reload
+				m.list.SetItems(nil)
+				m.students = nil // Clear student data
+				// Reload classes for ClassManagementView
 				cmds = append(cmds, m.loadClasses())
 			default:
 				if !m.isLoading {
@@ -249,7 +312,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			}
-		default: // Default for other views primarily using the list
+		default:
 			if !m.isLoading {
 				m.list, cmd = m.list.Update(msg)
 				cmds = append(cmds, cmd)
@@ -262,12 +325,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 		}
 
+	case mainMenuLoadedMsg:
+		log.Println("TUI: Update - Recebida mainMenuLoadedMsg.")
+		m.isLoading = false
+		m.mainMenuItems = []list.Item(msg)
+		m.list.SetItems(m.mainMenuItems)
+		m.list.Title = app.MainMenuView.String() // Ensure title is for main menu
+		log.Printf("TUI: Update - Menu Principal atualizado com %d itens.", len(m.mainMenuItems))
+
+
 	case dashboardTasksLoadedMsg:
 		log.Println("TUI: Update - Recebida dashboardTasksLoadedMsg.")
 		m.isLoading = false
 		m.upcomingTasks = []models.Task(msg)
-
-		m.dashboardItems = []list.Item{} // Reset before populating
+		m.dashboardItems = []list.Item{}
 		if len(m.upcomingTasks) == 0 {
 			m.dashboardItems = append(m.dashboardItems, placeholderItem{title: "Nenhuma tarefa ativa encontrada."})
 		} else {
@@ -275,14 +346,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.dashboardItems = append(m.dashboardItems, dashboardTaskItem{task})
 			}
 		}
-		// If other dashboard data (e.g., assessments) is loaded, append it here.
-		// Example:
-		// for _, assessment := range m.recentAssessments {
-		// m.dashboardItems = append(m.dashboardItems, dashboardAssessmentItem{assessment})
-		// }
 		m.list.SetItems(m.dashboardItems)
-		m.list.Title = "Dashboard"
-		log.Printf("TUI: Update - Dashboard atualizado com %d itens.", len(m.dashboardItems))
+		// Title is set when navigating to dashboard
+		log.Printf("TUI: Update - Dashboard atualizado com %d tarefas.", len(m.upcomingTasks))
 
 	case classesLoadedMsg:
 		log.Println("TUI: Update - Recebida classesLoadedMsg.")
@@ -297,7 +363,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.list.SetItems(items)
-		m.list.Title = "Turmas"
+		// Title is set when navigating to class management
 		log.Printf("TUI: Update - Lista de turmas atualizada com %d itens.", len(items))
 
 	case studentsLoadedMsg:
@@ -319,8 +385,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case errMsg:
 		log.Printf("TUI: Update - Recebida errMsg. Contexto: '%s', Erro: %v", msg.context, msg.err)
 		m.isLoading = false
-		m.err = msg.err // Store error to be displayed by View()
-		// No automatic quit; View() will show the error.
+		m.err = msg.err
+		// View() will display the error.
 
 	case tea.WindowSizeMsg:
 		h, v := docStyle.GetFrameSize()
@@ -339,7 +405,12 @@ func (m Model) View() string {
 	}
 
 	if m.isLoading {
-		loadingText := fmt.Sprintf("%s Carregando %s...", m.spinner.View(), m.currentView.String())
+		// Use the list's current title in the loading message if available and relevant
+		titleForLoading := m.list.Title
+		if titleForLoading == "" { // Fallback if list title isn't set yet
+			titleForLoading = m.currentView.String()
+		}
+		loadingText := fmt.Sprintf("%s Carregando %s...", m.spinner.View(), titleForLoading)
 		return docStyle.Render(loadingText)
 	}
 
@@ -348,13 +419,15 @@ func (m Model) View() string {
 }
 
 func (m Model) headerView() string {
-	titleStr := m.currentView.String()
-	if m.currentView == app.View(99) { // Student view (temporary naming)
-		if m.selectedClass != nil {
-			titleStr = fmt.Sprintf("Alunos - %s", m.selectedClass.Name)
-		} else {
-			titleStr = "Alunos"
-		}
+	// The list's title is now generally set when switching views / loading data.
+	// So, we can use m.list.Title directly, or fall back to m.currentView.String().
+	titleStr := m.list.Title
+	if titleStr == "" { // Fallback if list title somehow isn't set
+		titleStr = m.currentView.String()
+	}
+	// Special case for StudentListView if more specific title is needed beyond what list.Title might have
+	if m.currentView == app.StudentListView && m.selectedClass != nil {
+		 titleStr = fmt.Sprintf("%s - %s", app.StudentListView.String(), m.selectedClass.Name)
 	}
 	return titleStyle.Render(titleStr)
 }
@@ -364,19 +437,17 @@ func (m Model) footerView() string {
 	helpParts = append(helpParts, m.keys.Up.Help().Key+"/"+m.keys.Down.Help().Key+": "+m.keys.Up.Help().Desc)
 	helpParts = append(helpParts, m.keys.Select.Help().Key+": "+m.keys.Select.Help().Desc)
 
-	// Show 'Back' option only if not on the Dashboard
-	if m.currentView != app.DashboardView {
+	// Show 'Back' option only if not on the MainMenu
+	if m.currentView != app.MainMenuView {
 		helpParts = append(helpParts, m.keys.Back.Help().Key+": "+m.keys.Back.Help().Desc)
 	}
 	helpParts = append(helpParts, m.keys.Quit.Help().Key+": "+m.keys.Quit.Help().Desc)
-	// helpParts = append(helpParts, m.keys.Help.Help().Key+": "+m.keys.Help.Help().Desc) // If general help toggle is active
 
 	return helpStyle.Render(strings.Join(helpParts, " | "))
 }
 
 // --- Custom list items ---
 
-// placeholderItem is used when a list is empty.
 type placeholderItem struct {
 	title       string
 	description string
@@ -386,7 +457,6 @@ func (p placeholderItem) Title() string       { return p.title }
 func (p placeholderItem) Description() string { return p.description }
 func (p placeholderItem) FilterValue() string { return p.title }
 
-// dashboardTaskItem for displaying tasks on the dashboard.
 type dashboardTaskItem struct {
 	models.Task
 }
@@ -400,15 +470,13 @@ func (dti dashboardTaskItem) Description() string {
 		desc = "Sem prazo definido"
 	}
 	if dti.Task.ClassID != nil {
-		// For a better UX, ClassName could be fetched and displayed.
 		desc += fmt.Sprintf(" (Turma ID: %d)", *dti.Task.ClassID)
 	}
 	return desc
 }
 func (dti dashboardTaskItem) FilterValue() string { return dti.Task.Title }
 
-// dashboardAssessmentItem for displaying assessments (example, not fully used yet).
-type dashboardAssessmentItem struct {
+type dashboardAssessmentItem struct { // Example, not fully used
 	models.Assessment
 }
 
@@ -419,7 +487,6 @@ func (dai dashboardAssessmentItem) Description() string {
 }
 func (dai dashboardAssessmentItem) FilterValue() string { return dai.Assessment.Name }
 
-// listItemClass for displaying classes.
 type listItemClass struct {
 	models.Class
 }
@@ -429,7 +496,6 @@ func (lic listItemClass) Description() string { return fmt.Sprintf("ID: %d, Disc
 func (lic listItemClass) FilterValue() string { return lic.Name }
 func (lic listItemClass) ID() int64           { return lic.Class.ID }
 
-// listItemStudent for displaying students.
 type listItemStudent struct {
 	models.Student
 }
@@ -448,14 +514,12 @@ type errMsg struct {
 	context string
 }
 
-func (e errMsg) Error() string {
-	return fmt.Sprintf("context: %s, error: %v", e.context, e.err)
-}
+func (e errMsg) Error() string { return fmt.Sprintf("context: %s, error: %v", e.context, e.err) }
 
+type mainMenuLoadedMsg []list.Item // Carries fully formed list.Items for the menu
 type classesLoadedMsg []models.Class
 type studentsLoadedMsg []models.Student
 type dashboardTasksLoadedMsg []models.Task
-// Example for future: type dashboardAssessmentsLoadedMsg []models.Assessment
 
 // Start runs the TUI.
 func Start(classService service.ClassService, taskService service.TaskService, assessmentService service.AssessmentService) error {
@@ -469,29 +533,20 @@ func Start(classService service.ClassService, taskService service.TaskService, a
 		if assessmentService == nil { missing = append(missing, "AssessmentService") }
 
 		fatalMsg := fmt.Sprintf("TUI: Start - Serviços essenciais ausentes: %v. A TUI não pode iniciar.", strings.Join(missing, ", "))
-		log.Println(fatalMsg) // Log as info/error, don't os.Exit here
-		return fmt.Errorf(fatalMsg) // Return an error to the caller
+		log.Println(fatalMsg)
+		return fmt.Errorf(fatalMsg)
 	}
 
 	m := NewTUIModel(classService, taskService, assessmentService)
-	// Consider tea.WithMouseCellMotion() for mouse support if needed later.
 	p := tea.NewProgram(m, tea.WithAltScreen())
 
 	log.Println("TUI: Start - Iniciando programa Bubble Tea (p.Run()).")
-	finalModel, err := p.Run() // p.Run() is blocking
+	_, err := p.Run() // p.Run() is blocking; finalModel can be ignored if not used.
 	if err != nil {
 		log.Printf("TUI: Start - Erro ao executar o programa Bubble Tea: %v", err)
 		return err
 	}
 
 	log.Println("TUI: Start - Programa Bubble Tea finalizado.")
-	if finalModel != nil {
-		// Access the final model state if needed, e.g., to check m.err
-		// finalState, ok := finalModel.(Model)
-		// if ok && finalState.err != nil {
-		// log.Printf("TUI: Start - Final model state contained an error: %v", finalState.err)
-		// return finalState.err
-		// }
-	}
-	return nil // Success
+	return nil
 }
