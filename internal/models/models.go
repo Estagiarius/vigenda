@@ -25,19 +25,23 @@ type Subject struct {
 // Class represents a specific class or group of students within a subject
 // (e.g., "Calculus I - Section A", "History 101 - Morning Class").
 type Class struct {
-	ID        int64  `json:"id"`         // ID é o identificador único da turma.
-	UserID    int64  `json:"user_id"`    // UserID é o ID do usuário proprietário desta turma (indiretamente via Subject).
-	SubjectID int64  `json:"subject_id"` // SubjectID é o ID da disciplina à qual esta turma pertence.
-	Name      string `json:"name"`       // Name é o nome da turma (ex: "Turma 9A - 2025").
+	ID        int64     `json:"id"`         // ID é o identificador único da turma.
+	UserID    int64     `json:"user_id"`    // UserID é o ID do usuário proprietário desta turma (indiretamente via Subject).
+	SubjectID int64     `json:"subject_id"` // SubjectID é o ID da disciplina à qual esta turma pertence.
+	Name      string    `json:"name"`       // Name é o nome da turma (ex: "Turma 9A - 2025").
+	CreatedAt time.Time `json:"created_at"` // CreatedAt é o timestamp de quando a turma foi criada.
+	UpdatedAt time.Time `json:"updated_at"` // UpdatedAt é o timestamp da última atualização da turma.
 }
 
 // Student represents a student enrolled in a specific class.
 type Student struct {
-	ID           int64  `json:"id"`            // ID é o identificador único do estudante.
-	ClassID      int64  `json:"class_id"`      // ClassID é o ID da turma à qual o estudante pertence.
-	FullName     string `json:"full_name"`     // FullName é o nome completo do estudante.
-	EnrollmentID string `json:"enrollment_id"` // EnrollmentID é o número de matrícula ou de chamada (opcional).
-	Status       string `json:"status"`        // Status indica a situação do estudante (ex: 'ativo', 'inativo', 'transferido').
+	ID           int64     `json:"id"`            // ID é o identificador único do estudante.
+	ClassID      int64     `json:"class_id"`      // ClassID é o ID da turma à qual o estudante pertence.
+	FullName     string    `json:"full_name"`     // FullName é o nome completo do estudante.
+	EnrollmentID string    `json:"enrollment_id"` // EnrollmentID é o número de matrícula ou de chamada (opcional).
+	Status       string    `json:"status"`        // Status indica a situação do estudante (ex: 'ativo', 'inativo', 'transferido').
+	CreatedAt    time.Time `json:"created_at"`    // CreatedAt é o timestamp de quando o estudante foi adicionado.
+	UpdatedAt    time.Time `json:"updated_at"`    // UpdatedAt é o timestamp da última atualização do estudante.
 }
 
 // Lesson represents a planned lesson for a class.

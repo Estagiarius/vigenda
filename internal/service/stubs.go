@@ -129,6 +129,31 @@ func (s *stubClassService) CreateClass(ctx context.Context, name string, subject
 	return class, nil
 }
 
+func (s *stubClassService) UpdateClass(ctx context.Context, classID int64, name string, subjectID int64) (models.Class, error) {
+	fmt.Printf("[StubClassService] UpdateClass ID: %d, Name: %s, SubjectID: %d\n", classID, name, subjectID)
+	// Fetch, update, and save logic would go here if it were a real repo interaction
+	// For a stub, we can just return a modified class or fetch and return.
+	cls, err := s.classRepo.GetClassByID(ctx, classID)
+	if err != nil {
+		return models.Class{}, err
+	}
+	cls.Name = name
+	cls.SubjectID = subjectID
+	cls.UpdatedAt = time.Now() // Simulate update
+	err = s.classRepo.UpdateClass(ctx, cls)
+	if err != nil {
+		return models.Class{}, err
+	}
+	return *cls, nil
+}
+
+func (s *stubClassService) DeleteClass(ctx context.Context, classID int64) error {
+	fmt.Printf("[StubClassService] DeleteClass ID: %d\n", classID)
+	// UserID for deletion is assumed to be handled by service logic or context
+	return s.classRepo.DeleteClass(ctx, classID, 1) // Assuming UserID 1 for stub
+}
+
+
 func (s *stubClassService) ImportStudentsFromCSV(ctx context.Context, classID int64, csvData []byte) (int, error) {
 	fmt.Printf("[StubClassService] ImportStudentsFromCSV for ClassID: %d\n", classID)
 	reader := csv.NewReader(strings.NewReader(string(csvData)))
@@ -148,15 +173,10 @@ func (s *stubClassService) ImportStudentsFromCSV(ctx context.Context, classID in
 			if len(record) >= 3 && record[2] != "" {
 				status = record[2]
 			}
-			student := models.Student{
-				ClassID:      classID,
-				EnrollmentID: record[0],
-				FullName:     record[1],
-				Status:       status,
-			}
-			_, err := s.classRepo.AddStudent(ctx, &student)
+			// Use the AddStudent service method which in turn uses the repo
+			_, err := s.AddStudent(ctx, classID, record[1], record[0], status)
 			if err != nil {
-				fmt.Printf("Error adding student %s: %v\n", student.FullName, err)
+				fmt.Printf("Error adding student %s via service: %v\n", record[1], err)
 			} else {
 				count++
 			}
@@ -164,6 +184,65 @@ func (s *stubClassService) ImportStudentsFromCSV(ctx context.Context, classID in
 	}
 	return count, nil
 }
+
+func (s *stubClassService) AddStudent(ctx context.Context, classID int64, fullName string, enrollmentID string, status string) (models.Student, error) {
+	fmt.Printf("[StubClassService] AddStudent to ClassID %d: Name: %s\n", classID, fullName)
+	student := models.Student{
+		ClassID:      classID,
+		FullName:     fullName,
+		EnrollmentID: enrollmentID,
+		Status:       status,
+	}
+	id, err := s.classRepo.AddStudent(ctx, &student)
+	if err != nil {
+		return models.Student{}, err
+	}
+	student.ID = id
+	// Fetch to get timestamps
+	createdStudent, err := s.classRepo.GetStudentByID(ctx, id)
+	if err != nil {
+		return models.Student{}, err
+	}
+	return *createdStudent, nil
+}
+
+func (s *stubClassService) GetStudentByID(ctx context.Context, studentID int64) (models.Student, error) {
+	fmt.Printf("[StubClassService] GetStudentByID: %d\n", studentID)
+	student, err := s.classRepo.GetStudentByID(ctx, studentID)
+	if err != nil {
+		return models.Student{}, err
+	}
+	return *student, nil
+}
+
+
+func (s *stubClassService) UpdateStudent(ctx context.Context, studentID int64, fullName string, enrollmentID string, status string) (models.Student, error) {
+	fmt.Printf("[StubClassService] UpdateStudent ID %d: Name: %s, Status: %s\n", studentID, fullName, status)
+	student, err := s.classRepo.GetStudentByID(ctx, studentID)
+	if err != nil {
+		return models.Student{}, err
+	}
+	student.FullName = fullName
+	student.EnrollmentID = enrollmentID
+	student.Status = status
+	student.UpdatedAt = time.Now()
+	err = s.classRepo.UpdateStudent(ctx, student)
+	if err != nil {
+		return models.Student{}, err
+	}
+	return *student, nil
+}
+
+func (s *stubClassService) DeleteStudent(ctx context.Context, studentID int64) error {
+	fmt.Printf("[StubClassService] DeleteStudent ID: %d\n", studentID)
+	// Need classID for repo's DeleteStudent. Fetch student first.
+	student, err := s.classRepo.GetStudentByID(ctx, studentID)
+	if err != nil {
+		return fmt.Errorf("stub.DeleteStudent: student not found to get classID: %w", err)
+	}
+	return s.classRepo.DeleteStudent(ctx, studentID, student.ClassID)
+}
+
 
 func (s *stubClassService) UpdateStudentStatus(ctx context.Context, studentID int64, newStatus string) error {
 	fmt.Printf("[StubClassService] UpdateStudentStatus for StudentID %d to %s\n", studentID, newStatus)
@@ -184,10 +263,12 @@ func (s *stubClassService) GetClassByID(ctx context.Context, classID int64) (mod
 
 func (s *stubClassService) ListAllClasses(ctx context.Context) ([]models.Class, error) {
 	fmt.Printf("[StubClassService] ListAllClasses called\n")
-	return []models.Class{
-		{ID: 1, UserID: 1, SubjectID: 101, Name: "Turma Stub A"},
-		{ID: 2, UserID: 1, SubjectID: 102, Name: "Turma Stub B"},
-	}, nil
+	// Using the repo directly to allow tests with mock repo to control output
+	return s.classRepo.ListAllClasses(ctx)
+	// return []models.Class{
+	// 	{ID: 1, UserID: 1, SubjectID: 101, Name: "Turma Stub A"},
+	// 	{ID: 2, UserID: 1, SubjectID: 102, Name: "Turma Stub B"},
+	// }, nil
 }
 
 func (s *stubClassService) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {

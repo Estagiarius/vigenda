@@ -1,11 +1,12 @@
 package classes
 
 import (
-	"context" // Adicionado para chamadas de serviço
+	"context"
 	"fmt"
-	"log" // Adicionado para logging
-	"strconv" // Adicionado para conversão de subjectID
-	"strings" // Adicionado para strings.Builder
+	"log"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
@@ -14,7 +15,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"vigenda/internal/models"
 	"vigenda/internal/service"
-	"time" // Adicionar import para time
 )
 
 type ViewState int
@@ -22,7 +22,12 @@ type ViewState int
 const (
 	ListView ViewState = iota
 	CreatingView
+	EditingClassView
+	DeletingClassConfirmView
 	DetailsView
+	AddingStudentView
+	EditingStudentView
+	DeletingStudentConfirmView
 )
 
 type FocusTarget int
@@ -30,627 +35,764 @@ type FocusTarget int
 const (
 	FocusTargetNone FocusTarget = iota
 	FocusTargetStudentsTable
-	FocusTargetStatusSelector // Será usado na Parte 2
+	FocusTargetClassForm
+	FocusTargetStudentForm
 )
 
 var (
 	columnTitleID        = "ID"
 	columnTitleName      = "Nome da Turma"
 	columnTitleSubjectID = "ID Disciplina"
+	columnTitleCreatedAt = "Criada em"
+	columnTitleUpdatedAt = "Atualizada em"
 
-	dbOperationTimeout = 5 * time.Second // Timeout para operações de DB
+	dbOperationTimeout = 5 * time.Second
 
-	// Colunas para a tabela de alunos
 	studentColumnTitleID         = "ID Aluno"
 	studentColumnTitleEnrollment = "Nº Chamada"
 	studentColumnTitleFullName   = "Nome Completo"
 	studentColumnTitleStatus     = "Status"
+	studentColumnTitleCreatedAt  = "Criado em"
+	studentColumnTitleUpdatedAt  = "Atualizado em"
 )
 
-// Model representa o modelo para a gestão de turmas.
 type Model struct {
-	classService  service.ClassService
-	state         ViewState
-	table         table.Model // Tabela de turmas
-	studentsTable table.Model // Tabela de alunos para DetailsView
-	createForm    struct {
-		nameInput      textinput.Model
-		subjectIDInput textinput.Model
-		focusIndex     int
+	classService service.ClassService
+	state        ViewState
+	table        table.Model
+	formInputs   struct {
+		inputs     []textinput.Model
+		focusIndex int
 	}
-	allClasses    []models.Class // Para armazenar as turmas carregadas
-	selectedClass *models.Class  // Turma selecionada para DetailsView
-	classStudents []models.Student // Alunos da turma selecionada
-
-	detailsViewFocusTarget FocusTarget // Novo campo
-
-	isLoading bool
-	width     int
-	height    int
-	err       error
+	allClasses           []models.Class
+	selectedClass        *models.Class
+	selectedStudent      *models.Student
+	classStudents        []models.Student
+	studentsTable        table.Model
+	detailsViewFocusTarget FocusTarget
+	isLoading            bool
+	width                int
+	height               int
+	err                  error
 }
 
-// New cria um novo modelo para a gestão de turmas.
-// Changed to return *Model
 func New(cs service.ClassService) *Model {
-	log.Println("ClassesModel: New - Criando novo modelo de classes.")
-	// Tabela para listar turmas
+	log.Println("ClassesModel: New")
 	classTable := table.New(
 		table.WithColumns([]table.Column{
 			{Title: columnTitleID, Width: 5},
-			{Title: columnTitleName, Width: 30},
+			{Title: columnTitleName, Width: 25},
 			{Title: columnTitleSubjectID, Width: 15},
+			{Title: columnTitleCreatedAt, Width: 18},
+			{Title: columnTitleUpdatedAt, Width: 18},
 		}),
-		table.WithRows([]table.Row{}), // Inicialmente vazia
+		table.WithRows([]table.Row{}),
 		table.WithFocused(true),
-		table.WithHeight(10), // Altura será ajustada
+		table.WithHeight(10),
 	)
-
 	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
+	s.Header = s.Header.BorderStyle(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("240")).BorderBottom(true).Bold(false)
+	s.Selected = s.Selected.Foreground(lipgloss.Color("229")).Background(lipgloss.Color("57")).Bold(false)
 	classTable.SetStyles(s)
 
-	// Tabela para listar alunos (em DetailsView)
 	studentsTable := table.New(
 		table.WithColumns([]table.Column{
 			{Title: studentColumnTitleID, Width: 8},
 			{Title: studentColumnTitleEnrollment, Width: 10},
-			{Title: studentColumnTitleFullName, Width: 30},
+			{Title: studentColumnTitleFullName, Width: 25},
 			{Title: studentColumnTitleStatus, Width: 10},
+			{Title: studentColumnTitleCreatedAt, Width: 18},
+			{Title: studentColumnTitleUpdatedAt, Width: 18},
 		}),
 		table.WithRows([]table.Row{}),
-		table.WithFocused(false), // Foco inicial na tabela de turmas ou no form
+		table.WithFocused(false),
 		table.WithHeight(10),
 	)
-	studentsTable.SetStyles(s) // Reutiliza o mesmo estilo básico
+	studentsTable.SetStyles(s)
 
-	// Formulário de criação
-	nameInput := textinput.New()
-	nameInput.Placeholder = "Nome da Nova Turma"
-	nameInput.Focus() // Foco inicial pode ser removido se o estado inicial não for CreatingView
-	nameInput.CharLimit = 100
-	nameInput.Width = 30
-
-	subjectIDInput := textinput.New()
-	subjectIDInput.Placeholder = "ID da Disciplina (ex: 1)"
-	subjectIDInput.CharLimit = 10
-	subjectIDInput.Width = 20
-
-	return &Model{ // Return pointer
+	return &Model{
 		classService:  cs,
-		state:         ListView, // Estado inicial é a lista
+		state:         ListView,
 		table:         classTable,
 		studentsTable: studentsTable,
-		createForm: struct {
-			nameInput      textinput.Model
-			subjectIDInput textinput.Model
-			focusIndex     int
-		}{
-			nameInput:      nameInput,
-			subjectIDInput: subjectIDInput,
-			focusIndex:     0, // Foco no primeiro campo quando o formulário abrir
-		},
-		detailsViewFocusTarget: FocusTargetNone, // Explícito para clareza
-		isLoading:              true,            // Começa carregando
+		formInputs:    struct{ inputs []textinput.Model; focusIndex int }{inputs: []textinput.Model{}, focusIndex: 0},
+		isLoading:     true,
 	}
 }
 
-// Init carrega os dados iniciais para a gestão de turmas.
-// Changed to pointer receiver
 func (m *Model) Init() tea.Cmd {
-	log.Printf("ClassesModel: Init - Chamado. isLoading antes: %t", m.isLoading)
-	m.isLoading = true // Garantir que o estado de carregamento seja ativado
-	log.Printf("ClassesModel: Init - isLoading depois: %t. Retornando fetchClassesCmd.", m.isLoading)
+	m.isLoading = true
 	return m.fetchClassesCmd
 }
 
-
-// Update lida com mensagens e atualiza o modelo.
-// Changed to pointer receiver
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	log.Printf("ClassesModel: Update - Recebida msg tipo %T", msg) // Log adicionado anteriormente
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.SetSize(msg.Width, msg.Height)
-
 	case tea.KeyMsg:
-		// Se estivermos em DetailsView e studentsTable estiver focada, ela deve lidar com as teclas primeiro.
-		// (Isso será relevante quando adicionarmos foco à studentsTable)
-		// if m.state == DetailsView && m.studentsTable.Focused() {
-		// 	var studentsTableCmd tea.Cmd
-		// 	m.studentsTable, studentsTableCmd = m.studentsTable.Update(msg)
-		// 	cmds = append(cmds, studentsTableCmd)
-		// 	return m, tea.Batch(cmds...)
-		// }
-
-
-		switch m.state {
-		case ListView:
-			switch {
-			case key.Matches(msg, key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "detalhes"))):
-				if len(m.allClasses) > 0 && m.table.Cursor() < len(m.allClasses) {
-					selected := m.allClasses[m.table.Cursor()]
-					m.selectedClass = &selected // Armazena um ponteiro para a turma selecionada
-					m.state = DetailsView
-					m.isLoading = true // Mostrar carregamento para os alunos
-					m.err = nil        // Limpar erros anteriores
-					// Limpar alunos e tabela de alunos anteriores
-					m.classStudents = nil
-					m.studentsTable.SetRows([]table.Row{})
-					// Disparar comando para buscar alunos da turma selecionada
-					if m.selectedClass != nil { // Garantir que selectedClass não é nil
-						cmds = append(cmds, m.fetchClassStudentsCmd(m.selectedClass.ID))
-					} else {
-						// Isso não deveria acontecer se a lógica de seleção estiver correta
-						cmds = append(cmds, func() tea.Msg { return errMsg{fmt.Errorf("turma selecionada é nil antes de buscar alunos")} })
-					}
-				}
-			case key.Matches(msg, key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "nova turma"))):
-				m.state = CreatingView
-				m.createForm.focusIndex = 0
-				m.createForm.nameInput.Focus()
-				m.createForm.subjectIDInput.Blur()
-				m.createForm.nameInput.SetValue("")
-				m.createForm.subjectIDInput.SetValue("")
-				m.err = nil
-				m.selectedClass = nil // Limpa qualquer seleção anterior
-				return m, textinput.Blink // Return m directly as it's now *Model
-			default:
-				// m.table, cmd = m.table.Update(msg)
-				// cmds = append(cmds, cmd)
-				var updatedTable table.Model
-				updatedTable, cmd = m.table.Update(msg)
-				m.table = updatedTable
-				cmds = append(cmds, cmd)
-			}
-		// ... outros cases para CreatingView, DetailsView (para 'esc')...
-		case CreatingView:
-			// ... (lógica existente) ...
-			switch {
-			case key.Matches(msg, key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "cancelar"))):
-				m.state = ListView
-				m.err = nil
-				m.createForm.nameInput.Blur()
-				m.createForm.subjectIDInput.Blur()
-				m.table.Focus() // Devolve o foco para a tabela de turmas
-				return m, nil // Return m directly
-			case key.Matches(msg, key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "salvar"))):
-				if m.createForm.focusIndex == 1 {
-					name := strings.TrimSpace(m.createForm.nameInput.Value())
-					subjectIDStr := strings.TrimSpace(m.createForm.subjectIDInput.Value())
-
-					if name == "" || subjectIDStr == "" {
-						m.err = fmt.Errorf("nome da turma e ID da disciplina são obrigatórios")
-						return m, nil // Return m directly
-					}
-					m.isLoading = true
-					cmds = append(cmds, m.createClassCmd(name, subjectIDStr))
-				} else {
-					m.nextFormInput()
-				}
-			case key.Matches(msg, key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "próximo"))),
-				key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "anterior"))):
-				if msg.String() == "shift+tab" {
-					m.prevFormInput()
-				} else {
-					m.nextFormInput()
-				}
-			}
-			var focusedInputCmd tea.Cmd
-			if m.createForm.focusIndex == 0 {
-				m.createForm.nameInput, focusedInputCmd = m.createForm.nameInput.Update(msg)
-			} else {
-				m.createForm.subjectIDInput, focusedInputCmd = m.createForm.subjectIDInput.Update(msg)
-			}
-			cmds = append(cmds, focusedInputCmd)
-
-		case DetailsView:
-			switch {
-			case key.Matches(msg, key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "voltar"))):
-				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
-					m.detailsViewFocusTarget = FocusTargetNone
-					m.studentsTable.Blur()
-				} else { // FocusTargetNone ou outros futuros focos não tratados aqui
-					m.state = ListView
-					m.selectedClass = nil
-					m.classStudents = nil
-					m.studentsTable.SetRows([]table.Row{})
-					m.err = nil
-					m.table.Focus()
-				}
-
-			case key.Matches(msg, key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "focar/navegar"))):
-				if m.detailsViewFocusTarget == FocusTargetNone {
-					m.detailsViewFocusTarget = FocusTargetStudentsTable
-					m.studentsTable.Focus() // table.Focus() não retorna cmd, mas é necessário para o estado interno da tabela
-				} else if m.detailsViewFocusTarget == FocusTargetStudentsTable {
-					// Se já estiver na tabela, Tab pode remover o foco (ou ir para próximo elemento focável)
-					m.detailsViewFocusTarget = FocusTargetNone
-					m.studentsTable.Blur()
-				}
-				// Se houvesse outros elementos focáveis, Tab poderia ciclar entre eles.
-
-			case key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "remover foco"))):
-				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
-					m.detailsViewFocusTarget = FocusTargetNone
-					m.studentsTable.Blur()
-				}
-				// Se houvesse outros elementos focáveis, Shift+Tab poderia ciclar na ordem inversa.
-
-			default:
-				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
-					var studentsTableCmd tea.Cmd
-					// m.studentsTable, studentsTableCmd = m.studentsTable.Update(msg)
-					var updatedStudentsTable table.Model
-					updatedStudentsTable, studentsTableCmd = m.studentsTable.Update(msg)
-					m.studentsTable = updatedStudentsTable
-					cmds = append(cmds, studentsTableCmd)
-				}
-				// Lógica para outras teclas se nenhum elemento específico estiver focado
-				// ou se o foco estiver em outros elementos (como o futuro seletor de status)
-			}
-		}
-
-
-	// ... cases para fetchedClassesMsg, classCreatedMsg, errMsg ...
+		currentCmd := m.handleKeyPress(msg)
+		cmds = append(cmds, currentCmd)
 	case fetchedClassesMsg:
-		log.Printf("ClassesModel: Update - Recebida fetchedClassesMsg. Erro: %v. isLoading antes: %t", msg.err, m.isLoading)
-		m.isLoading = false
-		log.Printf("ClassesModel: Update - fetchedClassesMsg - isLoading depois: %t", m.isLoading)
-		if msg.err != nil {
-			m.err = msg.err
-			m.allClasses = nil
-			m.table.SetRows([]table.Row{}) // Limpa a tabela em caso de erro
-			log.Printf("ClassesModel: Update - fetchedClassesMsg - Erro ao buscar turmas: %v", msg.err)
-		} else {
-			m.err = nil
-			m.allClasses = msg.classes
-			var rows []table.Row
-			for _, cls := range m.allClasses {
-				rows = append(rows, table.Row{
-					fmt.Sprintf("%d", cls.ID),
-					cls.Name,
-					fmt.Sprintf("%d", cls.SubjectID),
-				})
-			}
-			m.table.SetRows(rows)
-			log.Printf("ClassesModel: Update - fetchedClassesMsg - Tabela de turmas atualizada com %d linhas.", len(rows))
-		}
-
+		cmd = m.handleFetchedClasses(msg)
 	case classCreatedMsg:
-		log.Printf("ClassesModel: Update - Recebida classCreatedMsg. Erro: %v. isLoading antes: %t", msg.err, m.isLoading)
-		m.isLoading = false
-		log.Printf("ClassesModel: Update - classCreatedMsg - isLoading depois: %t", m.isLoading)
-		if msg.err != nil {
-			m.err = fmt.Errorf("erro ao criar turma: %w", msg.err)
-			log.Printf("ClassesModel: Update - classCreatedMsg - Erro ao criar turma: %v", msg.err)
-		} else {
-			log.Println("ClassesModel: Update - classCreatedMsg - Turma criada com sucesso. Mudando para ListView e recarregando turmas.")
-			m.state = ListView
-			m.err = nil
-			m.isLoading = true // Para recarregar a lista
-			log.Printf("ClassesModel: Update - classCreatedMsg - isLoading definido como true para recarregar.")
-			m.table.Focus()
-			cmds = append(cmds, m.fetchClassesCmd)
-		}
-
+		cmd = m.handleClassCreated(msg)
+	case classUpdatedMsg:
+		cmd = m.handleClassUpdated(msg)
+	case classDeletedMsg:
+		cmd = m.handleClassDeleted(msg)
+	case fetchedClassStudentsMsg:
+		cmd = m.handleFetchedClassStudents(msg)
+	case studentAddedMsg:
+		cmd = m.handleStudentAdded(msg)
+	case studentUpdatedMsg:
+		cmd = m.handleStudentUpdated(msg)
+	case studentDeletedMsg:
+		cmd = m.handleStudentDeleted(msg)
 	case errMsg:
-		log.Printf("ClassesModel: Update - Recebida errMsg: %v. isLoading antes: %t", msg.err, m.isLoading)
 		m.err = msg.err
 		m.isLoading = false
-		log.Printf("ClassesModel: Update - errMsg - isLoading depois: %t", m.isLoading)
+	}
+	cmds = append(cmds, cmd)
 
-
-	// Novo case para processar os alunos buscados
-	case fetchedClassStudentsMsg:
-		log.Printf("ClassesModel: Update - Recebida fetchedClassStudentsMsg. Erro: %v. isLoading antes: %t", msg.err, m.isLoading)
-		m.isLoading = false // Finaliza o estado de carregamento (de alunos)
-		log.Printf("ClassesModel: Update - fetchedClassStudentsMsg - isLoading depois: %t", m.isLoading)
-		if msg.err != nil {
-			m.err = msg.err // Exibe o erro se a busca de alunos falhar
-			m.classStudents = nil
-			m.studentsTable.SetRows([]table.Row{})
-			log.Printf("ClassesModel: Update - fetchedClassStudentsMsg - Erro ao buscar alunos: %v", msg.err)
-		} else {
-			m.err = nil // Limpa erros anteriores se a busca for bem-sucedida
-			m.classStudents = msg.students
-			var rows []table.Row
-			if len(m.classStudents) == 0 {
-				log.Println("ClassesModel: Update - fetchedClassStudentsMsg - Nenhum aluno encontrado.")
-				// Adiciona uma linha indicando que não há alunos, se desejar
-				// Ou simplesmente deixa a tabela vazia.
-				// rows = append(rows, table.Row{"---", "Nenhum aluno encontrado", "---", "---"})
-			} else {
-				for _, student := range m.classStudents {
-					rows = append(rows, table.Row{
-						fmt.Sprintf("%d", student.ID),
-						student.EnrollmentID, // Já é string ou pode ser ""
-						student.FullName,
-						student.Status,
-					})
-				}
-				log.Printf("ClassesModel: Update - fetchedClassStudentsMsg - Tabela de alunos atualizada com %d linhas.", len(rows))
+	// Update focused form input if any form is active
+	if (m.state == CreatingView || m.state == EditingClassView || m.state == AddingStudentView || m.state == EditingStudentView) &&
+		len(m.formInputs.inputs) > 0 && m.formInputs.focusIndex >= 0 && m.formInputs.focusIndex < len(m.formInputs.inputs) {
+		// Only update if the message is a KeyMsg and it wasn't an action key already handled by form logic
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			isActionKey := key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter", "esc", "tab", "shift+tab")))
+			if !isActionKey {
+				var inputCmd tea.Cmd
+				m.formInputs.inputs[m.formInputs.focusIndex], inputCmd = m.formInputs.inputs[m.formInputs.focusIndex].Update(msg)
+				cmds = append(cmds, inputCmd)
 			}
-			m.studentsTable.SetRows(rows)
-			// Opcionalmente, focar a tabela de alunos aqui se for a próxima interação principal
-			// m.studentsTable.Focus()
 		}
-	} // Fim do switch msg.(type)
-
+	}
 	return m, tea.Batch(cmds...)
 }
 
-func (m *Model) nextFormInput() { // Already a pointer receiver, correct.
-	m.createForm.focusIndex = (m.createForm.focusIndex + 1) % 2 // 2 campos
-	if m.createForm.focusIndex == 0 {
-		m.createForm.nameInput.Focus()
-		m.createForm.subjectIDInput.Blur()
-	} else {
-		m.createForm.nameInput.Blur()
-		m.createForm.subjectIDInput.Focus()
+func (m *Model) handleKeyPress(msg tea.KeyMsg) tea.Cmd {
+	switch m.state {
+	case ListView:
+		return m.handleListViewKeys(msg)
+	case CreatingView, EditingClassView:
+		return m.handleClassFormKeys(msg)
+	case DeletingClassConfirmView:
+		return m.handleDeleteClassConfirmKeys(msg)
+	case DetailsView:
+		return m.handleDetailsViewKeys(msg)
+	case AddingStudentView, EditingStudentView:
+		return m.handleStudentFormKeys(msg)
+	case DeletingStudentConfirmView:
+		return m.handleDeleteStudentConfirmKeys(msg)
 	}
+	return nil
 }
 
-func (m *Model) prevFormInput() { // Already a pointer receiver, correct.
-	m.createForm.focusIndex = (m.createForm.focusIndex - 1 + 2) % 2 // 2 campos
-	if m.createForm.focusIndex == 0 {
-		m.createForm.nameInput.Focus()
-		m.createForm.subjectIDInput.Blur()
-	} else {
-		m.createForm.nameInput.Blur()
-		m.createForm.subjectIDInput.Focus()
-	}
-}
-
-// View renderiza a UI para a gestão de turmas.
-// Changed to pointer receiver
 func (m *Model) View() string {
-	log.Printf("ClassesModel: View - Chamado. isLoading: %t, State: %v, Error: %v", m.isLoading, m.state, m.err)
 	var b strings.Builder
-
 	if m.isLoading {
-		// Centralizar a mensagem de carregamento (aproximadamente)
-		loadingView := lipgloss.Place(m.width, m.height,
-			lipgloss.Center, lipgloss.Center,
-			"Carregando...",
-			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(lipgloss.AdaptiveColor{Light: "#D9DCCF", Dark: "#383838"}))
-		log.Println("ClassesModel: View - Exibindo 'Carregando...'.")
-		return loadingView
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, "Carregando...")
 	}
-
 	if m.err != nil {
-		errorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("9")).PaddingBottom(1)
-		b.WriteString(errorStyle.Render(fmt.Sprintf("Erro: %v", m.err)))
-		log.Printf("ClassesModel: View - Exibindo erro: %v", m.err)
+		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).PaddingBottom(1).Render(fmt.Sprintf("Erro: %v", m.err)))
 	}
 
 	switch m.state {
 	case ListView:
-		titleStyle := lipgloss.NewStyle().Bold(true).MarginBottom(1)
-		b.WriteString(titleStyle.Render("Lista de Turmas"))
+		b.WriteString(lipgloss.NewStyle().Bold(true).MarginBottom(1).Render("Lista de Turmas"))
 		b.WriteString(m.table.View())
-		helpStyle := lipgloss.NewStyle().Faint(true).MarginTop(1)
-		b.WriteString(helpStyle.Render("Pressione 'n' para Nova Turma, ↑/↓ para navegar, 'q' ou 'esc' para voltar ao menu."))
-	case CreatingView:
-		titleStyle := lipgloss.NewStyle().Bold(true).MarginBottom(1)
-		b.WriteString(titleStyle.Render("Nova Turma"))
-
-		b.WriteString(m.createForm.nameInput.View())
-		b.WriteString("\n")
-		b.WriteString(m.createForm.subjectIDInput.View())
-		b.WriteString("\n\n")
-
-		helpStyle := lipgloss.NewStyle().Faint(true)
-		b.WriteString(helpStyle.Render("Pressione Tab para navegar, Enter para salvar (no último campo), Esc para cancelar."))
-
-	case DetailsView: // Novo case
+		help := "↑/↓: Navegar | Enter: Detalhes | n: Nova | e: Editar | d: Deletar | q/Esc: Voltar"
+		b.WriteString(lipgloss.NewStyle().Faint(true).MarginTop(1).Render(help))
+	case CreatingView, EditingClassView:
+		title := "Nova Turma"
+		if m.state == EditingClassView && m.selectedClass != nil {
+			title = fmt.Sprintf("Editando Turma: %s (ID: %d)", m.selectedClass.Name, m.selectedClass.ID)
+		}
+		b.WriteString(lipgloss.NewStyle().Bold(true).MarginBottom(1).Render(title))
+		for _, input := range m.formInputs.inputs {
+			b.WriteString(input.View() + "\n")
+		}
+		b.WriteString("\n" + lipgloss.NewStyle().Faint(true).Render("Tab: Próximo | Shift+Tab: Anterior | Enter: Salvar | Esc: Cancelar"))
+	case DeletingClassConfirmView:
+		if m.selectedClass != nil {
+			b.WriteString(lipgloss.NewStyle().Bold(true).MarginBottom(1).Render(fmt.Sprintf("Confirmar Exclusão da Turma: %s?", m.selectedClass.Name)))
+			b.WriteString("Esta ação não pode ser desfeita.\n\n")
+			b.WriteString(lipgloss.NewStyle().Faint(true).Render("Pressione 's' para confirmar, 'n' ou 'Esc' para cancelar."))
+		}
+	case DetailsView:
 		if m.selectedClass == nil {
-			// Isso não deveria acontecer se a lógica de estado estiver correta
-			b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("Erro: Nenhuma turma selecionada."))
+			b.WriteString("Erro: Nenhuma turma selecionada.")
 		} else {
-			titleStyle := lipgloss.NewStyle().Bold(true).PaddingBottom(1)
-			detailHeaderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Cinza claro
-
-			b.WriteString(titleStyle.Render(fmt.Sprintf("Detalhes da Turma: %s", m.selectedClass.Name)))
-			b.WriteString(fmt.Sprintf("%s %d\n", detailHeaderStyle.Render("ID da Turma:"), m.selectedClass.ID))
-			b.WriteString(fmt.Sprintf("%s %d\n\n", detailHeaderStyle.Render("ID da Disciplina:"), m.selectedClass.SubjectID))
-
-			b.WriteString(lipgloss.NewStyle().Bold(true).Render("Alunos:"))
-			if m.isLoading { // Se estiver carregando alunos especificamente para esta view
-				b.WriteString("\nCarregando alunos...")
-			} else if len(m.classStudents) == 0 && m.err == nil { // m.err == nil para não sobrescrever erro de busca
-				b.WriteString("\nNenhum aluno encontrado para esta turma.")
-			} else if m.err != nil && len(m.classStudents) == 0 {
-				// Erro já impresso globalmente
+			headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+			b.WriteString(lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("Detalhes da Turma: %s\n", m.selectedClass.Name)))
+			b.WriteString(fmt.Sprintf("%s %d\n", headerStyle.Render("ID:"), m.selectedClass.ID))
+			b.WriteString(fmt.Sprintf("%s %d\n", headerStyle.Render("ID Disciplina:"), m.selectedClass.SubjectID))
+			b.WriteString(fmt.Sprintf("%s %s\n", headerStyle.Render("Criada em:"), m.selectedClass.CreatedAt.Format("02/01/2006 15:04")))
+			b.WriteString(fmt.Sprintf("%s %s\n\n", headerStyle.Render("Atualizada em:"), m.selectedClass.UpdatedAt.Format("02/01/2006 15:04")))
+			b.WriteString(lipgloss.NewStyle().Bold(true).Render("Alunos:\n"))
+			if len(m.classStudents) == 0 && m.err == nil { // Check m.err too
+				b.WriteString("Nenhum aluno encontrado.")
 			} else {
-				studentsTableRender := m.studentsTable.View()
+				tableRender := m.studentsTable.View()
 				if m.detailsViewFocusTarget == FocusTargetStudentsTable {
-					// Adiciona uma borda sutil para indicar foco na tabela de alunos
-					focusBorderStyle := lipgloss.NewStyle().
-						Border(lipgloss.RoundedBorder()).
-						BorderForeground(lipgloss.Color("63")). // Magenta para foco
-						Padding(0,0) // Padding (0,1) pode ser muito se a tabela já tem suas margens
-
-					studentsTableRender = focusBorderStyle.Render(studentsTableRender)
+					tableRender = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("63")).Render(tableRender)
 				}
-				b.WriteString("\n" + studentsTableRender)
+				b.WriteString(tableRender)
 			}
+			help := "Esc: Voltar | a: Add Aluno"
+			if len(m.classStudents) > 0 { // Only show table focus keys if there are students
+				if m.detailsViewFocusTarget == FocusTargetNone {
+					help += " | Tab: Focar Tabela Alunos"
+				} else {
+					help += " | ↑/↓: Nav Alunos | e: Editar Aluno | d: Deletar Aluno | Shift+Tab/Esc: Sair Foco"
+				}
+			}
+			b.WriteString("\n\n" + lipgloss.NewStyle().Faint(true).Render(help))
 		}
-		helpStyle := lipgloss.NewStyle().Faint(true).MarginTop(1)
-		currentHelp := "Pressione 'Esc' para voltar."
-		if m.detailsViewFocusTarget == FocusTargetNone {
-			currentHelp += " Use Tab para focar a tabela de alunos."
-		} else if m.detailsViewFocusTarget == FocusTargetStudentsTable {
-			currentHelp += " Use Setas para navegar, Shift+Tab ou Esc para sair do foco da tabela."
-			// Futuramente: "... 's' para mudar status."
+	case AddingStudentView, EditingStudentView:
+		title := "Adicionar Novo Aluno"
+		if m.state == EditingStudentView && m.selectedStudent != nil {
+			title = fmt.Sprintf("Editando Aluno: %s (ID: %d)", m.selectedStudent.FullName, m.selectedStudent.ID)
 		}
-		b.WriteString("\n\n" + helpStyle.Render(currentHelp))
-
-	} // Fim do switch m.state
+		b.WriteString(lipgloss.NewStyle().Bold(true).MarginBottom(1).Render(title))
+		for _, input := range m.formInputs.inputs {
+			b.WriteString(input.View() + "\n")
+		}
+		b.WriteString("\n" + lipgloss.NewStyle().Faint(true).Render("Tab: Próximo | Shift+Tab: Anterior | Enter: Salvar | Esc: Cancelar"))
+	case DeletingStudentConfirmView:
+		if m.selectedStudent != nil {
+			b.WriteString(lipgloss.NewStyle().Bold(true).MarginBottom(1).Render(fmt.Sprintf("Confirmar Exclusão do Aluno: %s?", m.selectedStudent.FullName)))
+			b.WriteString("Esta ação não pode ser desfeita.\n\n")
+			b.WriteString(lipgloss.NewStyle().Faint(true).Render("Pressione 's' para confirmar, 'n' ou 'Esc' para cancelar."))
+		}
+	}
 	return b.String()
 }
 
-// SetSize ajusta o tamanho do modelo e seus componentes.
 func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
+	contentHeight := height - 5 // Approx for title, error, help
+	if contentHeight < 1 { contentHeight = 1 }
+	tableWidth := width - 4
+	if tableWidth < 20 { tableWidth = 20 }
 
-	// Alturas comuns
-	titleHeight := 1
-	errorHeight := 0
-	if m.err != nil {
-		errorHeight = strings.Count(fmt.Sprintf("Erro: %v", m.err), "\n") + 1 + 1 // +1 for padding
-	}
-	helpHeight := 1
+	m.table.SetHeight(contentHeight)
+	m.table.SetWidth(tableWidth)
+	m.studentsTable.SetHeight(contentHeight - 7) // Adjusted for class details
+	m.studentsTable.SetWidth(tableWidth)
 
-	// Altura disponível para o conteúdo principal da view
-	contentHeight := height - titleHeight - errorHeight - helpHeight
-	if contentHeight < 0 { contentHeight = 0 }
-
-
-	switch m.state {
-	case ListView:
-		tableHeaderAndBorderHeight := 3
-		tableBodyHeight := contentHeight - tableHeaderAndBorderHeight
-		if tableBodyHeight < 1 { tableBodyHeight = 1 }
-		m.table.SetHeight(tableBodyHeight)
-		m.table.SetWidth(width - 4)
-
-	case CreatingView:
-		inputWidth := width - 4
-		if inputWidth < 20 { inputWidth = 20 }
-		m.createForm.nameInput.Width = inputWidth
-		m.createForm.subjectIDInput.Width = inputWidth
-
-	case DetailsView:
-		// Altura para os detalhes da turma (ID, Nome, ID Disciplina) - estimativa
-		classDetailsRenderedHeight := 4 // Título da view + ID Turma + ID Disciplina + linha em branco
-
-		// Altura para o cabeçalho "Alunos:"
-		studentsSectionHeaderHeight := 1
-
-		// Altura disponível para a tabela de alunos
-		studentsTableAvailableHeight := contentHeight - classDetailsRenderedHeight - studentsSectionHeaderHeight
-
-		studentsTableHeaderAndBorderHeight := 3 // Estimativa para cabeçalho e bordas da studentsTable
-		studentsTableBodyHeight := studentsTableAvailableHeight - studentsTableHeaderAndBorderHeight
-		if studentsTableBodyHeight < 1 { studentsTableBodyHeight = 1}
-
-		m.studentsTable.SetHeight(studentsTableBodyHeight)
-		m.studentsTable.SetWidth(width - 4) // Margens laterais
+	inputWidth := width - 8
+	if inputWidth < 20 { inputWidth = 20 }
+	for i := range m.formInputs.inputs {
+		m.formInputs.inputs[i].Width = inputWidth
 	}
 }
 
-// IsFocused indica se o modelo de turmas tem algum input focado.
-// Changed to pointer receiver
 func (m *Model) IsFocused() bool {
-	return m.state == CreatingView // Se estiver no formulário, considera focado para 'esc' local
+	return m.state == CreatingView || m.state == EditingClassView || m.state == AddingStudentView || m.state == EditingStudentView
 }
 
-// Comandos e Mensagens
-
-type fetchedClassesMsg struct {
-	classes []models.Class
-	err     error
+// Key Handlers
+func (m *Model) handleListViewKeys(msg tea.KeyMsg) tea.Cmd {
+	var cmds []tea.Cmd
+	switch {
+	case key.Matches(msg, key.NewBinding(key.WithKeys("n"))):
+		m.prepareClassForm(nil)
+		return textinput.Blink
+	case key.Matches(msg, key.NewBinding(key.WithKeys("e"))):
+		if idx := m.table.Cursor(); idx < len(m.allClasses) {
+			m.selectedClass = &m.allClasses[idx]
+			m.prepareClassForm(m.selectedClass)
+			return textinput.Blink
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("d"))):
+		if idx := m.table.Cursor(); idx < len(m.allClasses) {
+			m.selectedClass = &m.allClasses[idx]
+			m.state = DeletingClassConfirmView
+			m.err = nil
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
+		if idx := m.table.Cursor(); idx < len(m.allClasses) {
+			m.selectedClass = &m.allClasses[idx]
+			m.state = DetailsView
+			m.isLoading = true
+			m.err = nil
+			m.classStudents = nil
+			m.studentsTable.SetRows([]table.Row{})
+			cmds = append(cmds, m.fetchClassStudentsCmd(m.selectedClass.ID))
+		}
+	default:
+		var tableCmd tea.Cmd
+		m.table, tableCmd = m.table.Update(msg)
+		cmds = append(cmds, tableCmd)
+	}
+	return tea.Batch(cmds...)
 }
 
-type classCreatedMsg struct {
-	createdClass models.Class // Pode ser útil para feedback, embora não usado diretamente agora
-	err          error
+func (m *Model) handleClassFormKeys(msg tea.KeyMsg) tea.Cmd {
+	switch {
+	case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
+		m.state = ListView
+		m.err = nil
+		m.resetFormInputs()
+		m.selectedClass = nil
+		m.table.Focus()
+	case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
+		if m.formInputs.focusIndex == len(m.formInputs.inputs)-1 {
+			name := strings.TrimSpace(m.formInputs.inputs[0].Value())
+			subjectIDStr := strings.TrimSpace(m.formInputs.inputs[1].Value())
+			if name == "" || subjectIDStr == "" {
+				m.err = fmt.Errorf("nome e ID da disciplina obrigatórios")
+				return nil
+			}
+			m.isLoading = true
+			if m.state == CreatingView {
+				return m.createClassCmd(name, subjectIDStr)
+			} else if m.state == EditingClassView && m.selectedClass != nil {
+				return m.updateClassCmd(m.selectedClass.ID, name, subjectIDStr)
+			}
+		} else {
+			m.nextFormInput()
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
+		m.nextFormInput()
+	case key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab"))):
+		m.prevFormInput()
+	}
+	return nil // Input updates are handled in main Update loop
 }
 
+func (m *Model) handleDeleteClassConfirmKeys(msg tea.KeyMsg) tea.Cmd {
+	switch msg.String() {
+	case "s", "S":
+		if m.selectedClass != nil {
+			m.isLoading = true
+			return m.deleteClassCmd(m.selectedClass.ID)
+		}
+	case "n", "N", "esc":
+		m.state = ListView
+		m.selectedClass = nil
+		m.err = nil
+		m.table.Focus()
+	}
+	return nil
+}
+
+func (m *Model) handleDetailsViewKeys(msg tea.KeyMsg) tea.Cmd {
+	var cmds []tea.Cmd
+	switch {
+	case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
+		if m.detailsViewFocusTarget == FocusTargetStudentsTable {
+			m.detailsViewFocusTarget = FocusTargetNone
+			m.studentsTable.Blur()
+		} else {
+			m.state = ListView
+			m.selectedClass = nil
+			m.err = nil
+			m.table.Focus()
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("a"))):
+		if m.selectedClass != nil {
+			m.prepareStudentForm(nil)
+			return textinput.Blink
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
+		if m.detailsViewFocusTarget == FocusTargetNone && len(m.classStudents) > 0 {
+			m.detailsViewFocusTarget = FocusTargetStudentsTable
+			m.studentsTable.Focus()
+		} else { // Blur or cycle
+			m.detailsViewFocusTarget = FocusTargetNone
+			m.studentsTable.Blur()
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab"))):
+		if m.detailsViewFocusTarget == FocusTargetStudentsTable {
+			m.detailsViewFocusTarget = FocusTargetNone
+			m.studentsTable.Blur()
+		}
+	default:
+		if m.detailsViewFocusTarget == FocusTargetStudentsTable {
+			switch {
+			case key.Matches(msg, key.NewBinding(key.WithKeys("e"))):
+				if idx := m.studentsTable.Cursor(); idx < len(m.classStudents) {
+					m.selectedStudent = &m.classStudents[idx]
+					m.prepareStudentForm(m.selectedStudent)
+					return textinput.Blink
+				}
+			case key.Matches(msg, key.NewBinding(key.WithKeys("d"))):
+				if idx := m.studentsTable.Cursor(); idx < len(m.classStudents) {
+					m.selectedStudent = &m.classStudents[idx]
+					m.state = DeletingStudentConfirmView
+					m.err = nil
+				}
+			default:
+				var tableCmd tea.Cmd
+				m.studentsTable, tableCmd = m.studentsTable.Update(msg)
+				cmds = append(cmds, tableCmd)
+			}
+		}
+	}
+	return tea.Batch(cmds...)
+}
+
+func (m *Model) handleStudentFormKeys(msg tea.KeyMsg) tea.Cmd {
+	switch {
+	case key.Matches(msg, key.NewBinding(key.WithKeys("esc"))):
+		m.state = DetailsView
+		m.err = nil
+		m.resetFormInputs()
+		m.selectedStudent = nil
+		// Re-fetch students for details view to be up-to-date
+		if m.selectedClass != nil {
+			m.isLoading = true
+			return m.fetchClassStudentsCmd(m.selectedClass.ID)
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
+		if m.formInputs.focusIndex == len(m.formInputs.inputs)-1 { // Last field
+			fullName := strings.TrimSpace(m.formInputs.inputs[0].Value())
+			enrollmentID := strings.TrimSpace(m.formInputs.inputs[1].Value())
+			status := strings.ToLower(strings.TrimSpace(m.formInputs.inputs[2].Value()))
+			if fullName == "" || status == "" {
+				m.err = fmt.Errorf("nome completo e status são obrigatórios")
+				return nil
+			}
+			// Basic status validation
+			if status != "ativo" && status != "inativo" && status != "transferido" {
+				m.err = fmt.Errorf("status inválido: use ativo, inativo ou transferido")
+				return nil
+			}
+			m.isLoading = true
+			if m.state == AddingStudentView && m.selectedClass != nil {
+				return m.addStudentCmd(m.selectedClass.ID, fullName, enrollmentID, status)
+			} else if m.state == EditingStudentView && m.selectedStudent != nil {
+				return m.updateStudentCmd(m.selectedStudent.ID, fullName, enrollmentID, status)
+			}
+		} else {
+			m.nextFormInput()
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
+		m.nextFormInput()
+	case key.Matches(msg, key.NewBinding(key.WithKeys("shift+tab"))):
+		m.prevFormInput()
+	}
+	return nil // Input updates are handled in main Update loop
+}
+
+func (m *Model) handleDeleteStudentConfirmKeys(msg tea.KeyMsg) tea.Cmd {
+	switch msg.String() {
+	case "s", "S":
+		if m.selectedStudent != nil {
+			m.isLoading = true
+			return m.deleteStudentCmd(m.selectedStudent.ID)
+		}
+	case "n", "N", "esc":
+		m.state = DetailsView
+		m.selectedStudent = nil
+		m.err = nil
+		// Re-fetch students to update view
+		if m.selectedClass != nil {
+			m.isLoading = true
+			return m.fetchClassStudentsCmd(m.selectedClass.ID)
+		}
+	}
+	return nil
+}
+
+// Form Management
+func (m *Model) resetFormInputs() {
+	m.formInputs.inputs = []textinput.Model{}
+	m.formInputs.focusIndex = 0
+}
+
+func (m *Model) prepareClassForm(classToEdit *models.Class) {
+	m.resetFormInputs()
+	nameInput := textinput.New()
+	nameInput.Placeholder = "Nome da Turma"
+	nameInput.CharLimit = 100
+	subjectIDInput := textinput.New()
+	subjectIDInput.Placeholder = "ID da Disciplina (ex: 1)"
+	subjectIDInput.CharLimit = 10
+
+	if classToEdit != nil {
+		nameInput.SetValue(classToEdit.Name)
+		subjectIDInput.SetValue(strconv.FormatInt(classToEdit.SubjectID, 10))
+		m.state = EditingClassView
+	} else {
+		m.state = CreatingView
+	}
+	m.formInputs.inputs = []textinput.Model{nameInput, subjectIDInput}
+	m.formInputs.inputs[0].Focus()
+	m.formInputs.focusIndex = 0
+	m.err = nil
+}
+
+func (m *Model) prepareStudentForm(studentToEdit *models.Student) {
+	m.resetFormInputs()
+	fullNameInput := textinput.New()
+	fullNameInput.Placeholder = "Nome Completo do Aluno"
+	enrollmentIDInput := textinput.New()
+	enrollmentIDInput.Placeholder = "Nº Chamada/Matrícula (opcional)"
+	statusInput := textinput.New()
+	statusInput.Placeholder = "Status (ativo, inativo, transferido)"
+
+	if studentToEdit != nil {
+		fullNameInput.SetValue(studentToEdit.FullName)
+		enrollmentIDInput.SetValue(studentToEdit.EnrollmentID)
+		statusInput.SetValue(studentToEdit.Status)
+		m.state = EditingStudentView
+	} else {
+		statusInput.SetValue("ativo") // Default
+		m.state = AddingStudentView
+	}
+	m.formInputs.inputs = []textinput.Model{fullNameInput, enrollmentIDInput, statusInput}
+	m.formInputs.inputs[0].Focus()
+	m.formInputs.focusIndex = 0
+	m.err = nil
+}
+
+func (m *Model) nextFormInput() {
+	if len(m.formInputs.inputs) == 0 { return }
+	m.formInputs.inputs[m.formInputs.focusIndex].Blur()
+	m.formInputs.focusIndex = (m.formInputs.focusIndex + 1) % len(m.formInputs.inputs)
+	m.formInputs.inputs[m.formInputs.focusIndex].Focus()
+}
+
+func (m *Model) prevFormInput() {
+	if len(m.formInputs.inputs) == 0 { return }
+	m.formInputs.inputs[m.formInputs.focusIndex].Blur()
+	m.formInputs.focusIndex = (m.formInputs.focusIndex - 1 + len(m.formInputs.inputs)) % len(m.formInputs.inputs)
+	m.formInputs.inputs[m.formInputs.focusIndex].Focus()
+}
+
+// Message Handlers (CRUD results)
+func (m *Model) handleFetchedClasses(msg fetchedClassesMsg) tea.Cmd {
+	m.isLoading = false
+	if msg.err != nil {
+		m.err = msg.err
+		m.allClasses = nil
+	} else {
+		m.err = nil
+		m.allClasses = msg.classes
+	}
+	var rows []table.Row
+	for _, cls := range m.allClasses {
+		rows = append(rows, table.Row{
+			fmt.Sprintf("%d", cls.ID),
+			cls.Name,
+			fmt.Sprintf("%d", cls.SubjectID),
+			cls.CreatedAt.Format("02/01/06 15:04"),
+			cls.UpdatedAt.Format("02/01/06 15:04"),
+		})
+	}
+	m.table.SetRows(rows)
+	return nil
+}
+
+func (m *Model) handleClassCreated(msg classCreatedMsg) tea.Cmd {
+	m.isLoading = false
+	if msg.err != nil {
+		m.err = fmt.Errorf("criar turma: %w", msg.err)
+		return nil
+	}
+	m.state = ListView
+	m.err = nil
+	m.resetFormInputs()
+	m.table.Focus()
+	return m.fetchClassesCmd
+}
+
+func (m *Model) handleClassUpdated(msg classUpdatedMsg) tea.Cmd {
+	m.isLoading = false
+	if msg.err != nil {
+		m.err = fmt.Errorf("atualizar turma: %w", msg.err)
+		return nil
+	}
+	m.state = ListView
+	m.err = nil
+	m.resetFormInputs()
+	m.selectedClass = nil
+	m.table.Focus()
+	return m.fetchClassesCmd
+}
+
+func (m *Model) handleClassDeleted(msg classDeletedMsg) tea.Cmd {
+	m.isLoading = false
+	if msg.err != nil {
+		m.err = fmt.Errorf("deletar turma: %w", msg.err)
+		return nil
+	}
+	m.state = ListView
+	m.err = nil
+	m.selectedClass = nil
+	m.table.Focus()
+	return m.fetchClassesCmd
+}
+
+func (m *Model) handleFetchedClassStudents(msg fetchedClassStudentsMsg) tea.Cmd {
+	m.isLoading = false
+	if msg.err != nil {
+		m.err = msg.err
+		m.classStudents = nil
+	} else {
+		m.err = nil
+		m.classStudents = msg.students
+	}
+	var rows []table.Row
+	for _, std := range m.classStudents {
+		rows = append(rows, table.Row{
+			fmt.Sprintf("%d", std.ID),
+			std.EnrollmentID,
+			std.FullName,
+			std.Status,
+			std.CreatedAt.Format("02/01/06 15:04"),
+			std.UpdatedAt.Format("02/01/06 15:04"),
+		})
+	}
+	m.studentsTable.SetRows(rows)
+	if len(rows) == 0 { // If no students, blur table
+		m.detailsViewFocusTarget = FocusTargetNone
+		m.studentsTable.Blur()
+	} else if m.detailsViewFocusTarget == FocusTargetStudentsTable { // Re-apply focus if it was intended
+		m.studentsTable.Focus()
+	}
+	return nil
+}
+
+func (m *Model) handleStudentAdded(msg studentAddedMsg) tea.Cmd {
+	m.isLoading = false
+	if msg.err != nil {
+		m.err = fmt.Errorf("add aluno: %w", msg.err)
+		return nil
+	}
+	m.state = DetailsView
+	m.err = nil
+	m.resetFormInputs()
+	if m.selectedClass != nil {
+		m.isLoading = true
+		return m.fetchClassStudentsCmd(m.selectedClass.ID)
+	}
+	return nil
+}
+
+func (m *Model) handleStudentUpdated(msg studentUpdatedMsg) tea.Cmd {
+	m.isLoading = false
+	if msg.err != nil {
+		m.err = fmt.Errorf("atualizar aluno: %w", msg.err)
+		return nil
+	}
+	m.state = DetailsView
+	m.err = nil
+	m.resetFormInputs()
+	m.selectedStudent = nil
+	if m.selectedClass != nil {
+		m.isLoading = true
+		return m.fetchClassStudentsCmd(m.selectedClass.ID)
+	}
+	return nil
+}
+
+func (m *Model) handleStudentDeleted(msg studentDeletedMsg) tea.Cmd {
+	m.isLoading = false
+	if msg.err != nil {
+		m.err = fmt.Errorf("deletar aluno: %w", msg.err)
+		return nil
+	}
+	m.state = DetailsView
+	m.err = nil
+	m.selectedStudent = nil
+	if m.selectedClass != nil {
+		m.isLoading = true
+		return m.fetchClassStudentsCmd(m.selectedClass.ID)
+	}
+	return nil
+}
+
+// Commands
+type fetchedClassesMsg struct { classes []models.Class; err error }
+type classCreatedMsg struct { createdClass models.Class; err error }
+type classUpdatedMsg struct { updatedClass models.Class; err error }
+type classDeletedMsg struct { err error }
+type fetchedClassStudentsMsg struct { students []models.Student; err error }
+type studentAddedMsg struct { addedStudent models.Student; err error }
+type studentUpdatedMsg struct { updatedStudent models.Student; err error }
+type studentDeletedMsg struct { err error }
 type errMsg struct{ err error }
 
-// Error torna errMsg em um tipo de erro válido.
-func (e errMsg) Error() string {
-	if e.err == nil {
-		return "unknown error in errMsg"
-	}
-	return e.err.Error()
-}
+func (e errMsg) Error() string { return e.err.Error() }
 
-type fetchedClassStudentsMsg struct {
-	students []models.Student
-	err      error
-}
-
-// Changed to pointer receiver for consistency
-func (m *Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
-	return func() tea.Msg {
-		if m.classService == nil { // Checagem defensiva
-			return errMsg{fmt.Errorf("classService não inicializado")}
-		}
-		if classID == 0 {
-			return errMsg{fmt.Errorf("ID da turma inválido (0) para buscar alunos")}
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
-		defer cancel()
-
-		students, err := m.classService.GetStudentsByClassID(ctx, classID)
-		if err != nil {
-			// O erro já pode ser context.DeadlineExceeded ou um erro do DB
-			return errMsg{fmt.Errorf("falha ao buscar alunos para a turma ID %d: %w", classID, err)}
-		}
-		return fetchedClassStudentsMsg{students: students, err: nil}
-	}
-}
-
-func (m Model) fetchClassesCmd() tea.Msg {
-	log.Println("ClassesModel: fetchClassesCmd - Iniciando busca de turmas.")
-	if m.classService == nil {
-		log.Println("ClassesModel: fetchClassesCmd - Erro: classService não inicializado.")
-		return errMsg{fmt.Errorf("classService não inicializado em fetchClassesCmd")}
-	}
-
-	// Criar um contexto com timeout
+func (m *Model) fetchClassesCmd() tea.Msg {
 	ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
-	defer cancel() // É crucial chamar cancel para liberar recursos
-
-	log.Println("ClassesModel: fetchClassesCmd - Chamando classService.ListAllClasses.")
-	classes, err := m.classService.ListAllClasses(ctx) // Passar o contexto com timeout
-	if err != nil {
-		log.Printf("ClassesModel: fetchClassesCmd - Erro ao buscar turmas do serviço: %v", err)
-		return errMsg{fmt.Errorf("falha ao buscar turmas (pode ter ocorrido timeout): %w", err)}
-	}
-	log.Printf("ClassesModel: fetchClassesCmd - Busca de turmas bem-sucedida. %d turmas encontradas. Retornando fetchedClassesMsg.", len(classes))
-	return fetchedClassesMsg{classes: classes, err: nil}
+	defer cancel()
+	classes, err := m.classService.ListAllClasses(ctx)
+	return fetchedClassesMsg{classes: classes, err: err}
 }
 
-// Changed to pointer receiver for consistency
 func (m *Model) createClassCmd(name string, subjectIDStr string) tea.Cmd {
 	return func() tea.Msg {
+		subjectID, convErr := strconv.ParseInt(subjectIDStr, 10, 64)
+		if convErr != nil { return errMsg{fmt.Errorf("ID disciplina inválido: %w", convErr)} }
 		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
 		defer cancel()
+		created, err := m.classService.CreateClass(ctx, name, subjectID)
+		return classCreatedMsg{createdClass: created, err: err}
+	}
+}
 
-
+func (m *Model) updateClassCmd(id int64, name string, subjectIDStr string) tea.Cmd {
+	return func() tea.Msg {
 		subjectID, convErr := strconv.ParseInt(subjectIDStr, 10, 64)
-		if convErr != nil {
-			return errMsg{fmt.Errorf("ID da disciplina inválido ('%s'): %w", subjectIDStr, convErr)}
-		}
+		if convErr != nil { return errMsg{fmt.Errorf("ID disciplina inválido: %w", convErr)} }
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+		updated, err := m.classService.UpdateClass(ctx, id, name, subjectID)
+		return classUpdatedMsg{updatedClass: updated, err: err}
+	}
+}
 
-		// Validação adicional, embora já feita antes de chamar o comando
-		if name == "" {
-			return errMsg{fmt.Errorf("nome da turma não pode ser vazio")}
-		}
-		// UserID é tratado pelo serviço/repositório
-		createdClass, err := m.classService.CreateClass(ctx, name, subjectID)
-		if err != nil {
-			// Retorna um erro específico para criação, ou pode ser errMsg também
-			return classCreatedMsg{err: fmt.Errorf("serviço falhou ao criar turma: %w", err)}
-		}
-		return classCreatedMsg{createdClass: createdClass, err: nil}
+func (m *Model) deleteClassCmd(id int64) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+		err := m.classService.DeleteClass(ctx, id)
+		return classDeletedMsg{err: err}
+	}
+}
+
+func (m *Model) fetchClassStudentsCmd(classID int64) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+		students, err := m.classService.GetStudentsByClassID(ctx, classID)
+		return fetchedClassStudentsMsg{students: students, err: err}
+	}
+}
+
+func (m *Model) addStudentCmd(classID int64, fullName, enrollmentID, status string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+		added, err := m.classService.AddStudent(ctx, classID, fullName, enrollmentID, status)
+		return studentAddedMsg{addedStudent: added, err: err}
+	}
+}
+
+func (m *Model) updateStudentCmd(id int64, fullName, enrollmentID, status string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+		updated, err := m.classService.UpdateStudent(ctx, id, fullName, enrollmentID, status)
+		return studentUpdatedMsg{updatedStudent: updated, err: err}
+	}
+}
+
+func (m *Model) deleteStudentCmd(id int64) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+		err := m.classService.DeleteStudent(ctx, id)
+		return studentDeletedMsg{err: err}
 	}
 }
