@@ -14,6 +14,7 @@ const (
 	// Add other views as needed
 	// StudentListView is a temporary view, might be refactored later
 	StudentListView // Represents app.View(99) for now
+	CreateTaskFormView
 )
 
 func (v View) String() string {
@@ -27,5 +28,6 @@ func (v View) String() string {
 		"Banco de Questões",
 		"Gerar Provas",
 		"Alunos da Turma", // String for StudentListView
+		"Adicionar Nova Tarefa", // String for CreateTaskFormView
 	}[v]
 }
