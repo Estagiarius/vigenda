@@ -166,6 +166,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectedClass = nil
 				// Reload classes to reset the list
 				cmds = append(cmds, m.loadClasses())
+			} else if m.currentView == app.ProofGenerationView {
+				m.currentView = app.DashboardView
 			} else if m.currentView == app.ClassManagementView {
 				// TODO: Go back to a previous menu or exit if this is the top level
 				// For now, quit if at class view and back is pressed.
