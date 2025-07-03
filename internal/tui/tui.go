@@ -141,7 +141,7 @@ func (m *Model) initializeTaskForm() {
 	ti = textinput.New()
 	ti.Placeholder = "Título da Tarefa (obrigatório)"
 	ti.CharLimit = 120; ti.Width = 50
-	ti.PromptStyle = focusedInputStyle
+	ti.PromptStyle = focusedInputStyle // Set initial prompt style for the first focused field
 	m.taskFormInputs[taskFormFieldTitle] = ti
 
 	ti = textinput.New()
@@ -165,8 +165,8 @@ func (m *Model) initializeTaskForm() {
 	if len(m.taskFormOrder) > 0 {
 		m.taskFormFocusedField = m.taskFormOrder[0]
 		focusedInput := m.taskFormInputs[m.taskFormFocusedField]
-		focusedInput.Focus()
-		m.taskFormInputs[m.taskFormFocusedField] = focusedInput
+		focusedInput.Focus() // Call Focus on the input model
+		m.taskFormInputs[m.taskFormFocusedField] = focusedInput // Store it back
 	}
     m.list.SetItems(nil)
     m.statusMessage = ""
@@ -177,7 +177,7 @@ func (m *Model) initializeTaskForm() {
 const statusMessageDuration = 3 * time.Second
 type clearStatusMessageMsg struct{}
 
-func setStatusMessageCmd() tea.Cmd { // Removed duration, using const
+func setStatusMessageCmd() tea.Cmd {
 	return tea.Tick(statusMessageDuration, func(t time.Time) tea.Msg {
 		return clearStatusMessageMsg{}
 	})
@@ -242,7 +242,6 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, initialCmd)
 }
 
-// Helper to change focus in form
 func (m *Model) changeFormFocus(forward bool) {
     currentIndex := -1
     for i, fieldName := range m.taskFormOrder {
@@ -252,7 +251,6 @@ func (m *Model) changeFormFocus(forward bool) {
         }
     }
 
-    // Blur current
     input := m.taskFormInputs[m.taskFormFocusedField]
     input.Blur()
 	input.PromptStyle = blurredInputStyle
@@ -264,12 +262,15 @@ func (m *Model) changeFormFocus(forward bool) {
         currentIndex = (currentIndex - 1 + len(m.taskFormOrder)) % len(m.taskFormOrder)
     }
 
-    // Focus next
     m.taskFormFocusedField = m.taskFormOrder[currentIndex]
     input = m.taskFormInputs[m.taskFormFocusedField]
-    input.Focus()
+    input.Focus() // This returns a command, which needs to be handled.
 	input.PromptStyle = focusedInputStyle
     m.taskFormInputs[m.taskFormFocusedField] = input
+	// The command from input.Focus() should be returned by the Update method that calls changeFormFocus.
+	// For now, this function doesn't return commands, which might be an issue.
+	// However, textinput.Focus() typically returns textinput.Blink.
+	// The main Update loop will handle textinput.Blink if the input field itself is updated.
 }
 
 
@@ -277,17 +278,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 
-	// Helper to navigate back to TaskManagementView from form
 	goBackToTaskManagementView := func() tea.Model {
 		m.currentView = app.TaskManagementView
 		m.list.Title = app.TaskManagementView.String()
-		m.taskFormInputs = make(map[string]textinput.Model) // Clear form
+		m.taskFormInputs = make(map[string]textinput.Model)
 		m.taskFormFocusedField = ""
-		m.isLoading = true // To show loading for task list
+		m.isLoading = true
 		cmds = append(cmds, m.loadAndDisplayTasks())
 		return m
 	}
-
 
 	goBackToMainMenu := func() tea.Model {
 		m.currentView = app.MainMenuView
@@ -351,8 +350,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					default: setPlaceholderView(selected.targetView)
 					}
 				}
-			} else if key.Matches(msg, m.keys.Back) { return m, tea.Quit }
-			m.list, cmd = m.list.Update(msg); cmds = append(cmds, cmd)
+			} else if key.Matches(msg, m.keys.Back) { return m, tea.Quit
+			} else { // Default list navigation for main menu
+				m.list, cmd = m.list.Update(msg); cmds = append(cmds, cmd)
+			}
+
 
 		case app.TaskManagementView:
 			if key.Matches(msg, m.keys.AddTask) {
@@ -360,6 +362,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentView = app.CreateTaskFormView
 				m.list.Title = app.CreateTaskFormView.String()
 				m.isLoading = false
+				// Focus command for the first field in the form
+				if len(m.taskFormOrder) > 0 && m.taskFormInputs[m.taskFormOrder[0]].Focused() {
+					cmds = append(cmds, textinput.Blink) // textinput.Blink is often used
+				}
 			} else if key.Matches(msg, m.keys.CompleteTask) { handleTaskCompletion()
 			} else if key.Matches(msg, m.keys.Back) { return goBackToMainMenu(), tea.Batch(cmds...)
 			} else {
@@ -372,14 +378,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list, cmd = m.list.Update(msg); cmds = append(cmds, cmd)
 
 		case app.CreateTaskFormView:
-			if key.Matches(msg, m.keys.Back) { // Esc to cancel form
+			if key.Matches(msg, m.keys.Back) {
 				return goBackToTaskManagementView(), tea.Batch(cmds...)
 			} else if key.Matches(msg, m.keys.NextField) {
 				m.changeFormFocus(true)
+				// Ensure the focused input's cursor blinks
+				cmds = append(cmds, textinput.Blink)
 			} else if key.Matches(msg, m.keys.PrevField) {
 				m.changeFormFocus(false)
-			} else if key.Matches(msg, m.keys.Select) { // Enter to submit
-				// Validation
+				cmds = append(cmds, textinput.Blink)
+			} else if key.Matches(msg, m.keys.Select) {
 				title := m.taskFormInputs[taskFormFieldTitle].Value()
 				if title == "" {
 					m.statusMessage = "Título da tarefa é obrigatório."
@@ -412,7 +420,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					classID = &cid
 				}
 
-				// Call service
 				_, err := m.taskService.CreateTask(context.Background(), title, description, classID, dueDate)
 				if err != nil {
 					m.statusMessage = fmt.Sprintf("Erro ao criar tarefa: %v", err)
@@ -420,10 +427,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					m.statusMessage = fmt.Sprintf("Tarefa '%s' criada com sucesso!", title)
 					cmds = append(cmds, setStatusMessageCmd())
-					// Return to task list view after successful creation
 					return goBackToTaskManagementView(), tea.Batch(cmds...)
 				}
-			} else { // Default: pass key to focused input
+			} else {
 				if ti, ok := m.taskFormInputs[m.taskFormFocusedField]; ok {
 					var inputCmd tea.Cmd
 					newTi, inputCmd := ti.Update(msg)
@@ -431,7 +437,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, inputCmd)
 				}
 			}
-
 
 		case app.ClassManagementView:
 			if key.Matches(msg, m.keys.Select) {
@@ -456,6 +461,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case app.AssessmentManagementView, app.QuestionBankView, app.ProofGenerationView:
 			if key.Matches(msg, m.keys.Back) { return goBackToMainMenu(), tea.Batch(cmds...) }
 			m.list, cmd = m.list.Update(msg); cmds = append(cmds, cmd)
+		default: // Ensure list updates for any other view not explicitly handled for keys
+			if !m.isLoading {
+				m.list, cmd = m.list.Update(msg)
+				cmds = append(cmds, cmd)
+			}
 		}
 
 	case spinner.TickMsg:
@@ -502,21 +512,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		h, v := docStyle.GetFrameSize(); statusMessageHeight := 0
 		if m.statusMessage != "" { statusMessageHeight = lipgloss.Height(statusMessageStyle.Render(m.statusMessage)) +1 }
 
-		inputWidth := msg.Width - h - 4 // Default width for inputs
+		inputWidth := msg.Width - h - 4
 		if m.currentView == app.CreateTaskFormView {
 			for k := range m.taskFormInputs {
 				ti := m.taskFormInputs[k]
-				// Customize width per field if needed, e.g., description longer
 				if k == taskFormFieldDescription {
-					ti.Width = inputWidth // Or a larger fixed value
+					ti.Width = inputWidth
 				} else if k == taskFormFieldDueDate || k == taskFormFieldClassID {
-					ti.Width = inputWidth / 2 // Shorter fields
+					ti.Width = inputWidth / 2
 				} else {
 					ti.Width = inputWidth
 				}
 				m.taskFormInputs[k] = ti
 			}
-		} else { // For list-based views
+		} else {
 			listHeight := msg.Height - v - lipgloss.Height(m.headerView()) - lipgloss.Height(m.footerView()) - statusMessageHeight
 			m.list.SetSize(msg.Width-h, listHeight)
 		}
@@ -532,7 +541,7 @@ func (m Model) View() string {
 	sb.WriteString(m.headerView() + "\n")
 	if m.statusMessage != "" { sb.WriteString(statusMessageStyle.Render(m.statusMessage) + "\n") }
 
-	if m.isLoading && m.currentView != app.CreateTaskFormView { // Don't show general loading for form view
+	if m.isLoading && m.currentView != app.CreateTaskFormView {
 		title := m.list.Title; if title == "" { title = m.currentView.String() }
 		sb.WriteString(fmt.Sprintf("\n%s Carregando %s...", m.spinner.View(), title))
 	} else {
@@ -543,7 +552,9 @@ func (m Model) View() string {
 		if m.currentView == app.CreateTaskFormView {
 			formContent := []string{}
 			for _, fieldName := range m.taskFormOrder {
-				inputModel := m.taskFormInputs[fieldName]
+				inputModel, found := m.taskFormInputs[fieldName]
+				if !found { continue } // Should not happen if form is initialized correctly
+
 				label := ""
 				switch fieldName {
 				case taskFormFieldTitle: label = "Título:"
@@ -551,12 +562,8 @@ func (m Model) View() string {
 				case taskFormFieldDueDate: label = "Prazo (AAAA-MM-DD):"
 				case taskFormFieldClassID: label = "ID da Turma:"
 				}
-				// Apply focus/blur styles to prompt, not placeholder
-				if inputModel.Focused() {
-					inputModel.PromptStyle = focusedInputStyle
-				} else {
-					inputModel.PromptStyle = blurredInputStyle
-				}
+
+				// Style is now set during focus change, direct view call
 				formContent = append(formContent, labelStyle.Render(label))
 				formContent = append(formContent, inputModel.View()+"\n")
 			}
@@ -589,7 +596,7 @@ func (m Model) footerView() string {
 		parts = append(parts, m.keys.NextField.Help().Key+": "+m.keys.NextField.Help().Desc)
 		parts = append(parts, m.keys.PrevField.Help().Key+": "+m.keys.PrevField.Help().Desc)
 		parts = append(parts, m.keys.Select.Help().Key+": submeter")
-	} else { // For list based views
+	} else {
 		parts = append(parts, m.keys.Up.Help().Key+"/"+m.keys.Down.Help().Key+": "+m.keys.Up.Help().Desc)
 		parts = append(parts, m.keys.Select.Help().Key+": "+m.keys.Select.Help().Desc)
 	}
