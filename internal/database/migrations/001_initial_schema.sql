@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS classes (
     user_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
     name TEXT NOT NULL, -- Ex: "Turma 9A - 2025"
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
 );
@@ -25,8 +23,6 @@ CREATE TABLE IF NOT EXISTS students (
     full_name TEXT NOT NULL,
     enrollment_id TEXT, -- Número de Matrícula/Chamada
     status TEXT NOT NULL DEFAULT 'ativo', -- Valores permitidos: 'ativo', 'inativo', 'transferido'
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE
 );
 CREATE TABLE IF NOT EXISTS lessons (

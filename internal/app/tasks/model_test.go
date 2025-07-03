@@ -35,14 +35,6 @@ func (m *MockTaskService) ListAllTasks(ctx context.Context) ([]models.Task, erro
 	return nil, args.Error(1)
 }
 
-func (m *MockTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task, error) {
-	args := m.Called(ctx)
-	if tasks, ok := args.Get(0).([]models.Task); ok {
-		return tasks, args.Error(1)
-	}
-	return nil, args.Error(1)
-}
-
 func (m *MockTaskService) ListActiveTasksByClass(ctx context.Context, classID int64) ([]models.Task, error) {
 	args := m.Called(ctx, classID)
 	if tasks, ok := args.Get(0).([]models.Task); ok {
@@ -123,14 +115,12 @@ func TestTasksModel_KeyBindings_InTableView_TabFocusSwitch(t *testing.T) {
 	assert.True(t, model.pendingTasksTable.Focused())
 	assert.False(t, model.completedTasksTable.Focused())
 
-	updatedModelTea, _ := model.Update(tea.KeyMsg{Type: tea.KeyTab})
-	model = updatedModelTea.(*Model)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
 	assert.Equal(t, CompletedTableFocus, model.focusedTable)
 	assert.False(t, model.pendingTasksTable.Focused())
 	assert.True(t, model.completedTasksTable.Focused())
 
-	updatedModelTea2, _ := model.Update(tea.KeyMsg{Type: tea.KeyTab})
-	model = updatedModelTea2.(*Model)
+	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
 	assert.Equal(t, PendingTableFocus, model.focusedTable)
 	assert.True(t, model.pendingTasksTable.Focused())
 	assert.False(t, model.completedTasksTable.Focused())
@@ -157,23 +147,18 @@ func TestTasksModel_MarkTaskCompleted_MovesToCompletedTable(t *testing.T) {
 	completedTask.IsCompleted = true
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{completedTask}, nil).Once()
 
-	updatedModelTea, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
-	model = updatedModelTea.(*Model)
+	model, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
 	assert.True(t, model.isLoading)
 	assert.NotNil(t, cmd)
 
 	msg := cmd()
 	assert.IsType(t, taskMarkedCompletedMsg{}, msg)
-	updatedModelTea2, cmd := model.Update(msg)
-	model = updatedModelTea2.(*Model)
-
+	model, cmd = model.Update(msg)
 
 	assert.NotNil(t, cmd)
-	msg = cmd() // This is tasksLoadedMsg from refresh
+	msg = cmd()
 	assert.IsType(t, tasksLoadedMsg{}, msg)
-	updatedModelTea3, _ := model.Update(msg)
-	model = updatedModelTea3.(*Model)
-
+	model, _ = model.Update(msg)
 
 	assert.False(t, model.isLoading)
 	assert.Len(t, model.pendingTasksTable.Rows(), 0, "Pending table should be empty")

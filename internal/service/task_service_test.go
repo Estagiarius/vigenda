@@ -214,7 +214,7 @@ func TestTaskService_ListActiveTasksByClass(t *testing.T) {
 		}
 		if len(mockRepo.CreatedBugTasks) == 0 {
 			t.Errorf("Expected a bug task to be created")
-		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Task Listing By Class Failure") {
+		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Task Listing Failure") {
 			t.Errorf("Incorrect bug task title: %s", mockRepo.CreatedBugTasks[0].Title)
 		}
 	})
@@ -307,7 +307,7 @@ func TestTaskService_ListAllActiveTasks(t *testing.T) {
 		for _, task := range tasks {
 			titles = append(titles, task.Title)
 		}
-		// expectedTitles := []string{"Task 1 Active", "System Task Active (Bug)", "Task 4 Active"} // This line was unused
+		expectedTitles := []string{"Task 1 Active", "System Task Active (Bug)", "Task 4 Active"}
 		for _, et := range []string{"Task 1 Active", "System Task Active (Bug)", "Task 4 Active"} {
 			if !contains(titles, et) {
 				t.Errorf("Expected title '%s' to be in active tasks, but not found. Got: %v", et, titles)

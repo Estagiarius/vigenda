@@ -41,8 +41,6 @@ Armazena as turmas associadas a uma disciplina de um usuário.
     -   `subject_id` (INTEGER, NOT NULL): Chave estrangeira referenciando `subjects(id)`. Indica a qual disciplina esta turma pertence.
         -   `ON DELETE CASCADE`: Se uma disciplina for deletada, suas turmas também serão.
     -   `name` (TEXT, NOT NULL): Nome da turma (ex: "Turma 9A - 2025", "Cálculo I - Engenharia Civil").
-    -   `created_at` (TIMESTAMP, NOT NULL, DEFAULT CURRENT_TIMESTAMP): Data e hora de criação do registro.
-    -   `updated_at` (TIMESTAMP, NOT NULL, DEFAULT CURRENT_TIMESTAMP): Data e hora da última atualização do registro.
 
 ### 4. `students`
 
@@ -56,8 +54,6 @@ Armazena informações sobre os estudantes de uma turma.
     -   `full_name` (TEXT, NOT NULL): Nome completo do estudante.
     -   `enrollment_id` (TEXT): Número de matrícula ou de chamada do estudante (opcional).
     -   `status` (TEXT, NOT NULL, DEFAULT 'ativo'): Situação do estudante na turma. Valores permitidos incluem 'ativo', 'inativo', 'transferido'.
-    -   `created_at` (TIMESTAMP, NOT NULL, DEFAULT CURRENT_TIMESTAMP): Data e hora de criação do registro.
-    -   `updated_at` (TIMESTAMP, NOT NULL, DEFAULT CURRENT_TIMESTAMP): Data e hora da última atualização do registro.
 
 ### 5. `lessons`
 

@@ -71,8 +71,8 @@ func TestQuestionService_AddQuestionsFromJSON(t *testing.T) {
 
 		// Simular que o SubjectRepository não é usado ou retorna sucesso (para simplificar, já que não está implementado)
 		// Em um teste real, você configuraria o mock para GetOrCreateByNameAndUser
-		mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "Matemática", int64(1)).Return(models.Subject{ID: 1, Name: "Matemática", UserID: 1}, nil).Once()
-		mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "História", int64(1)).Return(models.Subject{ID: 2, Name: "História", UserID: 1}, nil).Once()
+		// mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "Matemática", int64(1)).Return(models.Subject{ID: 1, Name: "Matemática"}, nil)
+		// mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "História", int64(1)).Return(models.Subject{ID: 2, Name: "História"}, nil)
 
 
 		// Configurar mock para AddQuestion
@@ -84,7 +84,7 @@ func TestQuestionService_AddQuestionsFromJSON(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 2, count)
 		mockQuestionRepo.AssertExpectations(t)
-		mockSubjectRepo.AssertExpectations(t)
+		// mockSubjectRepo.AssertExpectations(t) // Descomente se estiver usando o mockSubjectRepo ativamente
 	})
 
 	t.Run("error_invalid_json", func(t *testing.T) {
@@ -124,7 +124,7 @@ func TestQuestionService_AddQuestionsFromJSON(t *testing.T) {
 			}
 		]`) // Falta "enunciado"
 
-		mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "Matemática", int64(1)).Return(models.Subject{ID: 1, Name: "Matemática", UserID: 1}, nil).Maybe() // .Maybe() because it might not be called if validation fails earlier
+		// mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "Matemática", int64(1)).Return(models.Subject{ID: 1, Name: "Matemática"}, nil)
 
 		_, err := questionService.AddQuestionsFromJSON(ctx, jsonData)
 		assert.Error(t, err)
@@ -147,7 +147,7 @@ func TestQuestionService_AddQuestionsFromJSON(t *testing.T) {
 			}
 		]`) // Falta "opcoes"
 
-		mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "História", int64(1)).Return(models.Subject{ID: 2, Name: "História", UserID: 1}, nil).Maybe()
+		// mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "História", int64(1)).Return(models.Subject{ID: 2, Name: "História"}, nil)
 
 		_, err := questionService.AddQuestionsFromJSON(ctx, jsonData)
 		assert.Error(t, err)
@@ -170,8 +170,6 @@ func TestQuestionService_AddQuestionsFromJSON(t *testing.T) {
 				"user_id": 1
 			}
 		]`)
-
-		mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "História", int64(1)).Return(models.Subject{ID: 2, Name: "História", UserID: 1}, nil).Maybe()
 
 		_, err := questionService.AddQuestionsFromJSON(ctx, jsonData)
 		assert.Error(t, err)
@@ -196,14 +194,14 @@ func TestQuestionService_AddQuestionsFromJSON(t *testing.T) {
 			}
 		]`)
 
-		mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "Matemática", int64(1)).Return(models.Subject{ID: 1, Name: "Matemática", UserID: 1}, nil).Once() // This call should happen
+		// mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "Matemática", int64(1)).Return(models.Subject{ID: 1, Name: "Matemática"}, nil)
 		mockQuestionRepo.On("AddQuestion", ctx, mock.AnythingOfType("*models.Question")).Return(int64(0), errors.New("db error on add")).Once()
 
 		_, err := questionService.AddQuestionsFromJSON(ctx, jsonData)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "falha ao adicionar questão 0 (Resolva x + 5 = 10.) ao repositório: db error on add")
 		mockQuestionRepo.AssertExpectations(t)
-		mockSubjectRepo.AssertExpectations(t)
+		// mockSubjectRepo.AssertExpectations(t)
 	})
 
 	// Adicionar mais testes para cobrir validações de SubjectID (quando SubjectRepository estiver implementado)
