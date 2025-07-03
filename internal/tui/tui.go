@@ -90,10 +90,19 @@ func NewTUIModel(cs service.ClassService) Model {
 
 func (m *Model) loadInitialData() {
 	m.isLoading = true
-	// Initially, we might load main menu items or directly classes if that's the primary view
-	// For "Gerenciar Turmas e Alunos", we start by listing classes.
-	m.currentView = app.ClassManagementView // Set to class management view for now
-	m.loadClasses()
+	m.currentView = app.DashboardView // Start with Dashboard view
+
+	items := []list.Item{
+		listItemMenuItem{title: "Gerar Provas", description: "Gerar provas para turmas", targetView: app.ProofGenerationView},
+		listItemMenuItem{title: "Gerenciar Turmas e Alunos", description: "Visualizar e gerenciar turmas e alunos", targetView: app.ClassManagementView},
+		// Add other dashboard items here
+	}
+
+	m.list = list.New(items, list.NewDefaultDelegate(), 0, 0)
+	m.list.Title = "Painel Principal"
+	m.list.SetShowHelp(false)
+	m.isLoading = false
+	// No initial command needed for dashboard, it's just a static list.
 }
 
 func (m *Model) loadClasses() tea.Cmd {
@@ -129,7 +138,9 @@ func (m *Model) loadStudentsForClass(classID int64) tea.Cmd {
 // Init initializes the TUI model.
 func (m Model) Init() tea.Cmd {
 	// return m.spinner.Tick // Start spinner if initially loading
-	return tea.Batch(m.spinner.Tick, m.loadClasses())
+	// No initial data loading command if starting at dashboard.
+	// loadInitialData is called by NewTUIModel synchronously now.
+	return m.spinner.Tick
 }
 
 // Update handles messages and updates the TUI model.
@@ -150,6 +161,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			selectedItem := m.list.SelectedItem()
 			if selectedItem != nil {
 				switch m.currentView {
+				case app.DashboardView:
+					if menuItem, ok := selectedItem.(listItemMenuItem); ok {
+						m.currentView = menuItem.targetView
+						if m.currentView == app.ClassManagementView {
+							// Clear selected class when navigating to class management from dashboard
+							m.selectedClass = nil
+							cmds = append(cmds, m.loadClasses())
+						} else if m.currentView == app.ProofGenerationView {
+							// For ProofGenerationView, we might need to set up a specific list or view
+							// For now, just changing the view is enough, the View() method will handle the display.
+							// We can create a placeholder list for ProofGenerationView if needed.
+							// For example, m.list.Title = "Gerar Provas"
+							// m.list.SetItems([]list.Item{listItemMenuItem{title: "Placeholder Item"}})
+							// Placeholder:
+							m.list.Title = "Gerar Provas (WIP)"
+							m.list.SetItems([]list.Item{}) // Empty list for now
+						}
+					}
 				case app.ClassManagementView:
 					if class, ok := selectedItem.(listItemClass); ok {
 						m.selectedClass = &class.Class
@@ -164,14 +193,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.currentView == app.View(99) { // Student view
 				m.currentView = app.ClassManagementView
 				m.selectedClass = nil
-				// Reload classes to reset the list
-				cmds = append(cmds, m.loadClasses())
-			} else if m.currentView == app.ProofGenerationView {
+				cmds = append(cmds, m.loadClasses()) // Reload classes to reset the list
+			} else if m.currentView == app.ProofGenerationView || m.currentView == app.ClassManagementView {
 				m.currentView = app.DashboardView
-			} else if m.currentView == app.ClassManagementView {
-				// TODO: Go back to a previous menu or exit if this is the top level
-				// For now, quit if at class view and back is pressed.
-				// return m, tea.Quit
+				m.selectedClass = nil // Clear selected class if any
+				// Reload dashboard items
+				// Re-calling loadInitialData will reset the view to dashboard and its items
+				m.loadInitialData()
+				// No cmd needed here as loadInitialData is synchronous and updates m.list
 			}
 		}
 
@@ -191,7 +220,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.list = list.New(items, list.NewDefaultDelegate(), 0, 0)
 		m.list.Title = "Turmas"
-		m.list.SetShowHelp(false) // We'll use our own help display
+		m.list.SetShowHelp(false)
 		log.Printf("TUI: Update - Lista de turmas atualizada com %d itens.", len(items))
 
 	case studentsLoadedMsg:
@@ -243,7 +272,9 @@ func (m Model) View() string {
 
 	if m.isLoading {
 		loadingText := fmt.Sprintf("%s Carregando...", m.spinner.View())
-		if m.currentView == app.ClassManagementView && len(m.classes) == 0 {
+		if m.currentView == app.DashboardView {
+			// No specific loading message for dashboard, spinner is enough.
+		} else if m.currentView == app.ClassManagementView && len(m.classes) == 0 {
 			loadingText += "\n\nNenhuma turma encontrada ainda."
 		} else if m.currentView == app.View(99) && len(m.students) == 0 && m.selectedClass != nil {
 			loadingText += fmt.Sprintf("\n\nNenhum aluno encontrado para a turma %s.", m.selectedClass.Name)
@@ -258,8 +289,19 @@ func (m Model) View() string {
 func (m Model) headerView() string {
 	var title string
 	switch m.currentView {
+	case app.DashboardView:
+		title = titleStyle.Render("Painel Principal")
 	case app.ClassManagementView:
-		title = titleStyle.Render("Gerenciar Turmas")
+		if m.selectedClass == nil { // Ensure title is "Gerenciar Turmas" if no class is selected (e.g. coming from dashboard)
+			title = titleStyle.Render("Gerenciar Turmas")
+		} else {
+			// This case should ideally not be reached if selectedClass is non-nil
+			// and currentView is ClassManagementView. It implies student view.
+			// However, to be safe:
+			title = titleStyle.Render(fmt.Sprintf("Turma: %s", m.selectedClass.Name))
+		}
+	case app.ProofGenerationView:
+		title = titleStyle.Render("Gerar Provas")
 	case app.View(99): // Student view
 		if m.selectedClass != nil {
 			title = titleStyle.Render(fmt.Sprintf("Alunos - %s", m.selectedClass.Name))
@@ -278,6 +320,16 @@ func (m Model) footerView() string {
 }
 
 // Custom list items
+type listItemMenuItem struct {
+	title       string
+	description string
+	targetView  app.View
+}
+
+func (lim listItemMenuItem) Title() string       { return lim.title }
+func (lim listItemMenuItem) Description() string { return lim.description }
+func (lim listItemMenuItem) FilterValue() string { return lim.title }
+
 type listItemClass struct {
 	models.Class
 }
