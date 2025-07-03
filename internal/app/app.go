@@ -14,7 +14,9 @@ import (
 	"vigenda/internal/app/proofs"      // Import for the proofs module
 	"vigenda/internal/app/questions"   // Import for the questions module
 	"vigenda/internal/app/tasks"       // Import for the tasks module
-	"vigenda/internal/service"         // Import for service interfaces
+	"vigenda/internal/service" // Import for service interfaces
+	// Ensure proofs package is imported if not already, for GoBackToDashboardMsg
+	// "vigenda/internal/app/proofs" // This line might already exist or be handled by goimports
 )
 
 var (
@@ -204,6 +206,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		// Default case for the first switch: if the msg type wasn't WindowSizeMsg, KeyMsg (for dashboard), or error,
 		// it will fall through to the submodel delegation logic.
+
+	case proofs.GoBackToDashboardMsg: // Handle message from proofs model
+		m.currentView = DashboardView
+		log.Println("AppModel: Voltando para DashboardView a partir de ProofGenerationView (via GoBackToDashboardMsg).")
+		// Optional: Reset list selection or other dashboard state if necessary
+		// m.list.ResetFilter()
+		// m.list.ResetSelected()
+		return m, nil // No further command needed from here for this action
 	}
 
 	// Second stage: Delegate message to the active submodel if not handled above
