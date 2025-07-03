@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"strconv" // Added for parsing ClassID
 	"strings"
 	"time"
 	"vigenda/internal/app"
@@ -15,6 +16,7 @@ import (
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -27,28 +29,45 @@ var (
 	deselectedStyle    = lipgloss.NewStyle().PaddingLeft(1)
 	helpStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("240")) // Gray
 	statusMessageStyle = lipgloss.NewStyle().MarginTop(1).MarginBottom(1).Foreground(lipgloss.Color("202"))
+	focusedInputStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	blurredInputStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	labelStyle         = lipgloss.NewStyle().Bold(true).MarginRight(1)
 )
 
 // KeyMap
 type KeyMap struct {
 	Up           key.Binding
 	Down         key.Binding
-	Select       key.Binding
-	Back         key.Binding
+	Select       key.Binding // Also used for Submit in forms
+	Back         key.Binding // Also used for Cancel in forms
 	Quit         key.Binding
 	Help         key.Binding
 	CompleteTask key.Binding
+	AddTask      key.Binding
+	NextField    key.Binding
+	PrevField    key.Binding
 }
 
 var DefaultKeyMap = KeyMap{
 	Up:           key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("↑/k", "cima")),
 	Down:         key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("↓/j", "baixo")),
-	Select:       key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "slcnar")),
-	Back:         key.NewBinding(key.WithKeys("esc", "backspace"), key.WithHelp("esc", "voltar")),
+	Select:       key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "slcnar/submeter")),
+	Back:         key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "voltar/cancelar")), // Unified Back/Cancel
 	Quit:         key.NewBinding(key.WithKeys("ctrl+c", "q"), key.WithHelp("q/ctrl+c", "sair")),
 	Help:         key.NewBinding(key.WithKeys("?"), key.WithHelp("?", "ajuda")),
 	CompleteTask: key.NewBinding(key.WithKeys("x", "c"), key.WithHelp("x/c", "concluir")),
+	AddTask:      key.NewBinding(key.WithKeys("a"), key.WithHelp("a", "add tarefa")),
+	NextField:    key.NewBinding(key.WithKeys("tab"), key.WithHelp("tab", "próx. campo")),
+	PrevField:    key.NewBinding(key.WithKeys("shift+tab"), key.WithHelp("shift+tab", "campo ant.")),
 }
+
+// Constants for task form fields
+const (
+	taskFormFieldTitle       = "title"
+	taskFormFieldDescription = "description"
+	taskFormFieldDueDate     = "dueDate"
+	taskFormFieldClassID     = "classID"
+)
 
 // Model
 type Model struct {
@@ -68,6 +87,9 @@ type Model struct {
 	dashboardItems    []list.Item
 	upcomingTasks     []models.Task
 	selectedClass     *models.Class
+	taskFormInputs       map[string]textinput.Model
+	taskFormFocusedField string
+	taskFormOrder        []string
 }
 
 // mainMenuItem
@@ -88,6 +110,14 @@ func NewTUIModel(cs service.ClassService, ts service.TaskService, as service.Ass
 	delegate := list.NewDefaultDelegate()
 	mainList := list.New(nil, delegate, 0, 0)
 	mainList.SetShowHelp(false)
+
+	formOrder := []string{
+		taskFormFieldTitle,
+		taskFormFieldDescription,
+		taskFormFieldDueDate,
+		taskFormFieldClassID,
+	}
+
 	m := Model{
 		classService:      cs,
 		taskService:       ts,
@@ -97,21 +127,62 @@ func NewTUIModel(cs service.ClassService, ts service.TaskService, as service.Ass
 		currentView:       app.MainMenuView,
 		isLoading:         false,
 		list:              mainList,
+		taskFormInputs:    make(map[string]textinput.Model),
+		taskFormOrder:     formOrder,
 	}
 	log.Println("TUI: NewTUIModel - currentView:", m.currentView.String())
 	return m
 }
 
+func (m *Model) initializeTaskForm() {
+	m.taskFormInputs = make(map[string]textinput.Model)
+	var ti textinput.Model
+
+	ti = textinput.New()
+	ti.Placeholder = "Título da Tarefa (obrigatório)"
+	ti.CharLimit = 120; ti.Width = 50
+	ti.PromptStyle = focusedInputStyle
+	m.taskFormInputs[taskFormFieldTitle] = ti
+
+	ti = textinput.New()
+	ti.Placeholder = "Descrição (opcional)"
+	ti.CharLimit = 256; ti.Width = 50
+	ti.PromptStyle = blurredInputStyle
+	m.taskFormInputs[taskFormFieldDescription] = ti
+
+	ti = textinput.New()
+	ti.Placeholder = "AAAA-MM-DD (opcional)"
+	ti.CharLimit = 10; ti.Width = 20
+	ti.PromptStyle = blurredInputStyle
+	m.taskFormInputs[taskFormFieldDueDate] = ti
+
+	ti = textinput.New()
+	ti.Placeholder = "ID da Turma (opcional, numérico)"
+	ti.CharLimit = 10; ti.Width = 20
+	ti.PromptStyle = blurredInputStyle
+	m.taskFormInputs[taskFormFieldClassID] = ti
+
+	if len(m.taskFormOrder) > 0 {
+		m.taskFormFocusedField = m.taskFormOrder[0]
+		focusedInput := m.taskFormInputs[m.taskFormFocusedField]
+		focusedInput.Focus()
+		m.taskFormInputs[m.taskFormFocusedField] = focusedInput
+	}
+    m.list.SetItems(nil)
+    m.statusMessage = ""
+    m.err = nil
+}
+
+
 const statusMessageDuration = 3 * time.Second
 type clearStatusMessageMsg struct{}
 
-func setStatusMessageCmd(duration time.Duration) tea.Cmd {
-	return tea.Tick(duration, func(t time.Time) tea.Msg {
+func setStatusMessageCmd() tea.Cmd { // Removed duration, using const
+	return tea.Tick(statusMessageDuration, func(t time.Time) tea.Msg {
 		return clearStatusMessageMsg{}
 	})
 }
 
-// Command/Data Loading functions
 func (m *Model) loadMainMenuItemsCmd() tea.Cmd {
 	m.isLoading = true
 	return func() tea.Msg {
@@ -127,14 +198,14 @@ func (m *Model) loadMainMenuItemsCmd() tea.Cmd {
 	}
 }
 
-func (m *Model) loadAndDisplayTasks() tea.Cmd { // Renamed from loadDashboardData for clarity
+func (m *Model) loadAndDisplayTasks() tea.Cmd {
 	m.isLoading = true
 	return func() tea.Msg {
 		tasks, err := m.taskService.ListAllActiveTasks(context.Background())
 		if err != nil {
 			return errMsg{err: err, context: "loading tasks for view"}
 		}
-		return tasksForViewLoadedMsg(tasks) // New message type
+		return tasksForViewLoadedMsg(tasks)
 	}
 }
 
@@ -160,7 +231,6 @@ func (m *Model) loadStudentsForClass(classID int64) tea.Cmd {
 	}
 }
 
-// Init
 func (m Model) Init() tea.Cmd {
 	var initialCmd tea.Cmd
 	if m.currentView == app.MainMenuView {
@@ -172,16 +242,60 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, initialCmd)
 }
 
-// Update
+// Helper to change focus in form
+func (m *Model) changeFormFocus(forward bool) {
+    currentIndex := -1
+    for i, fieldName := range m.taskFormOrder {
+        if fieldName == m.taskFormFocusedField {
+            currentIndex = i
+            break
+        }
+    }
+
+    // Blur current
+    input := m.taskFormInputs[m.taskFormFocusedField]
+    input.Blur()
+	input.PromptStyle = blurredInputStyle
+    m.taskFormInputs[m.taskFormFocusedField] = input
+
+    if forward {
+        currentIndex = (currentIndex + 1) % len(m.taskFormOrder)
+    } else {
+        currentIndex = (currentIndex - 1 + len(m.taskFormOrder)) % len(m.taskFormOrder)
+    }
+
+    // Focus next
+    m.taskFormFocusedField = m.taskFormOrder[currentIndex]
+    input = m.taskFormInputs[m.taskFormFocusedField]
+    input.Focus()
+	input.PromptStyle = focusedInputStyle
+    m.taskFormInputs[m.taskFormFocusedField] = input
+}
+
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
+
+	// Helper to navigate back to TaskManagementView from form
+	goBackToTaskManagementView := func() tea.Model {
+		m.currentView = app.TaskManagementView
+		m.list.Title = app.TaskManagementView.String()
+		m.taskFormInputs = make(map[string]textinput.Model) // Clear form
+		m.taskFormFocusedField = ""
+		m.isLoading = true // To show loading for task list
+		cmds = append(cmds, m.loadAndDisplayTasks())
+		return m
+	}
+
 
 	goBackToMainMenu := func() tea.Model {
 		m.currentView = app.MainMenuView
 		m.list.Title = app.MainMenuView.String()
 		m.statusMessage = ""
 		m.dashboardItems = nil; m.upcomingTasks = nil; m.classes = nil; m.students = nil; m.selectedClass = nil
+		m.taskFormInputs = make(map[string]textinput.Model)
+		m.taskFormFocusedField = ""
 		cmds = append(cmds, m.loadMainMenuItemsCmd())
 		return m
 	}
@@ -203,10 +317,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.statusMessage = fmt.Sprintf("Tarefa '%s' concluída!", taskItem.Title())
 				m.isLoading = true
-				// Reload tasks for the current view (Dashboard or TaskManagement)
 				cmds = append(cmds, m.loadAndDisplayTasks())
 			}
-			cmds = append(cmds, setStatusMessageCmd(statusMessageDuration))
+			cmds = append(cmds, setStatusMessageCmd())
 		}
 	}
 
@@ -221,7 +334,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if ok {
 					m.list.SetItems(nil); m.isLoading = true; m.statusMessage = ""
 					switch selected.targetView {
-					case app.DashboardView, app.TaskManagementView: // Both will list tasks for now
+					case app.DashboardView:
+						m.currentView = selected.targetView
+						m.list.Title = selected.targetView.String()
+						cmds = append(cmds, m.loadAndDisplayTasks())
+					case app.TaskManagementView:
 						m.currentView = selected.targetView
 						m.list.Title = selected.targetView.String()
 						cmds = append(cmds, m.loadAndDisplayTasks())
@@ -237,10 +354,84 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if key.Matches(msg, m.keys.Back) { return m, tea.Quit }
 			m.list, cmd = m.list.Update(msg); cmds = append(cmds, cmd)
 
-		case app.DashboardView, app.TaskManagementView: // Combined logic for task listing views
+		case app.TaskManagementView:
+			if key.Matches(msg, m.keys.AddTask) {
+				m.initializeTaskForm()
+				m.currentView = app.CreateTaskFormView
+				m.list.Title = app.CreateTaskFormView.String()
+				m.isLoading = false
+			} else if key.Matches(msg, m.keys.CompleteTask) { handleTaskCompletion()
+			} else if key.Matches(msg, m.keys.Back) { return goBackToMainMenu(), tea.Batch(cmds...)
+			} else {
+				m.list, cmd = m.list.Update(msg); cmds = append(cmds, cmd)
+			}
+
+		case app.DashboardView:
 			if key.Matches(msg, m.keys.CompleteTask) { handleTaskCompletion() }
-			if key.Matches(msg, m.keys.Back) { return goBackToMainMenu(), tea.Batch(cmds...) }
+			else if key.Matches(msg, m.keys.Back) { return goBackToMainMenu(), tea.Batch(cmds...) }
 			m.list, cmd = m.list.Update(msg); cmds = append(cmds, cmd)
+
+		case app.CreateTaskFormView:
+			if key.Matches(msg, m.keys.Back) { // Esc to cancel form
+				return goBackToTaskManagementView(), tea.Batch(cmds...)
+			} else if key.Matches(msg, m.keys.NextField) {
+				m.changeFormFocus(true)
+			} else if key.Matches(msg, m.keys.PrevField) {
+				m.changeFormFocus(false)
+			} else if key.Matches(msg, m.keys.Select) { // Enter to submit
+				// Validation
+				title := m.taskFormInputs[taskFormFieldTitle].Value()
+				if title == "" {
+					m.statusMessage = "Título da tarefa é obrigatório."
+					cmds = append(cmds, setStatusMessageCmd())
+					return m, tea.Batch(cmds...)
+				}
+				description := m.taskFormInputs[taskFormFieldDescription].Value()
+				dueDateStr := m.taskFormInputs[taskFormFieldDueDate].Value()
+				classIDStr := m.taskFormInputs[taskFormFieldClassID].Value()
+
+				var dueDate *time.Time
+				if dueDateStr != "" {
+					parsedDate, err := time.Parse("2006-01-02", dueDateStr)
+					if err != nil {
+						m.statusMessage = fmt.Sprintf("Data de prazo inválida (use AAAA-MM-DD): %v", err)
+						cmds = append(cmds, setStatusMessageCmd())
+						return m, tea.Batch(cmds...)
+					}
+					dueDate = &parsedDate
+				}
+
+				var classID *int64
+				if classIDStr != "" {
+					cid, err := strconv.ParseInt(classIDStr, 10, 64)
+					if err != nil {
+						m.statusMessage = fmt.Sprintf("ID da Turma inválido (deve ser numérico): %v", err)
+						cmds = append(cmds, setStatusMessageCmd())
+						return m, tea.Batch(cmds...)
+					}
+					classID = &cid
+				}
+
+				// Call service
+				_, err := m.taskService.CreateTask(context.Background(), title, description, classID, dueDate)
+				if err != nil {
+					m.statusMessage = fmt.Sprintf("Erro ao criar tarefa: %v", err)
+					cmds = append(cmds, setStatusMessageCmd())
+				} else {
+					m.statusMessage = fmt.Sprintf("Tarefa '%s' criada com sucesso!", title)
+					cmds = append(cmds, setStatusMessageCmd())
+					// Return to task list view after successful creation
+					return goBackToTaskManagementView(), tea.Batch(cmds...)
+				}
+			} else { // Default: pass key to focused input
+				if ti, ok := m.taskFormInputs[m.taskFormFocusedField]; ok {
+					var inputCmd tea.Cmd
+					newTi, inputCmd := ti.Update(msg)
+					m.taskFormInputs[m.taskFormFocusedField] = newTi
+					cmds = append(cmds, inputCmd)
+				}
+			}
+
 
 		case app.ClassManagementView:
 			if key.Matches(msg, m.keys.Select) {
@@ -262,7 +453,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.list, cmd = m.list.Update(msg); cmds = append(cmds, cmd)
 
-		case app.AssessmentManagementView, app.QuestionBankView, app.ProofGenerationView: // Placeholder views
+		case app.AssessmentManagementView, app.QuestionBankView, app.ProofGenerationView:
 			if key.Matches(msg, m.keys.Back) { return goBackToMainMenu(), tea.Batch(cmds...) }
 			m.list, cmd = m.list.Update(msg); cmds = append(cmds, cmd)
 		}
@@ -276,9 +467,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.isLoading = false; m.mainMenuItems = []list.Item(msg)
 		m.list.SetItems(m.mainMenuItems); m.list.Title = app.MainMenuView.String()
 
-	case tasksForViewLoadedMsg: // Handles tasks for Dashboard and TaskManagementView
+	case tasksForViewLoadedMsg:
 		m.isLoading = false; m.upcomingTasks = []models.Task(msg)
-		m.dashboardItems = []list.Item{} // Use dashboardItems for consistency in display
+		m.dashboardItems = []list.Item{}
 		if len(m.upcomingTasks) == 0 {
 			m.dashboardItems = append(m.dashboardItems, placeholderItem{title: "Nenhuma tarefa ativa encontrada."})
 		} else {
@@ -287,7 +478,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		m.list.SetItems(m.dashboardItems)
-		// Title is already set by navigation logic
 
 	case classesLoadedMsg:
 		m.isLoading = false; m.classes = []models.Class(msg)
@@ -311,8 +501,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		h, v := docStyle.GetFrameSize(); statusMessageHeight := 0
 		if m.statusMessage != "" { statusMessageHeight = lipgloss.Height(statusMessageStyle.Render(m.statusMessage)) +1 }
-		listHeight := msg.Height - v - lipgloss.Height(m.headerView()) - lipgloss.Height(m.footerView()) - statusMessageHeight
-		m.list.SetSize(msg.Width-h, listHeight)
+
+		inputWidth := msg.Width - h - 4 // Default width for inputs
+		if m.currentView == app.CreateTaskFormView {
+			for k := range m.taskFormInputs {
+				ti := m.taskFormInputs[k]
+				// Customize width per field if needed, e.g., description longer
+				if k == taskFormFieldDescription {
+					ti.Width = inputWidth // Or a larger fixed value
+				} else if k == taskFormFieldDueDate || k == taskFormFieldClassID {
+					ti.Width = inputWidth / 2 // Shorter fields
+				} else {
+					ti.Width = inputWidth
+				}
+				m.taskFormInputs[k] = ti
+			}
+		} else { // For list-based views
+			listHeight := msg.Height - v - lipgloss.Height(m.headerView()) - lipgloss.Height(m.footerView()) - statusMessageHeight
+			m.list.SetSize(msg.Width-h, listHeight)
+		}
 	}
 	return m, tea.Batch(cmds...)
 }
@@ -325,35 +532,75 @@ func (m Model) View() string {
 	sb.WriteString(m.headerView() + "\n")
 	if m.statusMessage != "" { sb.WriteString(statusMessageStyle.Render(m.statusMessage) + "\n") }
 
-	if m.isLoading {
+	if m.isLoading && m.currentView != app.CreateTaskFormView { // Don't show general loading for form view
 		title := m.list.Title; if title == "" { title = m.currentView.String() }
 		sb.WriteString(fmt.Sprintf("\n%s Carregando %s...", m.spinner.View(), title))
 	} else {
-		if m.currentView == app.DashboardView { // Explicit section title for dashboard
+		if m.currentView == app.DashboardView {
 			sb.WriteString(titleStyle.Copy().Bold(false).Underline(true).Render("Tarefas Pendentes") + "\n")
 		}
-		sb.WriteString(m.list.View())
+
+		if m.currentView == app.CreateTaskFormView {
+			formContent := []string{}
+			for _, fieldName := range m.taskFormOrder {
+				inputModel := m.taskFormInputs[fieldName]
+				label := ""
+				switch fieldName {
+				case taskFormFieldTitle: label = "Título:"
+				case taskFormFieldDescription: label = "Descrição:"
+				case taskFormFieldDueDate: label = "Prazo (AAAA-MM-DD):"
+				case taskFormFieldClassID: label = "ID da Turma:"
+				}
+				// Apply focus/blur styles to prompt, not placeholder
+				if inputModel.Focused() {
+					inputModel.PromptStyle = focusedInputStyle
+				} else {
+					inputModel.PromptStyle = blurredInputStyle
+				}
+				formContent = append(formContent, labelStyle.Render(label))
+				formContent = append(formContent, inputModel.View()+"\n")
+			}
+			sb.WriteString(lipgloss.JoinVertical(lipgloss.Left, formContent...))
+		} else {
+		    sb.WriteString(m.list.View())
+		}
 	}
 	sb.WriteString("\n" + m.footerView())
 	return docStyle.Render(sb.String())
 }
 
 func (m Model) headerView() string {
-	titleStr := m.list.Title; if titleStr == "" { titleStr = m.currentView.String() }
-	if m.currentView == app.StudentListView && m.selectedClass != nil {
-		 titleStr = fmt.Sprintf("%s - %s", app.StudentListView.String(), m.selectedClass.Name)
+	titleStr := ""
+	if m.currentView == app.CreateTaskFormView {
+		titleStr = app.CreateTaskFormView.String()
+	} else {
+		titleStr = m.list.Title
+		if titleStr == "" { titleStr = m.currentView.String() }
+		if m.currentView == app.StudentListView && m.selectedClass != nil {
+			 titleStr = fmt.Sprintf("%s - %s", app.StudentListView.String(), m.selectedClass.Name)
+		}
 	}
 	return titleStyle.Render(titleStr)
 }
 
 func (m Model) footerView() string {
-	parts := []string{
-		m.keys.Up.Help().Key+"/"+m.keys.Down.Help().Key+": "+m.keys.Up.Help().Desc,
-		m.keys.Select.Help().Key+": "+m.keys.Select.Help().Desc,
+	parts := []string{}
+	if m.currentView == app.CreateTaskFormView {
+		parts = append(parts, m.keys.NextField.Help().Key+": "+m.keys.NextField.Help().Desc)
+		parts = append(parts, m.keys.PrevField.Help().Key+": "+m.keys.PrevField.Help().Desc)
+		parts = append(parts, m.keys.Select.Help().Key+": submeter")
+	} else { // For list based views
+		parts = append(parts, m.keys.Up.Help().Key+"/"+m.keys.Down.Help().Key+": "+m.keys.Up.Help().Desc)
+		parts = append(parts, m.keys.Select.Help().Key+": "+m.keys.Select.Help().Desc)
 	}
+
 	if m.currentView == app.DashboardView || m.currentView == app.TaskManagementView {
 		parts = append(parts, m.keys.CompleteTask.Help().Key+": "+m.keys.CompleteTask.Help().Desc)
 	}
+	if m.currentView == app.TaskManagementView && m.currentView != app.CreateTaskFormView {
+		parts = append(parts, m.keys.AddTask.Help().Key+": "+m.keys.AddTask.Help().Desc)
+	}
+
 	if m.currentView != app.MainMenuView {
 		parts = append(parts, m.keys.Back.Help().Key+": "+m.keys.Back.Help().Desc)
 	}
@@ -361,7 +608,7 @@ func (m Model) footerView() string {
 	return helpStyle.Render(strings.Join(parts, " | "))
 }
 
-// List Item Types (placeholder, dashboardTaskItem, etc.)
+// List Item Types
 type placeholderItem struct{ title, description string }
 func (p placeholderItem) Title() string       { return p.title }
 func (p placeholderItem) Description() string { return p.description }
@@ -394,7 +641,7 @@ type errMsg struct{ err error; context string }
 func (e errMsg) Error() string { return fmt.Sprintf("ctx: %s, err: %v", e.context, e.err) }
 
 type mainMenuLoadedMsg []list.Item
-type tasksForViewLoadedMsg []models.Task // Used by Dashboard and TaskManagementView
+type tasksForViewLoadedMsg []models.Task
 type classesLoadedMsg []models.Class
 type studentsLoadedMsg []models.Student
 
