@@ -4,6 +4,7 @@ package repository
 
 import (
 	"context"
+	"time" // Added import for time
 	"vigenda/internal/models"
 )
 
@@ -58,9 +59,11 @@ type TaskRepository interface {
 	UpdateTask(ctx context.Context, task *models.Task) error                     // Added for updating tasks
 	// DeleteTask removes a task from the database by its ID.
 	DeleteTask(ctx context.Context, taskID int64) error                          // Added for deleting tasks
+	GetUpcomingTasksByUserID(ctx context.Context, userID int64, limit int) ([]models.Task, error) // For dashboard
 	// ... outros métodos
 }
 
+//go:generate mockgen -source=repository.go -destination=stubs/task_repository_mock.go -package=stubs TaskRepository
 //go:generate mockgen -source=repository.go -destination=stubs/class_repository_mock.go -package=stubs ClassRepository
 type ClassRepository interface {
 	CreateClass(ctx context.Context, class *models.Class) (int64, error)
@@ -74,6 +77,7 @@ type ClassRepository interface {
 	GetStudentByID(ctx context.Context, studentID int64) (*models.Student, error)
 	UpdateStudent(ctx context.Context, student *models.Student) error
 	DeleteStudent(ctx context.Context, studentID int64, classID int64) error
+	GetTodaysLessonsByUserID(ctx context.Context, userID int64, today time.Time) ([]models.Lesson, error) // For dashboard
 }
 
 type AssessmentRepository interface {

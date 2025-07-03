@@ -21,34 +21,31 @@ type MockTaskService struct {
 
 func (m *MockTaskService) CreateTask(ctx context.Context, title, description string, classID *int64, dueDate *time.Time) (models.Task, error) {
 	args := m.Called(ctx, title, description, classID, dueDate)
-	if task, ok := args.Get(0).(models.Task); ok {
-		return task, args.Error(1)
-	}
-	return models.Task{}, args.Error(1)
+	return args.Get(0).(models.Task), args.Error(1)
 }
 
 func (m *MockTaskService) ListAllTasks(ctx context.Context) ([]models.Task, error) {
 	args := m.Called(ctx)
-	if tasks, ok := args.Get(0).([]models.Task); ok {
-		return tasks, args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return nil, args.Error(1)
+	return args.Get(0).([]models.Task), args.Error(1)
 }
 
 func (m *MockTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task, error) {
 	args := m.Called(ctx)
-	if tasks, ok := args.Get(0).([]models.Task); ok {
-		return tasks, args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return nil, args.Error(1)
+	return args.Get(0).([]models.Task), args.Error(1)
 }
 
 func (m *MockTaskService) ListActiveTasksByClass(ctx context.Context, classID int64) ([]models.Task, error) {
 	args := m.Called(ctx, classID)
-	if tasks, ok := args.Get(0).([]models.Task); ok {
-		return tasks, args.Error(1)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
 	}
-	return nil, args.Error(1)
+	return args.Get(0).([]models.Task), args.Error(1)
 }
 
 func (m *MockTaskService) MarkTaskAsCompleted(ctx context.Context, taskID int64) error {
@@ -61,10 +58,7 @@ func (m *MockTaskService) GetTaskByID(ctx context.Context, taskID int64) (*model
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	if taskPtr, ok := args.Get(0).(*models.Task); ok {
-		return taskPtr, args.Error(1)
-	}
-	return nil, fmt.Errorf("mock GetTaskByID returned non-pointer type or unexpected type for task")
+	return args.Get(0).(*models.Task), args.Error(1)
 }
 
 func (m *MockTaskService) UpdateTask(ctx context.Context, task *models.Task) error {
@@ -77,7 +71,18 @@ func (m *MockTaskService) DeleteTask(ctx context.Context, taskID int64) error {
 	return args.Error(0)
 }
 
+func (m *MockTaskService) GetUpcomingTasks(ctx context.Context, userID int64, limit int) ([]models.Task, error) {
+	args := m.Called(ctx, userID, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]models.Task), args.Error(1)
+}
+
+// Ensure MockTaskService implements service.TaskService
 var _ service.TaskService = (*MockTaskService)(nil)
+
+// --- Test Functions from original file ---
 
 func TestTasksModel_Init(t *testing.T) {
 	mockService := new(MockTaskService)
@@ -155,7 +160,9 @@ func TestTasksModel_MarkTaskCompleted_MovesToCompletedTable(t *testing.T) {
 
 	completedTask := pendingTask
 	completedTask.IsCompleted = true
+	// This second ListAllTasks call is for the refresh after marking complete
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{completedTask}, nil).Once()
+
 
 	updatedModelTea, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
 	model = updatedModelTea.(*Model)
@@ -164,7 +171,7 @@ func TestTasksModel_MarkTaskCompleted_MovesToCompletedTable(t *testing.T) {
 
 	msg := cmd()
 	assert.IsType(t, taskMarkedCompletedMsg{}, msg)
-	updatedModelTea2, cmd := model.Update(msg)
+	updatedModelTea2, cmd := model.Update(msg) // cmd here is the refresh (ListAllTasks)
 	model = updatedModelTea2.(*Model)
 
 
@@ -192,10 +199,10 @@ func TestTasksModel_CreateTask_SubmitForm(t *testing.T) {
 	model.formSubState = CreatingTask
 	model.inputs[0].SetValue("New Task Title")
 	model.inputs[1].SetValue("New Task Description")
-	model.focusIndex = len(model.inputs) -1
+	model.focusIndex = len(model.inputs) -1 // Button focused
 
 	expectedTask := models.Task{ID: 1, Title: "New Task Title", Description: "New Task Description", UserID: 1}
-	mockService.On("CreateTask", mock.Anything, "New Task Title", "New Task Description", (*int64)(nil), (*time.Time)(nil)).Return(expectedTask, nil)
+	mockService.On("CreateTask", mock.Anything, "New Task Title", "New Task Description", (*int64)(nil), (*time.Time)(nil)).Return(expectedTask, nil).Once()
 
 	updatedModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m := updatedModel.(*Model)
@@ -206,7 +213,7 @@ func TestTasksModel_CreateTask_SubmitForm(t *testing.T) {
 	createMsg := cmd()
 	assert.IsType(t, taskCreatedMsg{}, createMsg)
 
-	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{expectedTask}, nil)
+	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{expectedTask}, nil).Once()
 	updatedModelAfterCreate, refreshCmd := m.Update(createMsg)
 	m = updatedModelAfterCreate.(*Model)
 
@@ -233,12 +240,12 @@ func TestTasksModel_UpdateTask_SubmitForm(t *testing.T) {
 
 	model.inputs[0].SetValue("Updated Title")
 	model.inputs[1].SetValue("Updated Desc")
-	model.focusIndex = len(model.inputs) - 1
+	model.focusIndex = len(model.inputs) - 1 // Button focused
 
 	taskWithUpdates := &models.Task{
 		ID:          originalTask.ID, UserID:      originalTask.UserID,
 		Title:       "Updated Title", Description: "Updated Desc",
-		ClassID:     nil, DueDate:     nil,
+		ClassID:     nil, DueDate:     nil, // Assuming form doesn't handle these yet
 		IsCompleted: originalTask.IsCompleted,
 	}
 
@@ -246,7 +253,7 @@ func TestTasksModel_UpdateTask_SubmitForm(t *testing.T) {
 		return task.ID == taskWithUpdates.ID && task.Title == taskWithUpdates.Title &&
 			   task.Description == taskWithUpdates.Description && task.UserID == taskWithUpdates.UserID &&
 			   task.IsCompleted == taskWithUpdates.IsCompleted
-	})).Return(nil)
+	})).Return(nil).Once()
 
 	updatedModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	m := updatedModel.(*Model)
@@ -256,7 +263,7 @@ func TestTasksModel_UpdateTask_SubmitForm(t *testing.T) {
 	updateMsg := cmd()
 	assert.IsType(t, taskUpdatedMsg{}, updateMsg)
 
-	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{*taskWithUpdates}, nil)
+	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{*taskWithUpdates}, nil).Once()
 	updatedModelAfterUpdate, refreshCmd := m.Update(updateMsg)
 	m = updatedModelAfterUpdate.(*Model)
 
@@ -276,45 +283,50 @@ func TestTasksModel_KeyBindings_CRUD_OnFocusedTable(t *testing.T) {
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
 	model := New(mockService)
 	model.SetSize(80, 30)
-	model.Update(model.Init()())
+	model.Update(model.Init()()) // Load initial tasks
 
 	assert.Equal(t, PendingTableFocus, model.focusedTable)
-	model.pendingTasksTable.SetCursor(0)
+	model.pendingTasksTable.SetCursor(0) // Ensure first item is selected
 
 	// Edit 'e' - should work on pending
 	mockService.On("GetTaskByID", mock.Anything, task1Pending.ID).Return(&task1Pending, nil).Once()
 	modelAfterEditKey, cmdEdit := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
 	assert.True(t, modelAfterEditKey.(*Model).isLoading)
 	assert.NotNil(t, cmdEdit)
-	modelAfterEditKey.(*Model).Update(cmdEdit())
+	modelAfterEditKey.(*Model).Update(cmdEdit()) // Process the taskLoadedForFormMsg
 	assert.Equal(t, FormView, modelAfterEditKey.(*Model).currentView)
 	assert.Equal(t, EditingTask, modelAfterEditKey.(*Model).formSubState)
 	assert.Equal(t, task1Pending.ID, modelAfterEditKey.(*Model).editingTaskID)
 
+	// Reset model for next key test
 	model = New(mockService)
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
 	model.SetSize(80,30)
 	model.Update(model.Init()())
 	model.pendingTasksTable.SetCursor(0)
 
+	// Delete 'd' - should work on pending
 	modelAfterDeleteKey, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	assert.Equal(t, ConfirmDeleteView, modelAfterDeleteKey.(*Model).currentView)
 	assert.Equal(t, task1Pending.ID, modelAfterDeleteKey.(*Model).taskIDToDelete)
 
+	// Reset model and switch focus to completed table
 	model = New(mockService)
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
 	model.SetSize(80,30)
-	model.Update(model.Init()())
-
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model.Update(model.Init()()) // Load tasks
+	model.Update(tea.KeyMsg{Type: tea.KeyTab}) // Switch focus to completed
 	assert.Equal(t, CompletedTableFocus, model.focusedTable)
-	model.completedTasksTable.SetCursor(0)
+	model.completedTasksTable.SetCursor(0) // Select first completed task
 
-	modelBeforeEditAttempt := *model
+	// Edit 'e' - should NOT work on completed table
+	modelBeforeEditAttempt := *model // Save state
 	modelAfterEditKeyOnCompleted, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
-	assert.Equal(t, modelBeforeEditAttempt.currentView, modelAfterEditKeyOnCompleted.(*Model).currentView)
-	assert.Equal(t, modelBeforeEditAttempt.formSubState, modelAfterEditKeyOnCompleted.(*Model).formSubState)
+	assert.Equal(t, modelBeforeEditAttempt.currentView, modelAfterEditKeyOnCompleted.(*Model).currentView, "View should not change on 'e' in completed table")
+	assert.Equal(t, modelBeforeEditAttempt.formSubState, modelAfterEditKeyOnCompleted.(*Model).formSubState, "FormSubState should not change on 'e' in completed table")
 
+
+	// Delete 'd' - should work on completed table
 	modelAfterDeleteKeyOnCompleted, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
 	assert.Equal(t, ConfirmDeleteView, modelAfterDeleteKeyOnCompleted.(*Model).currentView)
 	assert.Equal(t, task2Completed.ID, modelAfterDeleteKeyOnCompleted.(*Model).taskIDToDelete)
@@ -331,30 +343,35 @@ func TestTasksModel_ViewDetails_OnFocusedTable(t *testing.T) {
     mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{taskPending, taskCompleted}, nil).Once()
     model := New(mockService)
     model.SetSize(80,30)
-    model.Update(model.Init()())
-    model.pendingTasksTable.SetCursor(0)
+    model.Update(model.Init()()) // Load tasks
+    model.pendingTasksTable.SetCursor(0) // Select first pending
     assert.Equal(t, PendingTableFocus, model.focusedTable)
 
+    // View details for pending task (Enter key)
     mockService.On("GetTaskByID", mock.Anything, taskPending.ID).Return(&taskPending, nil).Once()
     model, cmdViewPending := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
     assert.True(t, model.isLoading)
-    model.Update(cmdViewPending())
+    model.Update(cmdViewPending()) // Process taskLoadedForDetailMsg
     assert.Equal(t, DetailView, model.currentView)
+    assert.NotNil(t, model.selectedTaskForDetail)
     assert.Equal(t, taskPending.ID, model.selectedTaskForDetail.ID)
 
+    // Reset and test for completed table
     model = New(mockService)
     mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{taskPending, taskCompleted}, nil).Once()
     model.SetSize(80,30)
-    model.Update(model.Init()())
-    model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
-    model.completedTasksTable.SetCursor(0)
+    model.Update(model.Init()()) // Load tasks
+    model.Update(tea.KeyMsg{Type: tea.KeyTab}) // Focus completed table
+    model.completedTasksTable.SetCursor(0) // Select first completed
     assert.Equal(t, CompletedTableFocus, model.focusedTable)
 
+    // View details for completed task ('v' key)
     mockService.On("GetTaskByID", mock.Anything, taskCompleted.ID).Return(&taskCompleted, nil).Once()
     model, cmdViewCompleted := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
     assert.True(t, model.isLoading)
-    model.Update(cmdViewCompleted())
+    model.Update(cmdViewCompleted()) // Process taskLoadedForDetailMsg
     assert.Equal(t, DetailView, model.currentView)
+    assert.NotNil(t, model.selectedTaskForDetail)
     assert.Equal(t, taskCompleted.ID, model.selectedTaskForDetail.ID)
 
     mockService.AssertExpectations(t)
@@ -367,18 +384,24 @@ func TestTasksModel_DeleteTask_ConfirmYes(t *testing.T) {
 	model.taskIDToDelete = 1
 
 	mockService.On("DeleteTask", mock.Anything, int64(1)).Return(nil).Once()
-	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{}, nil).Once()
+	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{}, nil).Once() // For refresh
 
-	m, cmdDelete := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	m, cmdDelete := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}}) // 's' for Sim (Yes)
 	assert.True(t, m.(*Model).isLoading)
 
-	deleteMsg := cmdDelete()
-	m, cmdRefresh := m.(*Model).Update(deleteMsg)
+	deleteMsg := cmdDelete() // This should be taskDeletedMsg
+	m, cmdRefresh := m.(*Model).Update(deleteMsg) // This should trigger refresh (ListAllTasks)
 
 	assert.Equal(t, TableView, m.(*Model).currentView) // Check currentView resets
 	assert.Equal(t, int64(0), m.(*Model).taskIDToDelete)
-	assert.False(t, m.(*Model).isLoading)
+	// isLoading is true here because ListAllTasks is called
+	assert.True(t, m.(*Model).isLoading)
 	assert.NotNil(t, cmdRefresh)
+
+	// Process the refresh
+	refreshMsg := cmdRefresh()
+	m, _ = m.(*Model).Update(refreshMsg) // tasksLoadedMsg
+	assert.False(t, m.(*Model).isLoading) // Now isLoading should be false
 
 	mockService.AssertExpectations(t)
 }
@@ -389,9 +412,9 @@ func TestTasksModel_DeleteTask_ConfirmNo(t *testing.T) {
 	model.currentView = ConfirmDeleteView // Set state for delete confirmation
 	model.taskIDToDelete = 1
 
-	m, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	m, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}) // 'n' for Não (No)
 	assert.Equal(t, TableView, m.(*Model).currentView) // Check currentView resets
 	assert.Equal(t, int64(0), m.(*Model).taskIDToDelete)
-	assert.Nil(t, cmd)
+	assert.Nil(t, cmd) // No command should be issued
 	mockService.AssertNotCalled(t, "DeleteTask", mock.Anything, mock.Anything)
 }

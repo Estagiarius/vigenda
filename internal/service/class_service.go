@@ -7,6 +7,7 @@ import (
 	"io"
 	"log" // Adicionado para logging
 	"strings"
+	"time" // Added import for time
 	"vigenda/internal/models"
 	"vigenda/internal/repository"
 )
@@ -406,4 +407,23 @@ func (s *classServiceImpl) GetStudentsByClassID(ctx context.Context, classID int
 		return nil, fmt.Errorf("service.GetStudentsByClassID: failed to get students: %w", err)
 	}
 	return students, nil
+}
+
+// GetTodaysLessons retrieves all lessons scheduled for the current calendar date
+// for a specific user.
+func (s *classServiceImpl) GetTodaysLessons(ctx context.Context, userID int64) ([]models.Lesson, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("user ID must be positive")
+	}
+	// Use local time for "today" as the repository query uses DATE() which typically works with local TZ context of the DB.
+	today := time.Now()
+
+	lessons, err := s.classRepo.GetTodaysLessonsByUserID(ctx, userID, today)
+	if err != nil {
+		// Log the error, but don't create a bug task for a simple "not found" or query error.
+		// The repository should handle sql.ErrNoRows gracefully.
+		log.Printf("Error getting today's lessons for userID %d: %v", userID, err)
+		return nil, fmt.Errorf("failed to get today's lessons for user %d: %w", userID, err)
+	}
+	return lessons, nil
 }

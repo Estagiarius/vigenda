@@ -3,7 +3,9 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors" // Added import for errors
 	"fmt"
+	"time" // Added import for time
 	"vigenda/internal/models"
 )
 
@@ -183,12 +185,26 @@ func (r *StubTaskRepository) DeleteTask(ctx context.Context, taskID int64) error
 	return nil
 }
 
+func (r *StubTaskRepository) GetUpcomingTasksByUserID(ctx context.Context, userID int64, limit int) ([]models.Task, error) {
+	fmt.Printf("[StubTaskRepository] GetUpcomingTasksByUserID called for UserID: %d, Limit: %d\n", userID, limit)
+	// Return an empty list or a predefined list for stubbing purposes
+	// This stub currently doesn't interact with r.DB for this method.
+	return []models.Task{}, nil
+}
+
 
 // StubClassRepository
 type StubClassRepository struct {
 	DB *sql.DB
 }
-func NewStubClassRepository(db *sql.DB) *StubClassRepository { return &StubClassRepository{DB:db} }
+
+// Ensure StubClassRepository implements ClassRepository
+var _ ClassRepository = (*StubClassRepository)(nil)
+
+func NewStubClassRepository(db *sql.DB) ClassRepository { // Return interface type
+	return &StubClassRepository{DB: db}
+}
+
 
 func (r *StubClassRepository) CreateClass(ctx context.Context, class *models.Class) (int64, error) {
 	fmt.Printf("[StubClassRepository] CreateClass: %s\n", class.Name)
@@ -204,14 +220,53 @@ func (r *StubClassRepository) UpdateStudentStatus(ctx context.Context, studentID
     fmt.Printf("[StubClassRepository] UpdateStudentStatus for %d to %s\n", studentID, status)
     return nil
 }
-func (r *StubClassRepository) GetClassByID(ctx context.Context, classID int64) (models.Class, error) {
+func (r *StubClassRepository) GetClassByID(ctx context.Context, classID int64) (*models.Class, error) { // Changed to return *models.Class
 	fmt.Printf("[StubClassRepository] GetClassByID: %d\n", classID)
 	// Simulate finding the class. In a real repo, query the DB.
 	// For the test TestTarefaListarTurmaOutput, we need class with ID 1 to be "Turma 9A".
 	if classID == 1 {
-		return models.Class{ID: 1, UserID: 1, SubjectID: 1, Name: "Turma 9A"}, nil
+		return &models.Class{ID: 1, UserID: 1, SubjectID: 1, Name: "Turma 9A"}, nil // Return as pointer
 	}
-	return models.Class{}, fmt.Errorf("class with ID %d not found in stub", classID)
+	return nil, fmt.Errorf("class with ID %d not found in stub", classID) // Return nil for not found
+}
+
+// Missing methods from ClassRepository for StubClassRepository
+func (r *StubClassRepository) ListAllClasses(ctx context.Context) ([]models.Class, error) {
+	fmt.Println("[StubClassRepository] ListAllClasses called")
+	return []models.Class{}, nil
+}
+
+func (r *StubClassRepository) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {
+	fmt.Printf("[StubClassRepository] GetStudentsByClassID for class %d called\n", classID)
+	return []models.Student{}, nil
+}
+
+func (r *StubClassRepository) UpdateClass(ctx context.Context, class *models.Class) error {
+	fmt.Printf("[StubClassRepository] UpdateClass for class %d called\n", class.ID)
+	return nil
+}
+
+func (r *StubClassRepository) DeleteClass(ctx context.Context, classID int64, userID int64) error {
+	fmt.Printf("[StubClassRepository] DeleteClass for class %d, user %d called\n", classID, userID)
+	return nil
+}
+func (r *StubClassRepository) GetStudentByID(ctx context.Context, studentID int64) (*models.Student, error) {
+	fmt.Printf("[StubClassRepository] GetStudentByID for student %d called\n", studentID)
+	return nil, errors.New("GetStudentByID not implemented in stub")
+}
+func (r *StubClassRepository) UpdateStudent(ctx context.Context, student *models.Student) error {
+	fmt.Printf("[StubClassRepository] UpdateStudent for student %d called\n", student.ID)
+	return nil
+}
+func (r *StubClassRepository) DeleteStudent(ctx context.Context, studentID int64, classID int64) error {
+	fmt.Printf("[StubClassRepository] DeleteStudent for student %d, class %d called\n", studentID, classID)
+	return nil
+}
+
+func (r *StubClassRepository) GetTodaysLessonsByUserID(ctx context.Context, userID int64, today time.Time) ([]models.Lesson, error) {
+	fmt.Printf("[StubClassRepository] GetTodaysLessonsByUserID called for UserID: %d, Date: %s\n", userID, today.Format("2006-01-02"))
+	// Return an empty list or a predefined list for stubbing purposes
+	return []models.Lesson{}, nil
 }
 
 
@@ -219,7 +274,13 @@ func (r *StubClassRepository) GetClassByID(ctx context.Context, classID int64) (
 type StubAssessmentRepository struct {
 	DB *sql.DB
 }
-func NewStubAssessmentRepository(db *sql.DB) *StubAssessmentRepository { return &StubAssessmentRepository{DB:db} }
+
+// Ensure StubAssessmentRepository implements AssessmentRepository
+var _ AssessmentRepository = (*StubAssessmentRepository)(nil)
+
+func NewStubAssessmentRepository(db *sql.DB) AssessmentRepository { // Return interface type
+	return &StubAssessmentRepository{DB: db}
+}
 
 func (r *StubAssessmentRepository) CreateAssessment(ctx context.Context, assessment *models.Assessment) (int64, error) {
 	fmt.Printf("[StubAssessmentRepository] CreateAssessment: %s\n", assessment.Name)
@@ -247,4 +308,9 @@ func (r *StubAssessmentRepository) GetGradesByClassID(ctx context.Context, class
     fmt.Printf("[StubAssessmentRepository] GetGradesByClassID: %d\n", classID)
     // Return dummy data for average calculation
     return []models.Grade{}, []models.Assessment{}, []models.Student{}, nil
+}
+
+func (r *StubAssessmentRepository) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {
+	fmt.Println("[StubAssessmentRepository] ListAllAssessments called")
+	return []models.Assessment{}, nil
 }

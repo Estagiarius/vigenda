@@ -111,6 +111,21 @@ func (s *taskServiceImpl) createTaskInternal(ctx context.Context, userID int64, 
 	return task, nil
 }
 
+// GetUpcomingTasks recupera uma lista limitada de tarefas futuras não concluídas para um usuário.
+func (s *taskServiceImpl) GetUpcomingTasks(ctx context.Context, userID int64, limit int) ([]models.Task, error) {
+	if limit <= 0 {
+		limit = 5 // Default limit
+	}
+	tasks, err := s.repo.GetUpcomingTasksByUserID(ctx, userID, limit)
+	if err != nil {
+		// Não criar bug task para falhas de listagem simples, a menos que seja um erro inesperado do DB.
+		// O repositório já lida com sql.ErrNoRows.
+		logError("GetUpcomingTasks: Failed to retrieve tasks for userID %d: %v", userID, err)
+		return nil, fmt.Errorf("falha ao buscar tarefas futuras para usuário %d: %w", userID, err)
+	}
+	return tasks, nil
+}
+
 // CreateTask cria uma nova tarefa no sistema.
 // Valida se o título da tarefa não está vazio.
 // Em caso de falha na criação (ex: erro no banco de dados), loga o erro e

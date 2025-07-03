@@ -265,3 +265,54 @@ func (r *classRepository) GetStudentsByClassID(ctx context.Context, classID int6
 
 	return students, nil
 }
+
+// GetTodaysLessonsByUserID retrieves all lessons associated with a given userID
+// that are scheduled for the specified date (ignoring the time part).
+// It joins lessons with classes to filter by user_id.
+func (r *classRepository) GetTodaysLessonsByUserID(ctx context.Context, userID int64, today time.Time) ([]models.Lesson, error) {
+	// Query needs to join with classes to filter by user_id,
+	// as lessons table itself does not have user_id.
+	// It filters lessons scheduled for the given date (today).
+	query := `
+        SELECT l.id, l.class_id, l.title, l.plan_content, l.scheduled_at
+        FROM lessons l
+        JOIN classes c ON l.class_id = c.id
+        WHERE c.user_id = ?
+          AND DATE(l.scheduled_at) = DATE(?)
+        ORDER BY l.scheduled_at ASC`
+
+	// today.Format("2006-01-02") could be used if DATE(?) doesn't work as expected with full timestamp.
+	// However, SQLite's DATE() function should correctly extract the date part from a timestamp.
+	rows, err := r.db.QueryContext(ctx, query, userID, today)
+	if err != nil {
+		return nil, fmt.Errorf("classRepository.GetTodaysLessonsByUserID: query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var lessons []models.Lesson
+	for rows.Next() {
+		lesson := models.Lesson{}
+		var planContent sql.NullString // plan_content can be NULL
+
+		err := rows.Scan(
+			&lesson.ID,
+			&lesson.ClassID,
+			&lesson.Title,
+			&planContent,
+			&lesson.ScheduledAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("classRepository.GetTodaysLessonsByUserID: scanning lesson: %w", err)
+		}
+		if planContent.Valid {
+			lesson.PlanContent = planContent.String
+		} else {
+			lesson.PlanContent = "" // Default to empty string if NULL
+		}
+		lessons = append(lessons, lesson)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("classRepository.GetTodaysLessonsByUserID: iterating rows: %w", err)
+	}
+	return lessons, nil
+}

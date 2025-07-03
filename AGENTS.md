@@ -33,7 +33,8 @@ Olá, Agente! Este documento fornece diretrizes e informações para ajudá-lo a
         -   `internal/models/models.go`: Definições das estruturas de dados (structs Go) do domínio.
         -   `internal/repository/`: Camada de acesso a dados (operações CRUD), abstraindo o SQLite. Arquivos como `task_repository.go`.
         -   `internal/service/`: Camada de lógica de negócios, orquestrando operações. Arquivos como `task_service.go`.
-        -   `internal/tui/`: Componentes e lógica da Interface de Texto do Usuário (Bubbletea). Arquivos como `prompt.go`, `table.go`, `statusbar.go`.
+        -   `internal/app/`: Contém os módulos principais da aplicação TUI (Bubbletea), onde cada submódulo (ex: `dashboard/`, `tasks/`, `classes/`) representa uma view principal ou funcionalidade da interface. `internal/app/app.go` orquestra essas views.
+        -   `internal/tui/`: Contém componentes TUI reutilizáveis e lógica de interface de usuário mais genérica (ex: `prompt.go`, `table.go`, `statusbar.go`) que podem ser usados pelos módulos em `internal/app/`.
     -   `tests/`:
         -   `tests/integration/cli_integration_test.go`: Testes de integração da CLI.
         -   `tests/integration/golden_files/`: Arquivos de saída esperada para testes de integração.

@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	// "time" // Not used anymore
+	"time" // Added import for time
 	"vigenda/internal/models"
 )
 
@@ -193,6 +193,66 @@ func (r *taskRepository) MarkTaskCompleted(ctx context.Context, taskID int64) er
 		return fmt.Errorf("taskRepository.MarkTaskCompleted: no task found with ID %d or task already completed", taskID)
 	}
 	return nil
+}
+
+// GetUpcomingTasksByUserID retrieves a list of tasks for a given user that are not completed,
+// have a due date in the future, ordered by the due date, and limited by the specified limit.
+func (r *taskRepository) GetUpcomingTasksByUserID(ctx context.Context, userID int64, limit int) ([]models.Task, error) {
+	query := `
+        SELECT id, user_id, class_id, title, description, due_date, is_completed
+        FROM tasks
+        WHERE user_id = ? AND is_completed = FALSE AND due_date IS NOT NULL AND due_date >= ?
+        ORDER BY due_date ASC
+        LIMIT ?`
+
+	// Using time.Now() in UTC to compare with stored dates, assuming dates are stored in UTC or consistently.
+	// For local time considerations, this might need adjustment based on how dates are handled application-wide.
+	// SQLite typically stores DATETIME as TEXT in UTC if not specified otherwise.
+	// Using time.Now().Format("2006-01-02 15:04:05") for SQLite compatibility if it expects text.
+	// However, mattn/go-sqlite3 driver handles time.Time correctly, so direct time.Time should be fine.
+	now := time.Now() // Using local time, assuming DB stores it consistently or driver handles conversion.
+					  // If explicit UTC is needed: time.Now().UTC()
+
+	rows, err := r.db.QueryContext(ctx, query, userID, now, limit)
+	if err != nil {
+		return nil, fmt.Errorf("taskRepository.GetUpcomingTasksByUserID: query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var tasks []models.Task
+	for rows.Next() {
+		task := models.Task{}
+		var classID sql.NullInt64
+		var description sql.NullString
+		var dueDate sql.NullTime // due_date is NOT NULL in the query
+
+		err := rows.Scan(
+			&task.ID,
+			&task.UserID,
+			&classID,
+			&task.Title,
+			&description,
+			&dueDate,
+			&task.IsCompleted,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("taskRepository.GetUpcomingTasksByUserID: scanning task: %w", err)
+		}
+		if classID.Valid {
+			task.ClassID = &classID.Int64
+		}
+		if description.Valid {
+			task.Description = description.String
+		}
+		if dueDate.Valid { // Should always be valid due to query `due_date IS NOT NULL`
+			task.DueDate = &dueDate.Time
+		}
+		tasks = append(tasks, task)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("taskRepository.GetUpcomingTasksByUserID: iterating rows: %w", err)
+	}
+	return tasks, nil
 }
 
 func (r *taskRepository) DeleteTask(ctx context.Context, taskID int64) error {

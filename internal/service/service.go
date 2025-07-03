@@ -21,6 +21,7 @@ type TaskService interface {
 	UpdateTask(ctx context.Context, task *models.Task) error             // Added for updating tasks
 	// DeleteTask removes a task by its ID.
 	DeleteTask(ctx context.Context, taskID int64) error                  // Added for deleting tasks
+	GetUpcomingTasks(ctx context.Context, userID int64, limit int) ([]models.Task, error) // For dashboard
 }
 
 // ClassService define os métodos para a gestão de turmas e alunos.
@@ -37,6 +38,7 @@ type ClassService interface {
 	GetStudentByID(ctx context.Context, studentID int64) (models.Student, error)
 	UpdateStudent(ctx context.Context, studentID int64, fullName string, enrollmentID string, status string) (models.Student, error)
 	DeleteStudent(ctx context.Context, studentID int64) error
+	GetTodaysLessons(ctx context.Context, userID int64) ([]models.Lesson, error) // For dashboard
 }
 
 // AssessmentService define os métodos para a gestão de avaliações e notas.

@@ -8,10 +8,12 @@ import (
 	"os"
 	"strings" // Added import
 	"testing"
+	"time" // Added import for time
 	"vigenda/internal/models"
 	// "vigenda/internal/repository" // repository package is not directly used by this test file, types are defined locally or through models.
 
-	_ "github.com/mattn/go-sqlite3" // DB driver
+	"github.com/stretchr/testify/assert" // Added import for assert
+	_ "github.com/mattn/go-sqlite3"      // DB driver
 )
 
 // MockTaskRepository for testing TaskService
@@ -23,6 +25,8 @@ type MockTaskRepository struct {
 	MarkTaskCompletedFunc func(ctx context.Context, taskID int64) error
 	UpdateTaskFunc        func(ctx context.Context, task *models.Task) error // Added
 	DeleteTaskFunc        func(ctx context.Context, taskID int64) error    // Added
+	GetUpcomingTasksByUserIDFunc func(ctx context.Context, userID int64, limit int) ([]models.Task, error)
+
 
 	// Store created bug tasks for verification
 	CreatedBugTasks []models.Task
@@ -78,6 +82,13 @@ func (m *MockTaskRepository) DeleteTask(ctx context.Context, taskID int64) error
 		return m.DeleteTaskFunc(ctx, taskID)
 	}
 	return errors.New("DeleteTaskFunc not implemented in mock")
+}
+
+func (m *MockTaskRepository) GetUpcomingTasksByUserID(ctx context.Context, userID int64, limit int) ([]models.Task, error) {
+	if m.GetUpcomingTasksByUserIDFunc != nil {
+		return m.GetUpcomingTasksByUserIDFunc(ctx, userID, limit)
+	}
+	return nil, errors.New("GetUpcomingTasksByUserIDFunc not implemented in mock")
 }
 
 
@@ -155,6 +166,75 @@ func TestTaskService_CreateTask(t *testing.T) {
 		if len(mockRepo.CreatedBugTasks) != 0 {
 			t.Errorf("Expected no bug tasks for validation error, got %d", len(mockRepo.CreatedBugTasks))
 		}
+	})
+}
+
+func TestTaskServiceImpl_GetUpcomingTasks(t *testing.T) {
+	// Renaming to avoid conflict with the testify mock import if it were used.
+	// No, keep testify/assert for assertions.
+	// The mock is manual.
+	// Use assert from "github.com/stretchr/testify/assert"
+
+	ctx := context.Background()
+	mockRepo := &MockTaskRepository{} // Use the manual mock
+	taskService := NewTaskService(mockRepo)
+
+	userID := int64(1)
+	now := time.Now()
+	sampleTasks := []models.Task{
+		{ID: 1, Title: "Task 1", UserID: userID, DueDate: func() *time.Time { t := now.Add(24 * time.Hour); return &t }()},
+		{ID: 2, Title: "Task 2", UserID: userID, DueDate: func() *time.Time { t := now.Add(48 * time.Hour); return &t }()},
+	}
+
+	t.Run("success", func(t *testing.T) {
+		limit := 5
+		mockRepo.GetUpcomingTasksByUserIDFunc = func(ctx context.Context, uID int64, l int) ([]models.Task, error) {
+			assert.Equal(t, userID, uID)
+			assert.Equal(t, limit, l)
+			return sampleTasks, nil
+		}
+
+		tasks, err := taskService.GetUpcomingTasks(ctx, userID, limit)
+
+		assert.NoError(t, err)
+		assert.Len(t, tasks, 2)
+		assert.Equal(t, sampleTasks, tasks)
+	})
+
+	t.Run("default limit", func(t *testing.T) {
+		// Test with limit 0
+		mockRepo.GetUpcomingTasksByUserIDFunc = func(ctx context.Context, uID int64, l int) ([]models.Task, error) {
+			assert.Equal(t, userID, uID)
+			assert.Equal(t, 5, l) // Default limit
+			return sampleTasks, nil
+		}
+		_, err := taskService.GetUpcomingTasks(ctx, userID, 0)
+		assert.NoError(t, err)
+
+		// Test with limit -1
+		mockRepo.GetUpcomingTasksByUserIDFunc = func(ctx context.Context, uID int64, l int) ([]models.Task, error) {
+			assert.Equal(t, userID, uID)
+			assert.Equal(t, 5, l) // Default limit
+			return sampleTasks, nil
+		}
+		_, err = taskService.GetUpcomingTasks(ctx, userID, -1)
+		assert.NoError(t, err)
+	})
+
+	t.Run("repository error", func(t *testing.T) {
+		limit := 3
+		repoErr := errors.New("repository error")
+		mockRepo.GetUpcomingTasksByUserIDFunc = func(ctx context.Context, uID int64, l int) ([]models.Task, error) {
+			return nil, repoErr
+		}
+
+		tasks, err := taskService.GetUpcomingTasks(ctx, userID, limit)
+
+		assert.Error(t, err)
+		assert.Nil(t, tasks)
+		assert.Contains(t, err.Error(), repoErr.Error())
+		// Check if the error is wrapped as expected by the service
+		assert.EqualError(t, err, fmt.Sprintf("falha ao buscar tarefas futuras para usuário %d: %s", userID, repoError.Error()))
 	})
 }
 

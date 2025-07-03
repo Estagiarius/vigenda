@@ -104,6 +104,13 @@ func (s *stubTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task
 	return activeTasks, nil
 }
 
+func (s *stubTaskService) GetUpcomingTasks(ctx context.Context, userID int64, limit int) ([]models.Task, error) {
+	fmt.Printf("[StubTaskService] GetUpcomingTasks called for UserID: %d, Limit: %d\n", userID, limit)
+	// This stub will use the repository's method, which might be a real one or a stub itself.
+	// This allows testing service logic independently if the repo stub is simple.
+	return s.taskRepo.GetUpcomingTasksByUserID(ctx, userID, limit)
+}
+
 // StubClassService
 type stubClassService struct {
 	classRepo repository.ClassRepository
@@ -274,6 +281,13 @@ func (s *stubClassService) ListAllClasses(ctx context.Context) ([]models.Class, 
 func (s *stubClassService) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {
 	fmt.Printf("[StubClassService] GetStudentsByClassID called for ClassID: %d\n", classID)
 	return s.classRepo.GetStudentsByClassID(ctx, classID)
+}
+
+func (s *stubClassService) GetTodaysLessons(ctx context.Context, userID int64) ([]models.Lesson, error) {
+	fmt.Printf("[StubClassService] GetTodaysLessons called for UserID: %d\n", userID)
+	// This stub will use the repository's method.
+	// The repository stub for GetTodaysLessonsByUserID currently returns an empty list.
+	return s.classRepo.GetTodaysLessonsByUserID(ctx, userID, time.Now())
 }
 
 // StubAssessmentService
