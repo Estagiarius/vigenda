@@ -24,8 +24,8 @@ var baseStyle = lipgloss.NewStyle().
 type ViewState int
 
 const (
-	FormView ViewState = iota // View for inputting proof generation criteria
-	ProofView                 // View for displaying the generated proof
+	FormView  ViewState = iota // View for inputting proof generation criteria
+	ProofView                  // View for displaying the generated proof
 )
 
 // Model represents the proof generation model.
@@ -51,6 +51,9 @@ type proofGeneratedMsg struct {
 	err   error
 }
 
+// Msg para indicar retorno ao menu principal
+type returnToMenuMsg struct{}
+
 // --- Cmds ---
 func (m *Model) generateProofCmd() tea.Cmd {
 	subjectIDStr := m.textInputs[0].Value()
@@ -72,7 +75,9 @@ func (m *Model) generateProofCmd() tea.Cmd {
 	hardCount, _ := strconv.Atoi(hardCountStr)     // Default to 0
 
 	if easyCount == 0 && mediumCount == 0 && hardCount == 0 {
-		return func() tea.Msg { return proofGeneratedMsg{err: fmt.Errorf("pelo menos uma contagem de dificuldade deve ser maior que zero")} }
+		return func() tea.Msg {
+			return proofGeneratedMsg{err: fmt.Errorf("pelo menos uma contagem de dificuldade deve ser maior que zero")}
+		}
 	}
 
 	criteria := service.ProofCriteria{
@@ -109,7 +114,6 @@ func New(proofService service.ProofService) *Model { // Return *Model
 		isNumberOrEmpty,
 	}
 
-
 	for i := range inputs {
 		ti := textinput.New()
 		ti.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
@@ -142,7 +146,7 @@ func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-// Changed to pointer receiver
+// ...existing code...
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
@@ -155,12 +159,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.err = nil
 				m.message = "Insira os critérios para gerar a prova."
 				m.generatedProof = nil // Clear previous proof
-				m.resetForm() // Reset form fields and focus
+				m.resetForm()          // Reset form fields and focus
 				// No need to explicitly return focus cmd here as resetForm handles it.
 				return m, nil // Return m directly
 			}
-			// If in FormView, Esc is handled by parent model to go to main menu
-			return m, nil // Return m directly
+			// Se estiver no FormView, propague o evento para o pai:
+			return m, func() tea.Msg { return returnToMenuMsg{} }
 		}
 
 		switch m.state {
@@ -172,7 +176,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.message = ""
 					cmds = append(cmds, m.generateProofCmd())
 				} else { // Move focus to next input
-					m.focusIndex = (m.focusIndex + 1) % (len(m.textInputs) +1) // +1 for submit "button"
+					m.focusIndex = (m.focusIndex + 1) % (len(m.textInputs) + 1) // +1 for submit "button"
 					cmds = append(cmds, m.updateInputFocusStyle())
 				}
 			} else if key.Matches(msg, key.NewBinding(key.WithKeys("up", "shift+tab"))) {
@@ -247,7 +251,6 @@ func (m *Model) View() string {
 		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("%s\n\n", m.message)))
 	}
 
-
 	switch m.state {
 	case FormView:
 		b.WriteString("Gerar Nova Prova\n\n")
@@ -306,7 +309,7 @@ func (m *Model) resetForm() {
 	}
 	m.focusIndex = 0
 	if len(m.textInputs) > 0 {
-	    m.textInputs[0].Focus()
+		m.textInputs[0].Focus()
 	}
 	m.updateInputFocusStyle()
 }
@@ -342,7 +345,9 @@ func (m *Model) SetSize(width, height int) {
 	m.height = height - baseStyle.GetVerticalFrameSize() - 1 // Adjusted for potential message line
 
 	inputLayoutWidth := m.width - 4 // General padding for input area
-	if inputLayoutWidth < 30 { inputLayoutWidth = 30 } // Min width for placeholders
+	if inputLayoutWidth < 30 {
+		inputLayoutWidth = 30
+	} // Min width for placeholders
 
 	for i := range m.textInputs {
 		m.textInputs[i].Width = inputLayoutWidth
