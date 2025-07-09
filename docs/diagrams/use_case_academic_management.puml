@@ -1,0 +1,40 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor Usuário
+
+rectangle "Pacote Gerenciamento Acadêmico" {
+  usecase "Gerenciar Disciplinas" as UC_Subjects
+  usecase "Gerenciar Turmas" as UC_Classes
+  usecase "Gerenciar Alunos" as UC_Students
+  usecase "Gerenciar Planos de Aula" as UC_Lessons
+
+  Usuário -- UC_Subjects
+  UC_Subjects .> (Adicionar Disciplina) : <<include>>
+  UC_Subjects .> (Listar Disciplinas) : <<include>>
+  UC_Subjects .> (Editar Disciplina) : <<include>>
+  UC_Subjects .> (Remover Disciplina) : <<include>>
+
+  Usuário -- UC_Classes
+  UC_Classes .> (Adicionar Turma) : <<include>>
+  UC_Classes .> (Listar Turmas) : <<include>>
+  UC_Classes .> (Editar Turma) : <<include>>
+  UC_Classes .> (Remover Turma) : <<include>>
+  UC_Classes ..> UC_Subjects : (depende de Disciplina existente)
+
+  Usuário -- UC_Students
+  UC_Students .> (Adicionar Aluno à Turma) : <<include>>
+  UC_Students .> (Listar Alunos da Turma) : <<include>>
+  UC_Students .> (Editar Aluno) : <<include>>
+  UC_Students .> (Remover Aluno da Turma) : <<include>>
+  UC_Students ..> UC_Classes : (opera em Turma existente)
+
+  Usuário -- UC_Lessons
+  UC_Lessons .> (Adicionar Plano de Aula) : <<include>>
+  UC_Lessons .> (Listar Planos de Aula) : <<include>>
+  UC_Lessons .> (Editar Plano de Aula) : <<include>>
+  UC_Lessons .> (Remover Plano de Aula) : <<include>>
+  UC_Lessons ..> UC_Classes : (opera em Turma existente)
+}
+@enduml
