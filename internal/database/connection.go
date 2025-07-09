@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	_ "github.com/lib/pq" // PostgreSQL driver
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
