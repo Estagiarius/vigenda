@@ -77,74 +77,50 @@ func GetDBConnection(config DBConfig) (*sql.DB, error) {
 	return db, nil
 }
 
-// applySQLiteSchema reads and applies the initial schema from the .sql file.
+// applySQLiteSchema reads and applies the initial schema from the embedded .sql file.
 func applySQLiteSchema(db *sql.DB) error {
-	var schemaBytes []byte
-	var readErr error
-	var attemptedPaths []string
-
-	// Path 1: Relative to executable (for distributed binary)
-	execPath, err := os.Executable()
-	if err == nil {
-		// Path 1: Relative to CWD (works for `go run` and if binary is run from project root)
-		schemaPath1 := "internal/database/migrations/001_initial_schema.sql"
-		attemptedPaths = append(attemptedPaths, schemaPath1)
-		schemaBytes, readErr = os.ReadFile(schemaPath1)
-
-		// Path 2: Relative to executable's directory (for distributed binaries)
-		if readErr != nil && err == nil { // err is from os.Executable()
-			execDir := filepath.Dir(execPath)
-			// Assuming migrations are bundled relative to the executable
-			// e.g. <exec_dir>/migrations/001_initial_schema.sql
-			// or <exec_dir>/../internal/database/migrations/001_initial_schema.sql
-			// For this project structure, if binary is in root:
-			schemaPath2 := filepath.Join(execDir, "internal/database/migrations/001_initial_schema.sql")
-			// If binary is in cmd/vigenda/vigenda:
-			// schemaPath2 := filepath.Join(execDir, "..", "..", "internal", "database", "migrations", "001_initial_schema.sql")
-			attemptedPaths = append(attemptedPaths, schemaPath2)
-			schemaBytes, readErr = os.ReadFile(schemaPath2)
-
-			// One more attempt for cmd/vigenda/vigenda structure
-			if readErr != nil {
-				schemaPath3 := filepath.Join(execDir, "..", "..", "internal", "database", "migrations", "001_initial_schema.sql")
-				attemptedPaths = append(attemptedPaths, schemaPath3)
-				schemaBytes, readErr = os.ReadFile(schemaPath3)
-			}
-		}
-	} else {
-		// Fallback if os.Executable() failed (e.g. in some test environments)
-		schemaPathCwdOnly := "internal/database/migrations/001_initial_schema.sql"
-		attemptedPaths = append(attemptedPaths, schemaPathCwdOnly)
-		schemaBytes, readErr = os.ReadFile(schemaPathCwdOnly)
-	}
-
-
-	if readErr != nil {
-		return fmt.Errorf("failed to read schema file. Attempted paths: [%s]. Last error: %w", strings.Join(attemptedPaths, ", "), readErr)
+	schemaBytes, err := migrationsFS.ReadFile("migrations/001_initial_schema.sql")
+	if err != nil {
+		// It's useful to know which file failed, even if there's only one for now.
+		return fmt.Errorf("failed to read embedded schema file migrations/001_initial_schema.sql: %w", err)
 	}
 
 	_, err = db.Exec(string(schemaBytes))
 	if err != nil {
-		return fmt.Errorf("failed to apply initial schema (tried paths: [%s]): %w", strings.Join(attemptedPaths, ", "), err)
+		return fmt.Errorf("failed to apply initial schema from embedded file: %w", err)
 	}
-	// fmt.Println("SQLite database schema initialized.") // Keep this commented or use a logger
+	// fmt.Println("SQLite database schema initialized from embedded file.") // Keep this commented or use a logger
 	return nil
 }
 
 // DefaultSQLitePath returns the default path for the SQLite database file.
 // It places it in the user's config directory or defaults to "vigenda.db" in CWD.
 // This function is now correctly named and used.
+// To avoid import cycle, this function cannot use DefaultSQLitePath_database from database.go directly.
+// It needs to have its own implementation or database.go's version needs to be made available differently.
+// For now, we will duplicate the logic slightly, assuming this is acceptable.
+// A better solution might involve a shared utility package or rethinking package responsibilities.
 func DefaultSQLitePath() string {
-	configDir, err := os.UserConfigDir()
+	// This implementation detail should ideally be centralized.
+	// For now, replicating the logic from database.go's DefaultSQLitePath_database
+	// to avoid import cycles or major refactoring.
+	// This is a common issue when splitting database setup logic.
+	// In a real scenario, further refactoring might be needed.
+	userConfigDir, err := os.UserConfigDir()
 	if err == nil {
-		appConfigDir := filepath.Join(configDir, "vigenda")
-		if err := os.MkdirAll(appConfigDir, 0750); err == nil { // Ensure directory exists
+		appConfigDir := filepath.Join(userConfigDir, "vigenda")
+		// Ensure the directory exists. Using 0755 for broader compatibility.
+		if mkdirErr := os.MkdirAll(appConfigDir, 0755); mkdirErr == nil {
 			return filepath.Join(appConfigDir, "vigenda.db")
 		}
+		// If MkdirAll fails, log it or handle as appropriate, then fallback.
+		// log.Printf("Warning: Failed to create config directory %s: %v. Using current directory.", appConfigDir, mkdirErr)
+	} else {
+		// log.Printf("Warning: Could not determine user config directory: %v. Using current directory.", err)
 	}
-	// Fallback to current working directory if user config dir fails
-	return "vigenda.db"
+	return "vigenda.db" // Fallback to current working directory
 }
+
 
 // DefaultDbPath is added back for compatibility if it's used elsewhere,
 // but it should ideally be replaced by DefaultSQLitePath for clarity.
