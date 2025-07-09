@@ -1,0 +1,109 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor Usuário
+
+rectangle "Sistema Vigenda" {
+
+  package "Autenticação" {
+    usecase "Autenticar Usuário" as UC_Auth
+    Usuário -- UC_Auth
+    UC_Auth .> (Registrar Novo Usuário) : <<include>>
+    UC_Auth .> (Realizar Login) : <<include>>
+  }
+
+  package "Gerenciamento Acadêmico" {
+    usecase "Gerenciar Disciplinas" as UC_Subjects
+    usecase "Gerenciar Turmas" as UC_Classes
+    usecase "Gerenciar Alunos" as UC_Students
+    usecase "Gerenciar Planos de Aula" as UC_Lessons
+
+    Usuário -- UC_Subjects
+    UC_Subjects .> (Adicionar Disciplina) : <<include>>
+    UC_Subjects .> (Listar Disciplinas) : <<include>>
+    UC_Subjects .> (Editar Disciplina) : <<include>>
+    UC_Subjects .> (Remover Disciplina) : <<include>>
+
+    Usuário -- UC_Classes
+    UC_Classes .> (Adicionar Turma) : <<include>>
+    UC_Classes .> (Listar Turmas) : <<include>>
+    UC_Classes .> (Editar Turma) : <<include>>
+    UC_Classes .> (Remover Turma) : <<include>>
+    UC_Classes ..> UC_Subjects : (depende de)
+
+    Usuário -- UC_Students
+    UC_Students .> (Adicionar Aluno à Turma) : <<include>>
+    UC_Students .> (Listar Alunos da Turma) : <<include>>
+    UC_Students .> (Editar Aluno) : <<include>>
+    UC_Students .> (Remover Aluno da Turma) : <<include>>
+    UC_Students ..> UC_Classes : (opera em)
+
+    Usuário -- UC_Lessons
+    UC_Lessons .> (Adicionar Plano de Aula) : <<include>>
+    UC_Lessons .> (Listar Planos de Aula) : <<include>>
+    UC_Lessons .> (Editar Plano de Aula) : <<include>>
+    UC_Lessons .> (Remover Plano de Aula) : <<include>>
+    UC_Lessons ..> UC_Classes : (opera em)
+  }
+
+  package "Avaliação e Desempenho" {
+    usecase "Gerenciar Avaliações (Provas, Testes)" as UC_Assessments
+    usecase "Gerenciar Banco de Questões" as UC_Questions
+    usecase "Gerar Provas (Compilado)" as UC_Proofs
+    usecase "Gerenciar Notas" as UC_Grades
+    usecase "Acompanhar Progresso" as UC_Progress
+
+    Usuário -- UC_Assessments
+    UC_Assessments .> (Adicionar Avaliação) : <<include>>
+    UC_Assessments .> (Listar Avaliações) : <<include>>
+    UC_Assessments .> (Editar Avaliação) : <<include>>
+    UC_Assessments .> (Remover Avaliação) : <<include>>
+    UC_Assessments ..> UC_Classes : (opera em)
+
+    Usuário -- UC_Questions
+    UC_Questions .> (Adicionar Questão ao Banco) : <<include>>
+    UC_Questions .> (Listar Questões do Banco) : <<include>>
+    UC_Questions .> (Editar Questão do Banco) : <<include>>
+    UC_Questions .> (Remover Questão do Banco) : <<include>>
+    UC_Questions .> (Importar Questões) : <<include>>
+    UC_Questions ..> UC_Subjects : (associado a)
+
+    Usuário -- UC_Proofs
+    UC_Proofs .> (Criar Prova a partir de Questões) : <<include>>
+    UC_Proofs .> (Visualizar Prova Gerada) : <<include>>
+    UC_Proofs .> (Exportar Prova) : <<include>>
+    (Criar Prova a partir de Questões) ..> UC_Questions : <<include>>
+
+    Usuário -- UC_Grades
+    UC_Grades .> (Lançar Nota de Aluno) : <<include>>
+    UC_Grades .> (Listar Notas) : <<include>>
+    UC_Grades .> (Editar Nota) : <<include>>
+    UC_Grades .> (Remover Nota) : <<include>>
+    (Lançar Nota de Aluno) ..> UC_Students : <<include>>
+    (Lançar Nota de Aluno) ..> UC_Assessments : <<include>>
+
+    Usuário -- UC_Progress
+    UC_Progress .> (Visualizar Dashboard) : <<include>>
+    UC_Progress .> (Gerar Relatório de Progresso da Turma) : <<include>>
+  }
+
+  package "Ferramentas de Produtividade" {
+    usecase "Gerenciar Tarefas" as UC_Tasks
+    usecase "Gerenciar Sessões de Foco" as UC_Focus
+
+    Usuário -- UC_Tasks
+    UC_Tasks .> (Adicionar Tarefa) : <<include>>
+    UC_Tasks .> (Listar Tarefas) : <<include>>
+    UC_Tasks .> (Editar Tarefa) : <<include>>
+    UC_Tasks .> (Marcar Tarefa como Concluída) : <<include>>
+    UC_Tasks .> (Remover Tarefa) : <<include>>
+
+    Usuário -- UC_Focus
+    UC_Focus .> (Iniciar Sessão de Foco) : <<include>>
+    UC_Focus .> (Concluir/Interromper Sessão) : <<include>>
+    UC_Focus .> (Visualizar Histórico de Foco) : <<include>>
+    (Iniciar Sessão de Foco) ..> UC_Tasks : <<extend>> (opcionalmente para uma tarefa)
+  }
+}
+@enduml
