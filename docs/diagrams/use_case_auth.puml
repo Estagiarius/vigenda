@@ -1,0 +1,13 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor Usuário
+
+rectangle "Pacote Autenticação" {
+  usecase "Autenticar Usuário" as UC_Auth
+  Usuário -- UC_Auth
+  UC_Auth .> (Registrar Novo Usuário) : <<include>>
+  UC_Auth .> (Realizar Login) : <<include>>
+}
+@enduml

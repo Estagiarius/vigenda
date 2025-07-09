@@ -1,0 +1,77 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor Usuário
+
+rectangle "Pacote Avaliação e Desempenho" {
+  usecase "Gerenciar Avaliações (Provas, Testes)" as UC_Assessments
+  usecase "Gerenciar Banco de Questões" as UC_Questions
+  usecase "Gerar Provas (Compilado)" as UC_Proofs
+  usecase "Gerenciar Notas" as UC_Grades
+  usecase "Acompanhar Progresso" as UC_Progress
+
+  ' Forward declarations for clarity on dependencies
+  usecase "Gerenciar Disciplinas" as UC_Subjects_Ext <<external>>
+  usecase "Gerenciar Turmas" as UC_Classes_Ext <<external>>
+  usecase "Gerenciar Alunos" as UC_Students_Ext <<external>>
+
+
+  Usuário -- UC_Assessments
+  UC_Assessments .> (Adicionar Avaliação) : <<include>>
+  UC_Assessments .> (Listar Avaliações) : <<include>>
+  UC_Assessments .> (Editar Avaliação) : <<include>>
+  UC_Assessments .> (Remover Avaliação) : <<include>>
+  UC_Assessments ..> UC_Classes_Ext : (opera em Turma existente)
+
+  Usuário -- UC_Questions
+  UC_Questions .> (Adicionar Questão ao Banco) : <<include>>
+  UC_Questions .> (Listar Questões do Banco) : <<include>>
+  UC_Questions .> (Editar Questão do Banco) : <<include>>
+  UC_Questions .> (Remover Questão do Banco) : <<include>>
+  UC_Questions .> (Importar Questões) : <<include>>
+  UC_Questions ..> UC_Subjects_Ext : (associado a Disciplina existente)
+
+  Usuário -- UC_Proofs
+  UC_Proofs .> (Criar Prova a partir de Questões) : <<include>>
+  UC_Proofs .> (Visualizar Prova Gerada) : <<include>>
+  UC_Proofs .> (Exportar Prova) : <<include>>
+  (Criar Prova a partir de Questões) ..> UC_Questions : <<include>> ' Dependência interna ao pacote
+  UC_Proofs ..> UC_Assessments : <<extend>> (Pode gerar uma Avaliação)
+
+  Usuário -- UC_Grades
+  UC_Grades .> (Lançar Nota de Aluno) : <<include>>
+  UC_Grades .> (Listar Notas) : <<include>>
+  UC_Grades .> (Editar Nota) : <<include>>
+  UC_Grades .> (Remover Nota) : <<include>>
+  (Lançar Nota de Aluno) ..> UC_Students_Ext : <<include>>
+  (Lançar Nota de Aluno) ..> UC_Assessments : <<include>> ' Dependência interna ao pacote
+
+  Usuário -- UC_Progress
+  UC_Progress .> (Visualizar Dashboard) : <<include>>
+  UC_Progress .> (Gerar Relatório de Progresso da Turma) : <<include>>
+  (Gerar Relatório de Progresso da Turma) ..> UC_Classes_Ext : (opera em)
+  (Gerar Relatório de Progresso da Turma) ..> UC_Grades : (utiliza)
+}
+
+note right of UC_Subjects_Ext
+  Este é um caso de uso de
+  outro pacote ("Gerenciamento Acadêmico"),
+  mostrado aqui para contextualizar
+  a dependência de UC_Questions.
+end note
+
+note right of UC_Classes_Ext
+  Este é um caso de uso de
+  outro pacote ("Gerenciamento Acadêmico"),
+  mostrado aqui para contextualizar
+  dependências.
+end note
+
+note right of UC_Students_Ext
+  Este é um caso de uso de
+  outro pacote ("Gerenciamento Acadêmico"),
+  mostrado aqui para contextualizar
+  a dependência de UC_Grades.
+end note
+@enduml

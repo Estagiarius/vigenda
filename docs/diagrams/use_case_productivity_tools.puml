@@ -1,0 +1,24 @@
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+
+actor Usuário
+
+rectangle "Pacote Ferramentas de Produtividade" {
+  usecase "Gerenciar Tarefas" as UC_Tasks
+  usecase "Gerenciar Sessões de Foco" as UC_Focus
+
+  Usuário -- UC_Tasks
+  UC_Tasks .> (Adicionar Tarefa) : <<include>>
+  UC_Tasks .> (Listar Tarefas) : <<include>>
+  UC_Tasks .> (Editar Tarefa) : <<include>>
+  UC_Tasks .> (Marcar Tarefa como Concluída) : <<include>>
+  UC_Tasks .> (Remover Tarefa) : <<include>>
+
+  Usuário -- UC_Focus
+  UC_Focus .> (Iniciar Sessão de Foco) : <<include>>
+  UC_Focus .> (Concluir/Interromper Sessão) : <<include>>
+  UC_Focus .> (Visualizar Histórico de Foco) : <<include>>
+  (Iniciar Sessão de Foco) ..> UC_Tasks : <<extend>> (opcionalmente para uma tarefa)
+}
+@enduml
