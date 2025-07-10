@@ -1,68 +1,89 @@
+// Package app contém a lógica principal da Interface de Texto do Usuário (TUI)
+// da aplicação Vigenda, utilizando o framework BubbleTea.
+// Este arquivo (app.go) define o modelo principal da aplicação TUI,
+// que gerencia as diferentes visualizações (telas/módulos) e suas interações.
 package app
 
 import (
 	"fmt"
-	"log" // Adicionado para logging
-	// "os" // Removido import não utilizado
+	"log" // Para logging interno do ciclo de vida da TUI.
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"vigenda/internal/app/assessments" // Import for the assessments module
-	"vigenda/internal/app/classes"     // Import for the classes module
-	"vigenda/internal/app/dashboard"   // Import for the new dashboard module
-	"vigenda/internal/app/proofs"      // Import for the proofs module
-	"vigenda/internal/app/questions"   // Import for the questions module
-	"vigenda/internal/app/tasks"       // Import for the tasks module
-	"vigenda/internal/service"         // Import for service interfaces
+
+	// Importações dos submódulos de visualização da TUI.
+	"vigenda/internal/app/assessments"
+	"vigenda/internal/app/classes"
+	"vigenda/internal/app/dashboard"
+	"vigenda/internal/app/proofs"
+	"vigenda/internal/app/questions"
+	"vigenda/internal/app/tasks"
+	"vigenda/internal/service" // Importa as interfaces de serviço.
 )
 
 var (
+	// appStyle define um estilo base para o contêiner principal da aplicação TUI.
 	appStyle = lipgloss.NewStyle().Padding(1, 2)
-	// Define other styles as needed
 )
 
-// Model represents the main application model.
+// Model (ou AppModel) é o modelo raiz da aplicação TUI.
+// Ele gerencia o estado global da TUI, como a visualização atual,
+// e contém instâncias dos sub-modelos para cada funcionalidade principal.
+// Também armazena as dependências de serviço injetadas.
 type Model struct {
-	list             list.Model
-	currentView      View
+	list list.Model // list é usado para o menu principal quando currentView é DashboardView.
+
+	currentView View // currentView rastreia qual módulo/tela está ativo.
+
+	// Sub-modelos para cada funcionalidade principal da TUI.
+	// Cada sub-modelo é um programa BubbleTea independente em sua essência.
 	tasksModel       *tasks.Model
 	classesModel     *classes.Model
 	assessmentsModel *assessments.Model
 	questionsModel   *questions.Model
 	proofsModel      *proofs.Model
-	dashboardModel   *dashboard.Model // Added dashboard model field
-	// Add other sub-models here as they are developed
-	width    int
-	height   int
-	quitting bool
-	err      error // To store any critical errors for display
+	dashboardModel   *dashboard.Model // Modelo para o painel de controle.
 
-	// Services - these will be injected
+	width    int  // width da janela do terminal.
+	height   int  // height da janela do terminal.
+	quitting bool // quitting é true se a aplicação está em processo de encerramento.
+	err      error // err armazena erros críticos que podem precisar ser exibidos.
+
+	// Instâncias de serviço injetadas, usadas pelos sub-modelos.
 	taskService       service.TaskService
 	classService      service.ClassService
 	assessmentService service.AssessmentService
 	questionService   service.QuestionService
 	proofService      service.ProofService
 	lessonService     service.LessonService
-	// ... other services
 }
 
-// Init initializes the application model.
-// Changed to pointer receiver
+// Init é o método de inicialização para o Model principal da aplicação.
+// Conforme a filosofia BubbleTea, pode retornar um tea.Cmd para executar
+// tarefas iniciais (ex: carregar dados). Neste caso, como os sub-modelos
+// têm seus próprios Inits, o Init do AppModel principal pode não precisar
+// fazer muito inicialmente, exceto se houver um estado global a ser carregado.
+// Atualmente, retorna nil, indicando nenhuma ação inicial imediata neste nível.
 func (m *Model) Init() tea.Cmd {
-	return nil // No initial command, sub-models handle their own Init
+	// O estado inicial (DashboardView com a lista de menu) é configurado em New.
+	// Os Inits dos sub-modelos são chamados quando a visualização muda para eles.
+	return nil
 }
 
-// New creates a new instance of the application model.
-// It requires services to be injected for its sub-models.
-// Changed to return *Model
-func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService, ls service.LessonService /* add other services as params */) *Model {
-	// Define menu items using the View enum for safer mapping
+// New é a função construtora para o Model principal da aplicação TUI.
+// Recebe todas as dependências de serviço necessárias para a operação dos
+// seus sub-modelos. Configura o menu principal (lista de itens) e inicializa
+// todos os sub-modelos. Retorna um ponteiro para o Model configurado.
+func New(
+	ts service.TaskService, cs service.ClassService,
+	as service.AssessmentService, qs service.QuestionService,
+	ps service.ProofService, ls service.LessonService,
+) *Model {
+	// Define os itens do menu principal. Cada item tem um título e uma View associada.
 	menuItems := []list.Item{
-		// DashboardView (as main menu) does not need an item for itself, it IS the list.
-		menuItem{title: ConcreteDashboardView.String(), view: ConcreteDashboardView}, // New menu item for actual dashboard
+		menuItem{title: ConcreteDashboardView.String(), view: ConcreteDashboardView},
 		menuItem{title: TaskManagementView.String(), view: TaskManagementView},
 		menuItem{title: ClassManagementView.String(), view: ClassManagementView},
 		menuItem{title: AssessmentManagementView.String(), view: AssessmentManagementView},
@@ -70,29 +91,33 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 		menuItem{title: ProofGenerationView.String(), view: ProofGenerationView},
 	}
 
+	// Cria o componente de lista para o menu principal.
 	l := list.New(menuItems, list.NewDefaultDelegate(), 0, 0)
-	l.Title = "Vigenda - Menu Principal" // Title for the main menu (DashboardView)
-	l.SetShowStatusBar(false)
-	l.SetFilteringEnabled(false)
-	l.Styles.Title = lipgloss.NewStyle().Bold(true).MarginBottom(1)
+	l.Title = "Vigenda - Menu Principal"
+	l.SetShowStatusBar(false)       // Não usa a barra de status padrão da lista.
+	l.SetFilteringEnabled(false)    // Desabilita filtragem para o menu principal.
+	l.Styles.Title = lipgloss.NewStyle().Bold(true).MarginBottom(1) // Estiliza o título do menu.
+	// Define teclas de ajuda adicionais para a lista do menu.
 	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q/ctrl+c", "sair")),
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "selecionar")),
 		}
 	}
-	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys // Keep it simple for now
+	l.AdditionalFullHelpKeys = l.AdditionalShortHelpKeys // Mantém simples por enquanto.
 
-	// Initialize sub-models
+	// Inicializa todos os sub-modelos, injetando suas respectivas dependências de serviço.
 	tm := tasks.New(ts)
 	cm := classes.New(cs)
 	am := assessments.New(as)
 	qm := questions.New(qs)
 	pm := proofs.New(ps)
-	dshModel := dashboard.New(ts, cs, as, ls) // Initialize dashboard model, passing necessary services
-	return &Model{ // Return pointer
+	dshModel := dashboard.New(ts, cs, as, ls)
+
+	// Retorna a instância do Model principal.
+	return &Model{
 		list:              l,
-		currentView:       DashboardView, // Start with the main menu (DashboardView acts as the container)
+		currentView:       DashboardView, // A visualização inicial é o menu principal (DashboardView).
 		tasksModel:        tm,
 		taskService:       ts,
 		classesModel:      cm,
@@ -103,41 +128,48 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 		questionService:   qs,
 		proofsModel:       pm,
 		proofService:      ps,
-		lessonService:     ls,         // Store lessonService
-		dashboardModel:    dshModel, // Assign initialized dashboard model
+		lessonService:     ls,
+		dashboardModel:    dshModel,
 	}
 }
 
-// menuItem holds the title and the corresponding view for a menu entry.
+// menuItem é uma struct helper que implementa a interface list.Item.
+// Usada para popular a lista do menu principal.
 type menuItem struct {
-	title string
-	view  View
+	title string // title é o texto exibido para o item de menu.
+	view  View   // view é a constante View associada a este item de menu.
 }
 
+// FilterValue retorna o valor usado pela lista para filtrar itens (o título neste caso).
 func (i menuItem) FilterValue() string { return i.title }
-func (i menuItem) Title() string       { return i.title }
-func (i menuItem) Description() string { return "" } // Could add descriptions later
 
-// Update handles messages and updates the model.
-// Changed to pointer receiver
+// Title retorna o título do item de menu.
+func (i menuItem) Title() string { return i.title }
+
+// Description retorna a descrição do item de menu (vazio neste caso).
+func (i menuItem) Description() string { return "" }
+
+// Update é o coração do ciclo de vida do BubbleTea para o Model principal.
+// Ele processa mensagens (eventos) como entradas de teclado, redimensionamento de janela,
+// ou mensagens customizadas de comandos.
+// Retorna o modelo atualizado e um tea.Cmd para quaisquer operações subsequentes.
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	log.Printf("AppModel: Update GLOBAL - Recebida msg tipo %T Valor: %v", msg, msg)
-	var cmds []tea.Cmd // Use a slice to collect commands
+	var cmds []tea.Cmd // Slice para acumular comandos a serem executados.
 
-	// First switch for messages that AppModel handles directly or globally
+	// Primeiro switch: lida com mensagens globais ou específicas do AppModel.
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
+	case tea.WindowSizeMsg: // Janela do terminal foi redimensionada.
 		m.width = msg.Width
 		m.height = msg.Height
-		// Adjust list size for main menu
-		listHeight := msg.Height - appStyle.GetVerticalPadding() - lipgloss.Height(m.list.Title) - lipgloss.Height(m.list.Help.View(m.list)) - 2 // Approximate height for help
+		// Ajusta o tamanho da lista do menu principal.
+		listHeight := msg.Height - appStyle.GetVerticalPadding() - lipgloss.Height(m.list.Title) - lipgloss.Height(m.list.Help.View(m.list)) - 2
 		m.list.SetSize(msg.Width-appStyle.GetHorizontalPadding(), listHeight)
 
-		// Propagate WindowSizeMsg to all submodels so they can resize
+		// Propaga a mensagem de redimensionamento para todos os sub-modelos ativos.
 		var subCmd tea.Cmd
 		var tempModel tea.Model
 
-		// Dashboard model
 		tempModel, subCmd = m.dashboardModel.Update(msg)
 		m.dashboardModel = tempModel.(*dashboard.Model)
 		cmds = append(cmds, subCmd)
@@ -145,7 +177,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		tempModel, subCmd = m.tasksModel.Update(msg)
 		m.tasksModel = tempModel.(*tasks.Model)
 		cmds = append(cmds, subCmd)
-
+		// ... (repetir para todos os outros sub-modelos) ...
 		tempModel, subCmd = m.classesModel.Update(msg)
 		m.classesModel = tempModel.(*classes.Model)
 		cmds = append(cmds, subCmd)
@@ -161,31 +193,31 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		tempModel, subCmd = m.proofsModel.Update(msg)
 		m.proofsModel = tempModel.(*proofs.Model)
 		cmds = append(cmds, subCmd)
+
 		return m, tea.Batch(cmds...)
 
-	case tea.KeyMsg:
-		// Global quit
+	case tea.KeyMsg: // Mensagem de tecla pressionada.
+		// Atalho global para sair (Ctrl+C).
 		if key.Matches(msg, key.NewBinding(key.WithKeys("ctrl+c"))) {
 			m.quitting = true
 			cmds = append(cmds, tea.Quit)
 			return m, tea.Batch(cmds...)
 		}
 
-		// Handle interactions based on the current view
-		// If in main menu (DashboardView), handle list navigation and selection
+		// Se a visualização atual é o menu principal (DashboardView).
 		if m.currentView == DashboardView {
 			var listCmd tea.Cmd
-			m.list, listCmd = m.list.Update(msg)
+			m.list, listCmd = m.list.Update(msg) // Deixa o componente de lista lidar com a navegação.
 			cmds = append(cmds, listCmd)
 
-			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
+			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) { // Seleção de item de menu.
 				selectedItem, ok := m.list.SelectedItem().(menuItem)
-				if ok { // No need to check selectedItem.view != DashboardView, as DashboardView is the container
-					m.currentView = selectedItem.view
+				if ok {
+					m.currentView = selectedItem.view // Muda para a visualização selecionada.
 					log.Printf("AppModel: Mudando para view %s (%d)", m.currentView.String(), m.currentView)
-					// Dispatch Init command for the selected submodel
+					// Dispara o comando Init do sub-modelo correspondente.
 					switch m.currentView {
-					case ConcreteDashboardView: // When "Painel de Controle" is selected
+					case ConcreteDashboardView:
 						cmds = append(cmds, m.dashboardModel.Init())
 					case TaskManagementView:
 						cmds = append(cmds, m.tasksModel.Init())
@@ -199,121 +231,153 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cmds = append(cmds, m.proofsModel.Init())
 					}
 				}
-			} else if key.Matches(msg, key.NewBinding(key.WithKeys("q"))) {
+			} else if key.Matches(msg, key.NewBinding(key.WithKeys("q"))) { // Sair do menu principal.
 				m.quitting = true
 				cmds = append(cmds, tea.Quit)
 			}
 			return m, tea.Batch(cmds...)
 		}
-		// If not in DashboardView (main menu), KeyMsg will be passed to the active submodel's Update method below.
+		// Se não estiver no DashboardView, a tecla será passada para o sub-modelo ativo abaixo.
 
-	case error: // Catch global errors (e.g., from Init functions of submodels if not handled there)
+	case error: // Captura erros globais (ex: de Inits de sub-modelos).
 		m.err = msg
 		log.Printf("AppModel: Erro global recebido: %v", msg)
-		// Optionally, switch to an error view or prepare to quit
-		// For now, just store the error. The View method can display it.
-		return m, tea.Batch(cmds...)
+		return m, tea.Batch(cmds...) // Armazena o erro para exibição.
 	}
 
-	// Second stage: Delegate message to the active submodel if not handled above
+	// Segundo estágio: Delega a mensagem para o sub-modelo ativo se não foi tratada globalmente.
 	var submodelCmd tea.Cmd
-	var updatedModel tea.Model
+	var updatedSubModel tea.Model // Usar tea.Model para o tipo retornado por Update.
+
+	// Função helper para processar retorno de sub-modelo e tecla 'esc'.
+	// Retorna true se a view deve voltar ao menu principal.
+	processSubmodelUpdate := func(currentSubModel tea.Model, kmsg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+		newSubModel, newSubCmd := currentSubModel.Update(kmsg)
+		// Tenta type assertion para verificar se o sub-modelo tem um método IsFocused.
+		// Este é um padrão que os sub-modelos podem implementar.
+		type focuser interface{ IsFocused() bool }
+		if f, ok := newSubModel.(focuser); ok {
+			if key.Matches(kmsg, key.NewBinding(key.WithKeys("esc"))) && !f.IsFocused() {
+				return newSubModel, newSubCmd, true // Sinaliza para voltar ao menu.
+			}
+		} else if key.Matches(kmsg, key.NewBinding(key.WithKeys("esc"))) {
+			// Se o sub-modelo não implementa IsFocused, 'esc' sempre volta.
+			return newSubModel, newSubCmd, true
+		}
+		return newSubModel, newSubCmd, false // Não volta.
+	}
 
 	switch m.currentView {
 	case ConcreteDashboardView:
-		updatedModel, submodelCmd = m.dashboardModel.Update(msg)
-		m.dashboardModel = updatedModel.(*dashboard.Model)
-		cmds = append(cmds, submodelCmd)
+		updatedSubModel, submodelCmd = m.dashboardModel.Update(msg)
+		m.dashboardModel = updatedSubModel.(*dashboard.Model)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
-			if !m.dashboardModel.IsFocused() {
-				m.currentView = DashboardView // Go back to main menu
+			// O dashboard pode ter sua própria lógica de foco interno.
+			// Se o dashboard indicar que não está mais focado (ex: após pressionar Esc de um modal interno), volta ao menu.
+			type focuser interface{ IsFocused() bool }
+			if f, ok := m.dashboardModel.Model.(focuser); !ok || !f.IsFocused() {
+				m.currentView = DashboardView
 				log.Println("AppModel: Voltando para o Menu Principal a partir do Painel de Controle.")
 			}
 		}
 	case TaskManagementView:
-		updatedModel, submodelCmd = m.tasksModel.Update(msg)
-		m.tasksModel = updatedModel.(*tasks.Model)
-		cmds = append(cmds, submodelCmd)
-		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
-			if !m.tasksModel.IsFocused() {
+		if km, ok := msg.(tea.KeyMsg); ok {
+			var shouldReturn bool
+			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.tasksModel, km)
+			m.tasksModel = updatedSubModel.(*tasks.Model)
+			if shouldReturn {
 				m.currentView = DashboardView
 				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Tarefas.")
 			}
+		} else {
+			updatedSubModel, submodelCmd = m.tasksModel.Update(msg)
+			m.tasksModel = updatedSubModel.(*tasks.Model)
 		}
+	// ... (Lógica similar para outros casos, usando processSubmodelUpdate para teclas) ...
 	case ClassManagementView:
-		updatedModel, submodelCmd = m.classesModel.Update(msg)
-		m.classesModel = updatedModel.(*classes.Model)
-		cmds = append(cmds, submodelCmd)
-		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
-			if !m.classesModel.IsFocused() {
+		if km, ok := msg.(tea.KeyMsg); ok {
+			var shouldReturn bool
+			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.classesModel, km)
+			m.classesModel = updatedSubModel.(*classes.Model)
+			if shouldReturn {
 				m.currentView = DashboardView
 				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Turmas.")
 			}
+		} else {
+			updatedSubModel, submodelCmd = m.classesModel.Update(msg)
+			m.classesModel = updatedSubModel.(*classes.Model)
 		}
 	case AssessmentManagementView:
-		updatedModel, submodelCmd = m.assessmentsModel.Update(msg)
-		m.assessmentsModel = updatedModel.(*assessments.Model)
-		cmds = append(cmds, submodelCmd)
-		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
-			if !m.assessmentsModel.IsFocused() {
+		if km, ok := msg.(tea.KeyMsg); ok {
+			var shouldReturn bool
+			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.assessmentsModel, km)
+			m.assessmentsModel = updatedSubModel.(*assessments.Model)
+			if shouldReturn {
 				m.currentView = DashboardView
 				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Avaliações.")
 			}
+		} else {
+			updatedSubModel, submodelCmd = m.assessmentsModel.Update(msg)
+			m.assessmentsModel = updatedSubModel.(*assessments.Model)
 		}
 	case QuestionBankView:
-		updatedModel, submodelCmd = m.questionsModel.Update(msg)
-		m.questionsModel = updatedModel.(*questions.Model)
-		cmds = append(cmds, submodelCmd)
-		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
-			if !m.questionsModel.IsFocused() {
+		if km, ok := msg.(tea.KeyMsg); ok {
+			var shouldReturn bool
+			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.questionsModel, km)
+			m.questionsModel = updatedSubModel.(*questions.Model)
+			if shouldReturn {
 				m.currentView = DashboardView
 				log.Println("AppModel: Voltando para o Menu Principal a partir do Banco de Questões.")
 			}
+		} else {
+			updatedSubModel, submodelCmd = m.questionsModel.Update(msg)
+			m.questionsModel = updatedSubModel.(*questions.Model)
 		}
 	case ProofGenerationView:
-		updatedModel, submodelCmd = m.proofsModel.Update(msg)
-		m.proofsModel = updatedModel.(*proofs.Model)
-		cmds = append(cmds, submodelCmd)
-		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
-			if !m.proofsModel.IsFocused() {
+		if km, ok := msg.(tea.KeyMsg); ok {
+			var shouldReturn bool
+			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.proofsModel, km)
+			m.proofsModel = updatedSubModel.(*proofs.Model)
+			if shouldReturn {
 				m.currentView = DashboardView
 				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerar Provas.")
 			}
+		} else {
+			updatedSubModel, submodelCmd = m.proofsModel.Update(msg)
+			m.proofsModel = updatedSubModel.(*proofs.Model)
 		}
-	// DashboardView (main menu) list updates are handled in the tea.KeyMsg section of the first switch.
 	}
+	cmds = append(cmds, submodelCmd) // Adiciona comando do sub-modelo.
 
 	return m, tea.Batch(cmds...)
 }
 
-// View renders the application's UI.
-// Changed to pointer receiver
+// View renderiza a interface do usuário com base no estado atual do Model principal.
+// Se estiver saindo ou houver um erro crítico, exibe mensagens apropriadas.
+// Caso contrário, delega a renderização para o View() do sub-modelo ativo
+// ou exibe o menu principal.
 func (m *Model) View() string {
 	if m.quitting {
 		return appStyle.Render("Saindo do Vigenda...\n")
 	}
 	if m.err != nil {
-		// More robust error display
-		errorStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("9"))
+		errorStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("9")) // Vermelho para erro.
 		return appStyle.Render(fmt.Sprintf("Ocorreu um erro crítico: %v\nPressione Ctrl+C para sair.", errorStyle.Render(m.err.Error())))
 	}
 
 	var viewContent string
-	var help string // Help text can be context-dependent
+	var help string // Texto de ajuda, pode ser contextual.
 
 	switch m.currentView {
-	case DashboardView: // This is the Main Menu
+	case DashboardView: // Se a view atual é o menu principal.
 		viewContent = m.list.View()
-		// Help for the main menu is usually part of the list component itself or can be added
-		help = m.list.Help.View(m.list) // Use built-in help view of the list
-	case ConcreteDashboardView: // The actual dashboard display
+		help = m.list.Help.View(m.list) // Usa a ajuda embutida do componente de lista.
+	case ConcreteDashboardView:
 		viewContent = m.dashboardModel.View()
-		// Help for ConcreteDashboardView might be part of its own View or defined here
-		// For now, assuming its View includes necessary help, or it's simple 'esc' to go back.
 		help = "\nPressione 'esc' para voltar ao menu principal."
 	case TaskManagementView:
 		viewContent = m.tasksModel.View()
-		help = "\nPressione 'esc' para voltar ao menu principal." // Simplified help
+		help = "\nPressione 'esc' para voltar ao menu principal."
 	case ClassManagementView:
 		viewContent = m.classesModel.View()
 		help = "\nPressione 'esc' para voltar ao menu principal."
@@ -326,30 +390,33 @@ func (m *Model) View() string {
 	case ProofGenerationView:
 		viewContent = m.proofsModel.View()
 		help = "\nPressione 'esc' para voltar ao menu principal."
-	default: // Should not happen if all views are handled
+	default: // Caso uma view desconhecida seja definida.
 		viewContent = fmt.Sprintf("Visão desconhecida: %s (%d)", m.currentView.String(), m.currentView)
 		help = "\nPressione 'esc' ou 'q' para tentar voltar ao menu principal."
 	}
 
-	// Combine content and help.
-	// Ensure help is only added if viewContent is not already filling the screen or managing its own help.
+	// Junta o conteúdo da view principal com o texto de ajuda.
 	finalRender := lipgloss.JoinVertical(lipgloss.Left,
 		viewContent,
-		lipgloss.NewStyle().MarginTop(1).Render(help), // Add margin to separate help
+		lipgloss.NewStyle().MarginTop(1).Render(help), // Adiciona margem para separar a ajuda.
 	)
-	return appStyle.Render(finalRender)
+	return appStyle.Render(finalRender) // Aplica o estilo global da aplicação.
 }
 
-// StartApp is a helper to run the BubbleTea program.
-// It requires services to be passed for initializing the main model.
-func StartApp(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService, ls service.LessonService /*, other services */) {
-	// New now returns *Model, so model is already a pointer.
-	model := New(ts, cs, as, qs, ps, ls /*, other services */)
-	// tea.NewProgram expects tea.Model, and *Model now implements tea.Model.
+// StartApp é a função ponto de entrada para iniciar a aplicação TUI Vigenda.
+// Ela cria uma nova instância do Model principal, injetando todas as dependências de serviço,
+// e então inicia o programa BubbleTea.
+// Esta função é tipicamente chamada pelo comando raiz da CLI quando nenhuma subcomando é fornecido.
+func StartApp(
+	ts service.TaskService, cs service.ClassService,
+	as service.AssessmentService, qs service.QuestionService,
+	ps service.ProofService, ls service.LessonService,
+) {
+	model := New(ts, cs, as, qs, ps, ls)
+	// tea.WithAltScreen() usa o buffer alternativo do terminal, preservando o histórico do shell.
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
-		// Use log for consistency, as file logging is set up.
-		log.Fatalf("Error running BubbleTea program: %v", err)
-		// os.Exit(1) // log.Fatalf will exit
+		// Usa log.Fatalf para registrar o erro e sair, garantindo que o erro seja logado no arquivo.
+		log.Fatalf("Erro ao executar o programa BubbleTea: %v", err)
 	}
 }
