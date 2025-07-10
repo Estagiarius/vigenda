@@ -159,7 +159,6 @@ func (s *stubClassService) DeleteClass(ctx context.Context, classID int64) error
 	return s.classRepo.DeleteClass(ctx, classID, 1) // Assuming UserID 1 for stub
 }
 
-
 func (s *stubClassService) ImportStudentsFromCSV(ctx context.Context, classID int64, csvData []byte) (int, error) {
 	fmt.Printf("[StubClassService] ImportStudentsFromCSV for ClassID: %d\n", classID)
 	reader := csv.NewReader(strings.NewReader(string(csvData)))
@@ -221,7 +220,6 @@ func (s *stubClassService) GetStudentByID(ctx context.Context, studentID int64) 
 	return *student, nil
 }
 
-
 func (s *stubClassService) UpdateStudent(ctx context.Context, studentID int64, fullName string, enrollmentID string, status string) (models.Student, error) {
 	fmt.Printf("[StubClassService] UpdateStudent ID %d: Name: %s, Status: %s\n", studentID, fullName, status)
 	student, err := s.classRepo.GetStudentByID(ctx, studentID)
@@ -248,7 +246,6 @@ func (s *stubClassService) DeleteStudent(ctx context.Context, studentID int64) e
 	}
 	return s.classRepo.DeleteStudent(ctx, studentID, student.ClassID)
 }
-
 
 func (s *stubClassService) UpdateStudentStatus(ctx context.Context, studentID int64, newStatus string) error {
 	fmt.Printf("[StubClassService] UpdateStudentStatus for StudentID %d to %s\n", studentID, newStatus)

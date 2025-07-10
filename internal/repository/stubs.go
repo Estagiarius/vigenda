@@ -55,7 +55,7 @@ func (r *StubSubjectRepository) GetOrCreateByNameAndUser(ctx context.Context, na
 
 // StubTaskRepository
 type StubTaskRepository struct {
-	DB                           *sql.DB
+	DB *sql.DB
 	// GetUpcomingActiveTasksFunc func(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) // Removido
 	// Tasks                        []models.Task // Removido
 	// Err                          error         // Removido
@@ -84,7 +84,6 @@ func (r *StubTaskRepository) CreateTask(ctx context.Context, task *models.Task) 
 		dueDate.Time = *task.DueDate
 		dueDate.Valid = true
 	}
-
 
 	res, err := stmt.ExecContext(ctx, task.UserID, classID, task.Title, task.Description, dueDate, task.IsCompleted)
 	if err != nil {
@@ -195,12 +194,12 @@ func (r *StubTaskRepository) DeleteTask(ctx context.Context, taskID int64) error
 	return nil
 }
 
-
 // StubClassRepository
 type StubClassRepository struct {
 	DB *sql.DB
 }
-func NewStubClassRepository(db *sql.DB) *StubClassRepository { return &StubClassRepository{DB:db} }
+
+func NewStubClassRepository(db *sql.DB) *StubClassRepository { return &StubClassRepository{DB: db} }
 
 func (r *StubClassRepository) CreateClass(ctx context.Context, class *models.Class) (int64, error) {
 	fmt.Printf("[StubClassRepository] CreateClass: %s\n", class.Name)
@@ -209,12 +208,12 @@ func (r *StubClassRepository) CreateClass(ctx context.Context, class *models.Cla
 	return 1, nil
 }
 func (r *StubClassRepository) AddStudent(ctx context.Context, student *models.Student) (int64, error) {
-    fmt.Printf("[StubClassRepository] AddStudent: %s to class %d\n", student.FullName, student.ClassID)
-    return 1, nil // Dummy student ID
+	fmt.Printf("[StubClassRepository] AddStudent: %s to class %d\n", student.FullName, student.ClassID)
+	return 1, nil // Dummy student ID
 }
 func (r *StubClassRepository) UpdateStudentStatus(ctx context.Context, studentID int64, status string) error {
-    fmt.Printf("[StubClassRepository] UpdateStudentStatus for %d to %s\n", studentID, status)
-    return nil
+	fmt.Printf("[StubClassRepository] UpdateStudentStatus for %d to %s\n", studentID, status)
+	return nil
 }
 func (r *StubClassRepository) GetClassByID(ctx context.Context, classID int64) (models.Class, error) {
 	fmt.Printf("[StubClassRepository] GetClassByID: %d\n", classID)
@@ -226,37 +225,39 @@ func (r *StubClassRepository) GetClassByID(ctx context.Context, classID int64) (
 	return models.Class{}, fmt.Errorf("class with ID %d not found in stub", classID)
 }
 
-
 // StubAssessmentRepository
 type StubAssessmentRepository struct {
 	DB *sql.DB
 }
-func NewStubAssessmentRepository(db *sql.DB) *StubAssessmentRepository { return &StubAssessmentRepository{DB:db} }
+
+func NewStubAssessmentRepository(db *sql.DB) *StubAssessmentRepository {
+	return &StubAssessmentRepository{DB: db}
+}
 
 func (r *StubAssessmentRepository) CreateAssessment(ctx context.Context, assessment *models.Assessment) (int64, error) {
 	fmt.Printf("[StubAssessmentRepository] CreateAssessment: %s\n", assessment.Name)
 	return 1, nil // Dummy ID
 }
 func (r *StubAssessmentRepository) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {
-    fmt.Printf("[StubAssessmentRepository] GetStudentsByClassID: %d\n", classID)
-    // Return a dummy list of students for testing grade entry
-    return []models.Student{
-        {ID: 101, FullName: "Alice Wonderland", ClassID: classID, Status: "ativo"},
-        {ID: 102, FullName: "Bob The Builder", ClassID: classID, Status: "ativo"},
-        {ID: 103, FullName: "Charlie Brown (Transferido)", ClassID: classID, Status: "transferido"},
-    }, nil
+	fmt.Printf("[StubAssessmentRepository] GetStudentsByClassID: %d\n", classID)
+	// Return a dummy list of students for testing grade entry
+	return []models.Student{
+		{ID: 101, FullName: "Alice Wonderland", ClassID: classID, Status: "ativo"},
+		{ID: 102, FullName: "Bob The Builder", ClassID: classID, Status: "ativo"},
+		{ID: 103, FullName: "Charlie Brown (Transferido)", ClassID: classID, Status: "transferido"},
+	}, nil
 }
 func (r *StubAssessmentRepository) GetAssessmentByID(ctx context.Context, assessmentID int64) (*models.Assessment, error) {
-    fmt.Printf("[StubAssessmentRepository] GetAssessmentByID: %d\n", assessmentID)
-    // Return a dummy assessment
-    return &models.Assessment{ID: assessmentID, Name: "Dummy Assessment", ClassID: 1, Term: 1, Weight: 1.0}, nil
+	fmt.Printf("[StubAssessmentRepository] GetAssessmentByID: %d\n", assessmentID)
+	// Return a dummy assessment
+	return &models.Assessment{ID: assessmentID, Name: "Dummy Assessment", ClassID: 1, Term: 1, Weight: 1.0}, nil
 }
 func (r *StubAssessmentRepository) EnterGrade(ctx context.Context, grade *models.Grade) error {
-    fmt.Printf("[StubAssessmentRepository] EnterGrade for student %d, assessment %d: %.2f\n", grade.StudentID, grade.AssessmentID, grade.Grade)
-    return nil
+	fmt.Printf("[StubAssessmentRepository] EnterGrade for student %d, assessment %d: %.2f\n", grade.StudentID, grade.AssessmentID, grade.Grade)
+	return nil
 }
 func (r *StubAssessmentRepository) GetGradesByClassID(ctx context.Context, classID int64) ([]models.Grade, []models.Assessment, []models.Student, error) {
-    fmt.Printf("[StubAssessmentRepository] GetGradesByClassID: %d\n", classID)
-    // Return dummy data for average calculation
-    return []models.Grade{}, []models.Assessment{}, []models.Student{}, nil
+	fmt.Printf("[StubAssessmentRepository] GetGradesByClassID: %d\n", classID)
+	// Return dummy data for average calculation
+	return []models.Grade{}, []models.Assessment{}, []models.Student{}, nil
 }

@@ -56,7 +56,7 @@ type Model struct {
 	isLoading           bool
 	err                 error
 	currentView         ViewState
-	formSubState        FormState    // If currentView is FormView, this specifies if creating or editing.
+	formSubState        FormState // If currentView is FormView, this specifies if creating or editing.
 	focusedTable        FocusedTable
 
 	inputs     []textinput.Model // Holds all form inputs
@@ -81,6 +81,7 @@ type fetchedTaskDetailMsg struct {
 	err     error
 	forEdit bool
 }
+
 // taskCreatedMsg is sent when a task is successfully created.
 type taskCreatedMsg struct{ task models.Task }
 
@@ -408,7 +409,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			tmpCmds := []tea.Cmd{}
 			for i := range m.inputs {
-				if i == m.focusIndex {m.inputs[i].Focus()} else {m.inputs[i].Blur()}
+				if i == m.focusIndex {
+					m.inputs[i].Focus()
+				} else {
+					m.inputs[i].Blur()
+				}
 				var updatedInput textinput.Model
 				updatedInput, cmd = m.inputs[i].Update(msg)
 				m.inputs[i] = updatedInput
@@ -540,7 +545,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentView = FormView
 				m.formSubState = EditingTask
 				m.focusIndex = 0
-				if len(m.inputs) > 0 { m.inputs[0].Focus() }
+				if len(m.inputs) > 0 {
+					m.inputs[0].Focus()
+				}
 				m.err = nil
 				cmds = append(cmds, textinput.Blink)
 			} else {
@@ -752,17 +759,25 @@ func (m *Model) SetSize(width, height int) {
 	m.height = height
 
 	availableHeight := height - baseStyle.GetVerticalFrameSize() - 5
-	if availableHeight < 2 { availableHeight = 2} // Corrected variable name typo
+	if availableHeight < 2 {
+		availableHeight = 2
+	} // Corrected variable name typo
 
 	pendingTableHeight := availableHeight / 2
 	if len(m.completedTasksTable.Rows()) == 0 && availableHeight > 1 { // Changed TotalRows to len(Rows)
-	    pendingTableHeight = availableHeight -1
-		if pendingTableHeight < 1 { pendingTableHeight = 1 }
+		pendingTableHeight = availableHeight - 1
+		if pendingTableHeight < 1 {
+			pendingTableHeight = 1
+		}
 	}
 	completedTableHeight := availableHeight - pendingTableHeight
 
-	if pendingTableHeight < 1 { pendingTableHeight = 1 }
-	if completedTableHeight < 1 { completedTableHeight = 1 }
+	if pendingTableHeight < 1 {
+		pendingTableHeight = 1
+	}
+	if completedTableHeight < 1 {
+		completedTableHeight = 1
+	}
 
 	tableWidth := width - baseStyle.GetHorizontalFrameSize()
 	m.pendingTasksTable.SetWidth(tableWidth)
@@ -771,7 +786,9 @@ func (m *Model) SetSize(width, height int) {
 	m.completedTasksTable.SetHeight(completedTableHeight)
 
 	inputWidth := width - baseStyle.GetHorizontalFrameSize() - 10
-	if inputWidth < 20 { inputWidth = 20 }
+	if inputWidth < 20 {
+		inputWidth = 20
+	}
 	for i := range m.inputs {
 		m.inputs[i].Width = inputWidth
 	}
@@ -784,5 +801,5 @@ func (m *Model) IsFocused() bool {
 
 // IsLoading returns true if the model is currently loading data.
 func (m *Model) IsLoading() bool {
-    return m.isLoading
+	return m.isLoading
 }

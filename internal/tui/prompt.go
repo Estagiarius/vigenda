@@ -1,10 +1,10 @@
 package tui
 
 import (
+	"bufio" // For reading from non-TTY stdin
 	"fmt"
 	"io"
 	"os" // Required for isatty.IsTerminal
-	"bufio" // For reading from non-TTY stdin
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -23,15 +23,15 @@ type PromptModel struct {
 }
 
 var (
-	promptStyle     = lipgloss.NewStyle().Padding(0, 1)
-	focusedStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	blurredStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	noStyle         = lipgloss.NewStyle()
-	helpStyle       = blurredStyle.Copy()
-	errorStyle      = lipgloss.NewStyle().Foreground(lipgloss.Color("9")) // Red for errors
-	cursorModeHelp  = helpStyle.Render("cursor mode is enabled")
-	focusedButton   = focusedStyle.Copy().Render("[ Submit ]")
-	blurredButton   = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
+	promptStyle    = lipgloss.NewStyle().Padding(0, 1)
+	focusedStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	blurredStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	noStyle        = lipgloss.NewStyle()
+	helpStyle      = blurredStyle.Copy()
+	errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("9")) // Red for errors
+	cursorModeHelp = helpStyle.Render("cursor mode is enabled")
+	focusedButton  = focusedStyle.Copy().Render("[ Submit ]")
+	blurredButton  = fmt.Sprintf("[ %s ]", blurredStyle.Render("Submit"))
 )
 
 func NewPromptModel(promptText string) PromptModel {
@@ -105,7 +105,6 @@ func (m PromptModel) View() string {
 	help := helpStyle.Render("Press Enter to submit, Esc or Ctrl+C to quit.")
 	viewBuilder.WriteString("\n\n" + help)
 
-
 	return viewBuilder.String()
 }
 
@@ -173,18 +172,18 @@ func GetInput(promptText string, output io.Writer, inputReader io.Reader) (strin
 // Example Usage (can be moved to a main or test file)
 
 func main_example() { // Renamed to avoid conflict if this file is part of a library build
-    // Example: GetInput
-    fmt.Println("Starting prompt...")
-    userInput, err := GetInput("What is your name?", os.Stdout, os.Stdin)
-    if err != nil {
-        fmt.Printf("Prompt error: %v\n", err)
-        return
-    }
-    if userInput != "" {
-        fmt.Printf("\nHello, %s!\n", userInput)
-    } else {
-        fmt.Println("\nNo input received.")
-    }
+	// Example: GetInput
+	fmt.Println("Starting prompt...")
+	userInput, err := GetInput("What is your name?", os.Stdout, os.Stdin)
+	if err != nil {
+		fmt.Printf("Prompt error: %v\n", err)
+		return
+	}
+	if userInput != "" {
+		fmt.Printf("\nHello, %s!\n", userInput)
+	} else {
+		fmt.Println("\nNo input received.")
+	}
 }
 
 /*

@@ -96,7 +96,7 @@ func (s *assessmentServiceImpl) EnterGrades(ctx context.Context, assessmentID in
 			AssessmentID: assessmentID,
 			StudentID:    studentID,
 			// UserID:       userID, // Removed: User who entered the grade is not stored in Grade model
-			Grade:        gradeVal,
+			Grade: gradeVal,
 		}
 		if err := s.assessmentRepo.EnterGrade(ctx, &grade); err != nil {
 			return fmt.Errorf("service.EnterGrades: entering grade for student %d: %w", studentID, err)
@@ -146,7 +146,6 @@ func (s *assessmentServiceImpl) CalculateClassAverage(ctx context.Context, class
 			continue // Skip grades for inactive/non-existent students
 		}
 
-
 		sa := studentAverages[g.StudentID]
 		sa.totalWeightedGrade += g.Grade * assessment.Weight
 		sa.totalWeight += assessment.Weight
@@ -178,12 +177,12 @@ func (s *assessmentServiceImpl) CalculateClassAverage(ctx context.Context, class
 
 // Helper function to find a student in a slice (if needed, not strictly necessary with map lookups)
 func findStudent(students []models.Student, studentID int64) (models.Student, bool) {
-    for _, s := range students {
-        if s.ID == studentID {
-            return s, true
-        }
-    }
-    return models.Student{}, false
+	for _, s := range students {
+		if s.ID == studentID {
+			return s, true
+		}
+	}
+	return models.Student{}, false
 }
 
 func (s *assessmentServiceImpl) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {

@@ -1,17 +1,17 @@
 package integration
 
 import (
+	"context"      // Added for CommandContext
+	"database/sql" // Added for setupTestDB and seedDB
+	"fmt"
+	_ "github.com/mattn/go-sqlite3" // SQLite driver for database/sql
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
-	"runtime"
-	"fmt"
-	"context" // Added for CommandContext
-	"time"    // Added for timeout
-	"database/sql" // Added for setupTestDB and seedDB
-	_ "github.com/mattn/go-sqlite3" // SQLite driver for database/sql
+	"time" // Added for timeout
 )
 
 var (
@@ -26,10 +26,10 @@ func TestMain(m *testing.M) {
 
 	// Build the CLI into a temporary directory
 	tempBinDir, err := os.MkdirTemp("", "vigenda_test_bin")
-    if err != nil {
-        panic(fmt.Sprintf("Failed to create temp dir for binary: %v", err))
-    }
-    defer os.RemoveAll(tempBinDir)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create temp dir for binary: %v", err))
+	}
+	defer os.RemoveAll(tempBinDir)
 
 	binPath = filepath.Join(tempBinDir, binName)
 
@@ -117,7 +117,6 @@ func seedDB(t *testing.T, dbPath string, statements []string) {
 	}
 	t.Logf("Successfully seeded DB %s with %d statements", dbPath, len(statements))
 }
-
 
 // runCLI executes the compiled CLI command with the given arguments.
 // It now ensures VIGENDA_DB_PATH is set if a test DB is configured.
@@ -223,7 +222,6 @@ func TestDashboardOutput(t *testing.T) {
 	// For now, we just ensure the DB is initialized so the app doesn't fail on DB connection.
 	_ = dbPath // Use dbPath to avoid unused variable error if no seeding is done.
 
-
 	// For the main TUI (formerly dashboard), the command is just `vigenda` (no arguments).
 	// The TUI is interactive and won't exit on its own, so runCLI will hit its timeout.
 	// We expect a context.DeadlineExceeded error, which indicates the TUI ran until timeout.
@@ -254,14 +252,12 @@ func TestDashboardOutput(t *testing.T) {
 		t.Fatalf("CLI TUI exited without error, which is unexpected for an interactive app. Expected timeout.")
 	}
 
-
 	if stderr != "" {
 		t.Logf("Stderr output (should be empty for clean TUI start, but can have logs): %s", stderr)
 	}
 	// No longer asserting against golden file for the main TUI (menu)
 	// assertGoldenFile(t, stdout, "golden_files/dashboard_output.txt")
 }
-
 
 // TestNotasLancarOutput - Corresponds to TC-I-001 from Artefact 6
 // "O comando `vigenda notas lancar` deve apresentar a lista correta de alunos ativos para a avaliação selecionada."
@@ -308,7 +304,6 @@ func TestRelatorioProgressoTurmaOutput(t *testing.T) {
 	// assertGoldenFile(t, stdout, "golden_files/relatorio_progresso_turma.txt")
 	t.Log("TestRelatorioProgressoTurmaOutput: Placeholder - requires database setup for meaningful comparison.")
 }
-
 
 // TestTarefaListarTurmaOutput - Based on Artefact 7 `golden_files/tarefa_listar_turma_output.txt`
 // This implies a command like `vigenda tarefa listar --turma "Turma 9A"`
@@ -362,4 +357,5 @@ func TestFocoIniciarOutput(t *testing.T) {
 	// // assertGoldenFile(t, stdout, "golden_files/foco_iniciar_output.txt") // This will likely fail due to time
 	t.Log("TestFocoIniciarOutput: Placeholder - time-sensitive output, direct golden file comparison is problematic.")
 }
+
 // import "fmt" // Added import for fmt used in TestMain panic <- This line was removed

@@ -39,7 +39,6 @@ func (s *lessonServiceImpl) validateUserOwnsClass(ctx context.Context, userID in
 	return class, nil
 }
 
-
 func (s *lessonServiceImpl) CreateLesson(ctx context.Context, classID int64, title string, planContent string, scheduledAt time.Time) (models.Lesson, error) {
 	if title == "" {
 		return models.Lesson{}, fmt.Errorf("título da lição não pode ser vazio")

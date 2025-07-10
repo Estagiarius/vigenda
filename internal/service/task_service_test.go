@@ -22,7 +22,7 @@ type MockTaskRepository struct {
 	GetAllTasksFunc       func(ctx context.Context) ([]models.Task, error)
 	MarkTaskCompletedFunc func(ctx context.Context, taskID int64) error
 	UpdateTaskFunc        func(ctx context.Context, task *models.Task) error // Added
-	DeleteTaskFunc        func(ctx context.Context, taskID int64) error    // Added
+	DeleteTaskFunc        func(ctx context.Context, taskID int64) error      // Added
 
 	// Store created bug tasks for verification
 	CreatedBugTasks []models.Task
@@ -79,7 +79,6 @@ func (m *MockTaskRepository) DeleteTask(ctx context.Context, taskID int64) error
 	}
 	return errors.New("DeleteTaskFunc not implemented in mock")
 }
-
 
 func TestTaskService_CreateTask(t *testing.T) {
 	mockRepo := &MockTaskRepository{}
@@ -203,7 +202,6 @@ func TestTaskService_ListActiveTasksByClass(t *testing.T) {
 		mockRepo.CreateTaskFunc = func(ctx context.Context, task *models.Task) (int64, error) {
 			return 100, nil
 		}
-
 
 		_, err := taskService.ListActiveTasksByClass(ctx, classID)
 		if err == nil {
@@ -345,7 +343,6 @@ func TestTaskService_ListAllActiveTasks(t *testing.T) {
 	})
 }
 
-
 func TestTaskService_MarkTaskAsCompleted(t *testing.T) {
 	mockRepo := &MockTaskRepository{}
 	taskService := NewTaskService(mockRepo)
@@ -393,7 +390,6 @@ func TestTaskService_MarkTaskAsCompleted(t *testing.T) {
 	})
 }
 
-
 // Helper function
 func contains(slice []string, item string) bool {
 	for _, s := range slice {
@@ -440,6 +436,7 @@ func TestMain(m *testing.M) {
 	// Teardown tasks after tests are done
 	os.Exit(exitCode)
 }
+
 // Add import for strings at the top of the file
 // import "strings"
 
@@ -519,7 +516,6 @@ func TestTaskService_GetTaskByID(t *testing.T) {
 	})
 }
 
-
 func TestTaskService_UpdateTask(t *testing.T) {
 	mockRepo := &MockTaskRepository{}
 	taskService := NewTaskService(mockRepo)
@@ -573,7 +569,6 @@ func TestTaskService_UpdateTask(t *testing.T) {
 			return 0, errors.New("unexpected call to CreateTask for bug")
 		}
 
-
 		err := taskService.UpdateTask(ctx, taskToUpdate)
 		if err == nil {
 			t.Errorf("Expected an error, got nil")
@@ -593,7 +588,6 @@ func TestTaskService_UpdateTask(t *testing.T) {
 			return repoError
 		}
 		mockRepo.CreateTaskFunc = func(ctx context.Context, task *models.Task) (int64, error) { return 104, nil }
-
 
 		err := taskService.UpdateTask(ctx, taskToUpdate)
 		if err == nil {

@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
+	"github.com/mattn/go-isatty"
 	"os"
 	"vigenda/internal/tui" // Assuming vigenda is the module name
-	"github.com/mattn/go-isatty"
 )
 
 func main() {

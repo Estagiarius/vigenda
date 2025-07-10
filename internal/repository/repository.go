@@ -4,8 +4,8 @@ package repository
 
 import (
 	"context"
-	"vigenda/internal/models"
 	"time" // Movido para o final do bloco de import para forçar reavaliação
+	"vigenda/internal/models"
 )
 
 // QuestionQueryCriteria define os critérios para buscar questões.
@@ -53,12 +53,12 @@ type TaskRepository interface {
 	CreateTask(ctx context.Context, task *models.Task) (int64, error)
 	GetTaskByID(ctx context.Context, id int64) (*models.Task, error)
 	GetTasksByClassID(ctx context.Context, classID int64) ([]models.Task, error) // Added for listing tasks
-	GetAllTasks(ctx context.Context) ([]models.Task, error)                       // New method
+	GetAllTasks(ctx context.Context) ([]models.Task, error)                      // New method
 	MarkTaskCompleted(ctx context.Context, taskID int64) error                   // Added for completing tasks
 	// UpdateTask updates an existing task in the database.
-	UpdateTask(ctx context.Context, task *models.Task) error                     // Added for updating tasks
+	UpdateTask(ctx context.Context, task *models.Task) error // Added for updating tasks
 	// DeleteTask removes a task from the database by its ID.
-	DeleteTask(ctx context.Context, taskID int64) error                          // Added for deleting tasks
+	DeleteTask(ctx context.Context, taskID int64) error // Added for deleting tasks
 	GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error)
 	// ... outros métodos
 }
@@ -96,7 +96,7 @@ type AssessmentRepository interface {
 	// GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) // Moved to ClassRepository
 	EnterGrade(ctx context.Context, grade *models.Grade) error
 	GetGradesByClassID(ctx context.Context, classID int64) ([]models.Grade, []models.Assessment, []models.Student, error) // For calculating class average
-	ListAllAssessments(ctx context.Context) ([]models.Assessment, error) // Novo método adicionado
+	ListAllAssessments(ctx context.Context) ([]models.Assessment, error)                                                  // Novo método adicionado
 	// GetAssessmentWithGrades(ctx context.Context, assessmentID int64) (*models.AssessmentWithGrades, error) // Example for a more complex query
 }
 

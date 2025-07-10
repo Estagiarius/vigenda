@@ -13,14 +13,14 @@ import (
 type TaskService interface {
 	CreateTask(ctx context.Context, title, description string, classID *int64, dueDate *time.Time) (models.Task, error)
 	ListActiveTasksByClass(ctx context.Context, classID int64) ([]models.Task, error) // Returns only active tasks for a class
-	ListAllActiveTasks(ctx context.Context) ([]models.Task, error)       // Fetches ALL active tasks (pending)
-	ListAllTasks(ctx context.Context) ([]models.Task, error)             // Fetches ALL tasks (pending and completed)
+	ListAllActiveTasks(ctx context.Context) ([]models.Task, error)                    // Fetches ALL active tasks (pending)
+	ListAllTasks(ctx context.Context) ([]models.Task, error)                          // Fetches ALL tasks (pending and completed)
 	MarkTaskAsCompleted(ctx context.Context, taskID int64) error
 	GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error) // Added for viewing details
 	// UpdateTask updates an existing task.
-	UpdateTask(ctx context.Context, task *models.Task) error             // Added for updating tasks
+	UpdateTask(ctx context.Context, task *models.Task) error // Added for updating tasks
 	// DeleteTask removes a task by its ID.
-	DeleteTask(ctx context.Context, taskID int64) error                  // Added for deleting tasks
+	DeleteTask(ctx context.Context, taskID int64) error // Added for deleting tasks
 	GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error)
 }
 

@@ -64,16 +64,16 @@ type Model struct {
 		inputs     []textinput.Model
 		focusIndex int
 	}
-	allClasses           []models.Class
-	selectedClass        *models.Class
-	selectedStudent      *models.Student
-	classStudents        []models.Student
-	studentsTable        table.Model
+	allClasses             []models.Class
+	selectedClass          *models.Class
+	selectedStudent        *models.Student
+	classStudents          []models.Student
+	studentsTable          table.Model
 	detailsViewFocusTarget FocusTarget
-	isLoading            bool
-	width                int
-	height               int
-	err                  error
+	isLoading              bool
+	width                  int
+	height                 int
+	err                    error
 }
 
 func New(cs service.ClassService) *Model {
@@ -115,8 +115,11 @@ func New(cs service.ClassService) *Model {
 		state:         ListView,
 		table:         classTable,
 		studentsTable: studentsTable,
-		formInputs:    struct{ inputs []textinput.Model; focusIndex int }{inputs: []textinput.Model{}, focusIndex: 0},
-		isLoading:     true,
+		formInputs: struct {
+			inputs     []textinput.Model
+			focusIndex int
+		}{inputs: []textinput.Model{}, focusIndex: 0},
+		isLoading: true,
 	}
 }
 
@@ -276,9 +279,13 @@ func (m *Model) SetSize(width, height int) {
 	m.width = width
 	m.height = height
 	contentHeight := height - 5 // Approx for title, error, help
-	if contentHeight < 1 { contentHeight = 1 }
+	if contentHeight < 1 {
+		contentHeight = 1
+	}
 	tableWidth := width - 4
-	if tableWidth < 20 { tableWidth = 20 }
+	if tableWidth < 20 {
+		tableWidth = 20
+	}
 
 	m.table.SetHeight(contentHeight)
 	m.table.SetWidth(tableWidth)
@@ -286,7 +293,9 @@ func (m *Model) SetSize(width, height int) {
 	m.studentsTable.SetWidth(tableWidth)
 
 	inputWidth := width - 8
-	if inputWidth < 20 { inputWidth = 20 }
+	if inputWidth < 20 {
+		inputWidth = 20
+	}
 	for i := range m.formInputs.inputs {
 		m.formInputs.inputs[i].Width = inputWidth
 	}
@@ -392,7 +401,7 @@ func (m *Model) handleDetailsViewKeys(msg tea.KeyMsg) tea.Cmd {
 		} else {
 			m.state = ListView
 			m.selectedClass = nil
-			m.classStudents = nil // Limpar alunos da turma anterior
+			m.classStudents = nil                  // Limpar alunos da turma anterior
 			m.studentsTable.SetRows([]table.Row{}) // Limpar linhas da tabela de alunos
 			m.err = nil
 			m.table.Focus()
@@ -556,14 +565,18 @@ func (m *Model) prepareStudentForm(studentToEdit *models.Student) {
 }
 
 func (m *Model) nextFormInput() {
-	if len(m.formInputs.inputs) == 0 { return }
+	if len(m.formInputs.inputs) == 0 {
+		return
+	}
 	m.formInputs.inputs[m.formInputs.focusIndex].Blur()
 	m.formInputs.focusIndex = (m.formInputs.focusIndex + 1) % len(m.formInputs.inputs)
 	m.formInputs.inputs[m.formInputs.focusIndex].Focus()
 }
 
 func (m *Model) prevFormInput() {
-	if len(m.formInputs.inputs) == 0 { return }
+	if len(m.formInputs.inputs) == 0 {
+		return
+	}
 	m.formInputs.inputs[m.formInputs.focusIndex].Blur()
 	m.formInputs.focusIndex = (m.formInputs.focusIndex - 1 + len(m.formInputs.inputs)) % len(m.formInputs.inputs)
 	m.formInputs.inputs[m.formInputs.focusIndex].Focus()
@@ -714,14 +727,32 @@ func (m *Model) handleStudentDeleted(msg studentDeletedMsg) tea.Cmd {
 }
 
 // Commands
-type fetchedClassesMsg struct { classes []models.Class; err error }
-type classCreatedMsg struct { createdClass models.Class; err error }
-type classUpdatedMsg struct { updatedClass models.Class; err error }
-type classDeletedMsg struct { err error }
-type fetchedClassStudentsMsg struct { students []models.Student; err error }
-type studentAddedMsg struct { addedStudent models.Student; err error }
-type studentUpdatedMsg struct { updatedStudent models.Student; err error }
-type studentDeletedMsg struct { err error }
+type fetchedClassesMsg struct {
+	classes []models.Class
+	err     error
+}
+type classCreatedMsg struct {
+	createdClass models.Class
+	err          error
+}
+type classUpdatedMsg struct {
+	updatedClass models.Class
+	err          error
+}
+type classDeletedMsg struct{ err error }
+type fetchedClassStudentsMsg struct {
+	students []models.Student
+	err      error
+}
+type studentAddedMsg struct {
+	addedStudent models.Student
+	err          error
+}
+type studentUpdatedMsg struct {
+	updatedStudent models.Student
+	err            error
+}
+type studentDeletedMsg struct{ err error }
 type errMsg struct{ err error }
 
 func (e errMsg) Error() string { return e.err.Error() }
@@ -736,7 +767,9 @@ func (m *Model) fetchClassesCmd() tea.Msg {
 func (m *Model) createClassCmd(name string, subjectIDStr string) tea.Cmd {
 	return func() tea.Msg {
 		subjectID, convErr := strconv.ParseInt(subjectIDStr, 10, 64)
-		if convErr != nil { return errMsg{fmt.Errorf("ID disciplina inválido: %w", convErr)} }
+		if convErr != nil {
+			return errMsg{fmt.Errorf("ID disciplina inválido: %w", convErr)}
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
 		defer cancel()
 		created, err := m.classService.CreateClass(ctx, name, subjectID)
@@ -747,7 +780,9 @@ func (m *Model) createClassCmd(name string, subjectIDStr string) tea.Cmd {
 func (m *Model) updateClassCmd(id int64, name string, subjectIDStr string) tea.Cmd {
 	return func() tea.Msg {
 		subjectID, convErr := strconv.ParseInt(subjectIDStr, 10, 64)
-		if convErr != nil { return errMsg{fmt.Errorf("ID disciplina inválido: %w", convErr)} }
+		if convErr != nil {
+			return errMsg{fmt.Errorf("ID disciplina inválido: %w", convErr)}
+		}
 		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
 		defer cancel()
 		updated, err := m.classService.UpdateClass(ctx, id, name, subjectID)

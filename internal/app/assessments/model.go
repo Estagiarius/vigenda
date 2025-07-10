@@ -44,11 +44,11 @@ type Model struct {
 	focusIndex int
 
 	// Data
-	assessments     []models.Assessment
-	currentClassID  *int64 // For context when creating or listing assessments for a class
-	currentAssessmentID *int64 // For context when entering grades or calculating average
-	studentsForGrading []models.Student // For EnterGradesView
-	gradesInput        map[int64]textinput.Model // studentID -> textinput for grade
+	assessments         []models.Assessment
+	currentClassID      *int64                    // For context when creating or listing assessments for a class
+	currentAssessmentID *int64                    // For context when entering grades or calculating average
+	studentsForGrading  []models.Student          // For EnterGradesView
+	gradesInput         map[int64]textinput.Model // studentID -> textinput for grade
 
 	isLoading bool
 	err       error
@@ -68,19 +68,18 @@ type assessmentCreatedMsg struct {
 	err        error
 }
 type studentsForGradingLoadedMsg struct {
-	students []models.Student
+	students       []models.Student
 	assessmentName string
-	err      error
+	err            error
 }
 type gradesEnteredMsg struct {
 	err error
 }
 type classAverageCalculatedMsg struct {
-	average float64
+	average   float64
 	className string // Or ClassID
-	err     error
+	err       error
 }
-
 
 // --- Cmds ---
 func (m *Model) loadAssessmentsCmd(classID int64) tea.Cmd {
@@ -94,7 +93,6 @@ func (m *Model) loadAssessmentsCmd(classID int64) tea.Cmd {
 	}
 }
 
-
 func New(assessmentService service.AssessmentService /*, classService service.ClassService */) *Model {
 	actionItems := []list.Item{
 		actionItem{title: "Listar Avaliações", description: "Visualizar todas as avaliações (pode pedir turma)."},
@@ -107,7 +105,7 @@ func New(assessmentService service.AssessmentService /*, classService service.Cl
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
 	l.Styles.Title = lipgloss.NewStyle().Bold(true).MarginBottom(1)
-	l.AdditionalShortHelpKeys = func() []key.Binding{
+	l.AdditionalShortHelpKeys = func() []key.Binding {
 		return []key.Binding{
 			key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "selecionar")),
 			key.NewBinding(key.WithKeys("esc"), key.WithHelp("esc", "voltar")),
@@ -138,11 +136,11 @@ func New(assessmentService service.AssessmentService /*, classService service.Cl
 	return &Model{ // Ensure this returns a pointer
 		assessmentService: assessmentService,
 		// classService: classService,
-		state:      ListView,
-		list:       l,
-		table:      tbl,
-		textInputs: inputs,
-		isLoading:  false,
+		state:       ListView,
+		list:        l,
+		table:       tbl,
+		textInputs:  inputs,
+		isLoading:   false,
 		gradesInput: make(map[int64]textinput.Model),
 	}
 }
@@ -157,7 +155,7 @@ func (m *Model) Init() tea.Cmd {
 	m.currentClassID = nil
 	m.currentAssessmentID = nil
 	m.list.Select(-1) // Deselect any previous action
-	return nil // No initial data loading from main menu
+	return nil        // No initial data loading from main menu
 }
 
 type actionItem struct { // Re-defined locally, or use a shared TUI components package
@@ -210,7 +208,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					switch selected.title {
 					case "Listar Avaliações":
 						m.isLoading = true
-						m.state = ListAssessmentsView // Dedicated view for table
+						m.state = ListAssessmentsView                // Dedicated view for table
 						cmds = append(cmds, m.loadAssessmentsCmd(0)) // 0 for all, or adapt service
 					case "Criar Nova Avaliação":
 						m.state = CreateAssessmentView
@@ -376,7 +374,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
-
 	return m, tea.Batch(cmds...)
 }
 
@@ -476,7 +473,7 @@ func (m *Model) setupCreateAssessmentForm() {
 	m.textInputs = make([]textinput.Model, 4) // Name, ClassID, Term, Weight
 
 	placeholders := []string{"Nome da Avaliação", "ID da Turma", "Período (ex: 1)", "Peso (ex: 3.0)"}
-	validators := []func(string)error{nil, isNumber, isNumber, isFloatOrEmpty}
+	validators := []func(string) error{nil, isNumber, isNumber, isFloatOrEmpty}
 
 	for i, p := range placeholders {
 		m.textInputs[i] = textinput.New()
@@ -531,7 +528,6 @@ func (m *Model) updateFocus() tea.Cmd {
 		return nil
 	}
 
-
 	m.focusIndex = (m.focusIndex + 1) % (numInputs + 1) // +1 for submit "button"
 	return m.updateInputFocusStyle()
 }
@@ -545,7 +541,6 @@ func (m *Model) updateInputFocusStyle() tea.Cmd {
 	} else if (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || m.state == ClassAverageView {
 		numInputs = 1
 	} // Other states might not use these textInputs directly or have their own focus logic
-
 
 	cmds := make([]tea.Cmd, numInputs)
 	for i := 0; i < numInputs; i++ {
@@ -565,9 +560,12 @@ func (m *Model) updateFormInputs(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	// Update focused text input
 	activeInputs := 0
-	if m.state == CreateAssessmentView { activeInputs = 4 }
-	if (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || m.state == ClassAverageView { activeInputs = 1}
-
+	if m.state == CreateAssessmentView {
+		activeInputs = 4
+	}
+	if (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || m.state == ClassAverageView {
+		activeInputs = 1
+	}
 
 	if m.focusIndex < activeInputs {
 		var cmd tea.Cmd
@@ -589,11 +587,23 @@ func (m *Model) submitCreateAssessmentFormCmd() tea.Cmd {
 		return nil
 	}
 	classID, err := strconv.ParseInt(classIDStr, 10, 64)
-	if err != nil { m.err = fmt.Errorf("ID da Turma inválido"); m.isLoading = false; return nil }
+	if err != nil {
+		m.err = fmt.Errorf("ID da Turma inválido")
+		m.isLoading = false
+		return nil
+	}
 	term, err := strconv.Atoi(termStr)
-	if err != nil { m.err = fmt.Errorf("Período inválido"); m.isLoading = false; return nil }
+	if err != nil {
+		m.err = fmt.Errorf("Período inválido")
+		m.isLoading = false
+		return nil
+	}
 	weight, err := strconv.ParseFloat(weightStr, 64)
-	if err != nil { m.err = fmt.Errorf("Peso inválido"); m.isLoading = false; return nil }
+	if err != nil {
+		m.err = fmt.Errorf("Peso inválido")
+		m.isLoading = false
+		return nil
+	}
 
 	return func() tea.Msg {
 		asm, err := m.assessmentService.CreateAssessment(context.Background(), name, classID, term, weight)
@@ -622,10 +632,14 @@ func (m *Model) submitGradesCmd() tea.Cmd {
 	grades := make(map[int64]float64)
 	for studentID, ti := range m.gradesInput {
 		gradeStr := ti.Value()
-		if gradeStr == "" { continue } // Skip empty grades or handle as 0?
+		if gradeStr == "" {
+			continue
+		} // Skip empty grades or handle as 0?
 		grade, err := strconv.ParseFloat(gradeStr, 64)
 		if err != nil {
-			return func() tea.Msg { return gradesEnteredMsg{err: fmt.Errorf("nota inválida para aluno ID %d: '%s'", studentID, gradeStr)} }
+			return func() tea.Msg {
+				return gradesEnteredMsg{err: fmt.Errorf("nota inválida para aluno ID %d: '%s'", studentID, gradeStr)}
+			}
 		}
 		grades[studentID] = grade
 	}
@@ -640,17 +654,20 @@ func (m *Model) submitGradesCmd() tea.Cmd {
 	}
 }
 
-
 // --- Helpers & Validators ---
 func isNumber(s string) error {
-	if s == "" { return nil }
+	if s == "" {
+		return nil
+	}
 	if _, err := strconv.Atoi(s); err != nil {
 		return fmt.Errorf("deve ser um número inteiro")
 	}
 	return nil
 }
 func isFloatOrEmpty(s string) error {
-	if s == "" { return nil }
+	if s == "" {
+		return nil
+	}
 	if _, err := strconv.ParseFloat(s, 64); err != nil {
 		return fmt.Errorf("deve ser um número (ex: 7.5)")
 	}
@@ -660,14 +677,16 @@ func isFloatOrEmpty(s string) error {
 // SetSize method was already using a pointer receiver, which is correct.
 func (m *Model) SetSize(width, height int) {
 	m.width = width - baseStyle.GetHorizontalFrameSize()
-	m.height = height - baseStyle.GetVerticalFrameSize() -1 // Adjusted for potential message line
+	m.height = height - baseStyle.GetVerticalFrameSize() - 1 // Adjusted for potential message line
 
 	// Adjust list (main action list)
 	listTitleHeight := lipgloss.Height(m.list.Title)
 	// Assuming some help text height for the list view if applicable
 	listHelpHeight := 2
 	availableHeightForList := m.height - listTitleHeight - listHelpHeight
-	if availableHeightForList < 0 { availableHeightForList = 0 }
+	if availableHeightForList < 0 {
+		availableHeightForList = 0
+	}
 	m.list.SetSize(m.width, availableHeightForList)
 
 	// Adjust table (for listing assessments)
@@ -675,15 +694,18 @@ func (m *Model) SetSize(width, height int) {
 	tableHeaderHeight := 1 // if table has its own title line rendered by the model's View
 	tableHelpHeight := 1   // if table view has help text
 	availableHeightForTable := m.height - tableHeaderHeight - tableHelpHeight
-	if availableHeightForTable < 5 { availableHeightForTable = 5} // Min height for table
+	if availableHeightForTable < 5 {
+		availableHeightForTable = 5
+	} // Min height for table
 	m.table.SetWidth(m.width)
 	m.table.SetHeight(availableHeightForTable)
-
 
 	// Adjust textInputs based on current state or a general approach
 	// This width calculation can be dynamic based on form structure in View()
 	inputRegionWidth := m.width - 4 // General padding for forms
-	if inputRegionWidth < 20 { inputRegionWidth = 20}
+	if inputRegionWidth < 20 {
+		inputRegionWidth = 20
+	}
 
 	for i := range m.textInputs {
 		// Check if textInput is actually part of the current form to avoid nil pointer if textInputs is resized
@@ -704,7 +726,7 @@ func (m *Model) SetSize(width, height int) {
 func (m *Model) IsFocused() bool {
 	// Focused if in any form input state
 	return m.state == CreateAssessmentView ||
-	       (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || // inputting assessment ID
-	       (m.state == EnterGradesView && len(m.studentsForGrading) > 0) || // inputting grades (complex focus)
-	       m.state == ClassAverageView // inputting class ID
+		(m.state == EnterGradesView && len(m.studentsForGrading) == 0) || // inputting assessment ID
+		(m.state == EnterGradesView && len(m.studentsForGrading) > 0) || // inputting grades (complex focus)
+		m.state == ClassAverageView // inputting class ID
 }

@@ -9,9 +9,9 @@ import "time"
 // User represents a user of the Vigenda application.
 // Users can own subjects, classes, tasks, and questions.
 type User struct {
-	ID           int64  `json:"id"`                    // ID é o identificador único do usuário, gerado pelo banco de dados.
-	Username     string `json:"username"`              // Username é o nome de usuário para login, deve ser único.
-	PasswordHash string `json:"-"`                     // PasswordHash é o hash da senha do usuário, não exposto em JSON.
+	ID           int64  `json:"id"`       // ID é o identificador único do usuário, gerado pelo banco de dados.
+	Username     string `json:"username"` // Username é o nome de usuário para login, deve ser único.
+	PasswordHash string `json:"-"`        // PasswordHash é o hash da senha do usuário, não exposto em JSON.
 }
 
 // Subject represents a subject or discipline (e.g., Mathematics, History).
@@ -46,20 +46,20 @@ type Student struct {
 
 // Lesson represents a planned lesson for a class.
 type Lesson struct {
-	ID           int64     `json:"id"`            // ID é o identificador único da aula.
-	ClassID      int64     `json:"class_id"`      // ClassID é o ID da turma para a qual a aula é planejada.
-	Title        string    `json:"title"`         // Title é o título da aula.
-	PlanContent  string    `json:"plan_content"`  // PlanContent contém o conteúdo do plano de aula, preferencialmente em Markdown.
-	ScheduledAt  time.Time `json:"scheduled_at"`  // ScheduledAt é a data e hora agendada para a aula.
+	ID          int64     `json:"id"`           // ID é o identificador único da aula.
+	ClassID     int64     `json:"class_id"`     // ClassID é o ID da turma para a qual a aula é planejada.
+	Title       string    `json:"title"`        // Title é o título da aula.
+	PlanContent string    `json:"plan_content"` // PlanContent contém o conteúdo do plano de aula, preferencialmente em Markdown.
+	ScheduledAt time.Time `json:"scheduled_at"` // ScheduledAt é a data e hora agendada para a aula.
 }
 
 // Assessment represents an assessment or evaluation (e.g., test, quiz, project) for a class.
 type Assessment struct {
-	ID             int64      `json:"id"`               // ID é o identificador único da avaliação.
-	ClassID        int64      `json:"class_id"`         // ClassID é o ID da turma para a qual a avaliação é aplicada.
-	Name           string     `json:"name"`             // Name é o nome da avaliação (ex: "Prova Bimestral 1").
-	Term           int        `json:"term"`             // Term indica o período da avaliação (ex: 1 para o primeiro bimestre/trimestre).
-	Weight         float64    `json:"weight"`           // Weight é o peso da avaliação na composição da nota final.
+	ID             int64      `json:"id"`                        // ID é o identificador único da avaliação.
+	ClassID        int64      `json:"class_id"`                  // ClassID é o ID da turma para a qual a avaliação é aplicada.
+	Name           string     `json:"name"`                      // Name é o nome da avaliação (ex: "Prova Bimestral 1").
+	Term           int        `json:"term"`                      // Term indica o período da avaliação (ex: 1 para o primeiro bimestre/trimestre).
+	Weight         float64    `json:"weight"`                    // Weight é o peso da avaliação na composição da nota final.
 	AssessmentDate *time.Time `json:"assessment_date,omitempty"` // AssessmentDate é a data de aplicação da avaliação (ponteiro para permitir nulo).
 }
 

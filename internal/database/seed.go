@@ -90,8 +90,8 @@ func SeedData(db *sql.DB) error {
 		Name      string
 		ID        int64 // Para armazenar o ID da turma inserida
 	}{
-		{SubjectID: subjects[0].ID, Name: "Turma A - Matemática (Manhã)"}, // Matemática
-		{SubjectID: subjects[0].ID, Name: "Turma B - Matemática (Tarde)"},  // Matemática
+		{SubjectID: subjects[0].ID, Name: "Turma A - Matemática (Manhã)"},   // Matemática
+		{SubjectID: subjects[0].ID, Name: "Turma B - Matemática (Tarde)"},   // Matemática
 		{SubjectID: subjects[1].ID, Name: "Turma Única - História (Noite)"}, // História
 	}
 

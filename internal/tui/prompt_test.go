@@ -78,11 +78,10 @@ func TestPromptModel_Update_Enter_Empty(t *testing.T) {
 	}
 }
 
-
 func TestPromptModel_Update_Quit(t *testing.T) {
 	testCases := []struct {
-		name    string
-		keyType tea.KeyType
+		name     string
+		keyType  tea.KeyType
 		keyRunes []rune
 	}{
 		{"CtrlC", tea.KeyCtrlC, nil},
@@ -159,7 +158,6 @@ func TestPromptModel_View(t *testing.T) {
 	}
 }
 
-
 func TestGetInput_Simulated(t *testing.T) {
 	promptText := "Enter test input:"
 
@@ -220,7 +218,7 @@ func TestGetInput_Simulated(t *testing.T) {
 
 		go func() {
 			defer inputWriter.Close()
-			time.Sleep(50 * time.Millisecond) // give program time to start
+			time.Sleep(50 * time.Millisecond)       // give program time to start
 			fmt.Fprintln(inputWriter, "test input") // Simulate typing "test input" and pressing enter
 		}()
 

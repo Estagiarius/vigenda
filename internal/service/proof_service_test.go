@@ -47,7 +47,6 @@ func (m *MockQuestionRepository) GetQuestionsByCriteriaProofGeneration(ctx conte
 	return args.Get(0).([]models.Question), args.Error(1)
 }
 
-
 func TestProofService_GenerateProof(t *testing.T) {
 	ctx := context.Background()
 
@@ -178,7 +177,7 @@ func TestProofService_GenerateProof(t *testing.T) {
 		mockRepo.AssertExpectations(t)
 	})
 
-    t.Run("error_fetching_medium_questions", func(t *testing.T) {
+	t.Run("error_fetching_medium_questions", func(t *testing.T) {
 		mockRepo := new(MockQuestionRepository)
 		proofService := service.NewProofService(mockRepo)
 		criteria := service.ProofCriteria{SubjectID: 1, MediumCount: 1}
@@ -197,7 +196,7 @@ func TestProofService_GenerateProof(t *testing.T) {
 		mockRepo.AssertExpectations(t)
 	})
 
-    t.Run("error_not_enough_medium_questions", func(t *testing.T) {
+	t.Run("error_not_enough_medium_questions", func(t *testing.T) {
 		mockRepo := new(MockQuestionRepository)
 		proofService := service.NewProofService(mockRepo)
 		criteria := service.ProofCriteria{SubjectID: 1, MediumCount: 2}
@@ -217,7 +216,7 @@ func TestProofService_GenerateProof(t *testing.T) {
 		mockRepo.AssertExpectations(t)
 	})
 
-    t.Run("error_fetching_hard_questions", func(t *testing.T) {
+	t.Run("error_fetching_hard_questions", func(t *testing.T) {
 		mockRepo := new(MockQuestionRepository)
 		proofService := service.NewProofService(mockRepo)
 		criteria := service.ProofCriteria{SubjectID: 1, HardCount: 1}
@@ -236,7 +235,7 @@ func TestProofService_GenerateProof(t *testing.T) {
 		mockRepo.AssertExpectations(t)
 	})
 
-    t.Run("error_not_enough_hard_questions", func(t *testing.T) {
+	t.Run("error_not_enough_hard_questions", func(t *testing.T) {
 		mockRepo := new(MockQuestionRepository)
 		proofService := service.NewProofService(mockRepo)
 		criteria := service.ProofCriteria{SubjectID: 1, HardCount: 2}

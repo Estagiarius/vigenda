@@ -94,7 +94,7 @@ func TestTasksModel_Init(t *testing.T) {
 func TestTasksModel_PopulateTables_PendingAndCompleted(t *testing.T) {
 	mockService := new(MockTaskService)
 	model := New(mockService)
-	model.SetSize(80,24)
+	model.SetSize(80, 24)
 
 	task1 := models.Task{ID: 1, Title: "Pending Task", IsCompleted: false}
 	task2 := models.Task{ID: 2, Title: "Completed Task", IsCompleted: true}
@@ -111,11 +111,10 @@ func TestTasksModel_PopulateTables_PendingAndCompleted(t *testing.T) {
 	assert.Equal(t, expectedCompletedTitle, m.completedTasksTable.Rows()[0][1], "Completed task title mismatch or not strikethrough")
 }
 
-
 func TestTasksModel_KeyBindings_InTableView_TabFocusSwitch(t *testing.T) {
 	mockService := new(MockTaskService)
 	model := New(mockService)
-	model.SetSize(80,24)
+	model.SetSize(80, 24)
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{}, nil).Once()
 	model.Update(model.Init()())
 
@@ -137,14 +136,13 @@ func TestTasksModel_KeyBindings_InTableView_TabFocusSwitch(t *testing.T) {
 	mockService.AssertExpectations(t)
 }
 
-
 func TestTasksModel_MarkTaskCompleted_MovesToCompletedTable(t *testing.T) {
 	mockService := new(MockTaskService)
 	pendingTask := models.Task{ID: 1, Title: "Task to complete", IsCompleted: false, UserID: 1}
 
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{pendingTask}, nil).Once()
 	model := New(mockService)
-	model.SetSize(80,24)
+	model.SetSize(80, 24)
 	model.Update(model.Init()())
 
 	assert.Len(t, model.pendingTasksTable.Rows(), 1)
@@ -167,13 +165,11 @@ func TestTasksModel_MarkTaskCompleted_MovesToCompletedTable(t *testing.T) {
 	updatedModelTea2, cmdAfterMark := model.Update(msg)
 	model = updatedModelTea2.(*Model) // Correct
 
-
 	assert.NotNil(t, cmdAfterMark)
 	msgFromRefresh := cmdAfterMark() // This is tasksLoadedMsg from refresh
 	assert.IsType(t, tasksLoadedMsg{}, msgFromRefresh)
 	updatedModelTea3, _ := model.Update(msgFromRefresh)
 	model = updatedModelTea3.(*Model) // Correct
-
 
 	assert.False(t, model.isLoading)
 	assert.Len(t, model.pendingTasksTable.Rows(), 0, "Pending table should be empty")
@@ -183,7 +179,6 @@ func TestTasksModel_MarkTaskCompleted_MovesToCompletedTable(t *testing.T) {
 	mockService.AssertExpectations(t)
 }
 
-
 func TestTasksModel_CreateTask_SubmitForm(t *testing.T) {
 	mockService := new(MockTaskService)
 	model := New(mockService)
@@ -192,7 +187,7 @@ func TestTasksModel_CreateTask_SubmitForm(t *testing.T) {
 	model.formSubState = CreatingTask
 	model.inputs[0].SetValue("New Task Title")
 	model.inputs[1].SetValue("New Task Description")
-	model.focusIndex = len(model.inputs) -1
+	model.focusIndex = len(model.inputs) - 1
 
 	expectedTask := models.Task{ID: 1, Title: "New Task Title", Description: "New Task Description", UserID: 1}
 	mockService.On("CreateTask", mock.Anything, "New Task Title", "New Task Description", (*int64)(nil), (*time.Time)(nil)).Return(expectedTask, nil)
@@ -236,16 +231,16 @@ func TestTasksModel_UpdateTask_SubmitForm(t *testing.T) {
 	model.focusIndex = len(model.inputs) - 1
 
 	taskWithUpdates := &models.Task{
-		ID:          originalTask.ID, UserID:      originalTask.UserID,
-		Title:       "Updated Title", Description: "Updated Desc",
-		ClassID:     nil, DueDate:     nil,
+		ID: originalTask.ID, UserID: originalTask.UserID,
+		Title: "Updated Title", Description: "Updated Desc",
+		ClassID: nil, DueDate: nil,
 		IsCompleted: originalTask.IsCompleted,
 	}
 
 	mockService.On("UpdateTask", mock.Anything, mock.MatchedBy(func(task *models.Task) bool {
 		return task.ID == taskWithUpdates.ID && task.Title == taskWithUpdates.Title &&
-			   task.Description == taskWithUpdates.Description && task.UserID == taskWithUpdates.UserID &&
-			   task.IsCompleted == taskWithUpdates.IsCompleted
+			task.Description == taskWithUpdates.Description && task.UserID == taskWithUpdates.UserID &&
+			task.IsCompleted == taskWithUpdates.IsCompleted
 	})).Return(nil)
 
 	updatedModel, cmd := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -266,7 +261,6 @@ func TestTasksModel_UpdateTask_SubmitForm(t *testing.T) {
 
 	mockService.AssertExpectations(t)
 }
-
 
 func TestTasksModel_KeyBindings_CRUD_OnFocusedTable(t *testing.T) {
 	mockService := new(MockTaskService)
@@ -297,7 +291,7 @@ func TestTasksModel_KeyBindings_CRUD_OnFocusedTable(t *testing.T) {
 	// Reset model for next test part
 	model = New(mockService)
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
-	model.SetSize(80,30)
+	model.SetSize(80, 30)
 	modelInterface, _ := model.Update(model.Init()())
 	model = modelInterface.(*Model)
 	model.pendingTasksTable.SetCursor(0)
@@ -310,10 +304,9 @@ func TestTasksModel_KeyBindings_CRUD_OnFocusedTable(t *testing.T) {
 	// Reset model for next test part
 	model = New(mockService)
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
-	model.SetSize(80,30)
+	model.SetSize(80, 30)
 	modelInterface, _ = model.Update(model.Init()())
 	model = modelInterface.(*Model)
-
 
 	updatedModelTea, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
 	model = updatedModelTea.(*Model)
@@ -334,51 +327,50 @@ func TestTasksModel_KeyBindings_CRUD_OnFocusedTable(t *testing.T) {
 	mockService.AssertExpectations(t)
 }
 
-
 func TestTasksModel_ViewDetails_OnFocusedTable(t *testing.T) {
-    mockService := new(MockTaskService)
-    taskPending := models.Task{ID: 1, Title: "Pending Detail", UserID: 1}
-    taskCompleted := models.Task{ID: 2, Title: "Completed Detail", UserID: 1, IsCompleted: true}
+	mockService := new(MockTaskService)
+	taskPending := models.Task{ID: 1, Title: "Pending Detail", UserID: 1}
+	taskCompleted := models.Task{ID: 2, Title: "Completed Detail", UserID: 1, IsCompleted: true}
 
-    mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{taskPending, taskCompleted}, nil).Once()
-    model := New(mockService)
-    model.SetSize(80,30)
-    modelInterface, _ := model.Update(model.Init()())
-    model = modelInterface.(*Model)
-    model.pendingTasksTable.SetCursor(0)
-    assert.Equal(t, PendingTableFocus, model.focusedTable)
+	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{taskPending, taskCompleted}, nil).Once()
+	model := New(mockService)
+	model.SetSize(80, 30)
+	modelInterface, _ := model.Update(model.Init()())
+	model = modelInterface.(*Model)
+	model.pendingTasksTable.SetCursor(0)
+	assert.Equal(t, PendingTableFocus, model.focusedTable)
 
-    mockService.On("GetTaskByID", mock.Anything, taskPending.ID).Return(&taskPending, nil).Once()
-    modelInterface, cmdViewPending := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
-    model = modelInterface.(*Model)
-    assert.True(t, model.isLoading)
-    modelInterface, _ = model.Update(cmdViewPending())
-    model = modelInterface.(*Model)
-    assert.Equal(t, DetailView, model.currentView)
-    assert.Equal(t, taskPending.ID, model.selectedTaskForDetail.ID)
+	mockService.On("GetTaskByID", mock.Anything, taskPending.ID).Return(&taskPending, nil).Once()
+	modelInterface, cmdViewPending := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+	model = modelInterface.(*Model)
+	assert.True(t, model.isLoading)
+	modelInterface, _ = model.Update(cmdViewPending())
+	model = modelInterface.(*Model)
+	assert.Equal(t, DetailView, model.currentView)
+	assert.Equal(t, taskPending.ID, model.selectedTaskForDetail.ID)
 
 	// Reset model for next part
-    model = New(mockService)
-    mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{taskPending, taskCompleted}, nil).Once()
-    model.SetSize(80,30)
-    modelInterface, _ = model.Update(model.Init()())
-    model = modelInterface.(*Model)
+	model = New(mockService)
+	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{taskPending, taskCompleted}, nil).Once()
+	model.SetSize(80, 30)
+	modelInterface, _ = model.Update(model.Init()())
+	model = modelInterface.(*Model)
 
-    modelInterface, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
-    model = modelInterface.(*Model)
-    model.completedTasksTable.SetCursor(0)
-    assert.Equal(t, CompletedTableFocus, model.focusedTable)
+	modelInterface, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model = modelInterface.(*Model)
+	model.completedTasksTable.SetCursor(0)
+	assert.Equal(t, CompletedTableFocus, model.focusedTable)
 
-    mockService.On("GetTaskByID", mock.Anything, taskCompleted.ID).Return(&taskCompleted, nil).Once()
-    modelInterface, cmdViewCompleted := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
-    model = modelInterface.(*Model)
-    assert.True(t, model.isLoading)
-    modelInterface, _ = model.Update(cmdViewCompleted())
-    model = modelInterface.(*Model)
-    assert.Equal(t, DetailView, model.currentView)
-    assert.Equal(t, taskCompleted.ID, model.selectedTaskForDetail.ID)
+	mockService.On("GetTaskByID", mock.Anything, taskCompleted.ID).Return(&taskCompleted, nil).Once()
+	modelInterface, cmdViewCompleted := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+	model = modelInterface.(*Model)
+	assert.True(t, model.isLoading)
+	modelInterface, _ = model.Update(cmdViewCompleted())
+	model = modelInterface.(*Model)
+	assert.Equal(t, DetailView, model.currentView)
+	assert.Equal(t, taskCompleted.ID, model.selectedTaskForDetail.ID)
 
-    mockService.AssertExpectations(t)
+	mockService.AssertExpectations(t)
 }
 
 func TestTasksModel_DeleteTask_ConfirmYes(t *testing.T) {
@@ -401,7 +393,7 @@ func TestTasksModel_DeleteTask_ConfirmYes(t *testing.T) {
 	assert.Equal(t, TableView, model.currentView) // Check currentView resets
 	assert.Equal(t, int64(0), model.taskIDToDelete)
 	assert.False(t, model.isLoading) // Should be false after refresh is processed, but refresh is not processed here yet.
-	                                 // Let's check isLoading after processing refresh.
+	// Let's check isLoading after processing refresh.
 
 	assert.NotNil(t, cmdRefresh)
 	updatedModelTea, _ = model.Update(cmdRefresh())

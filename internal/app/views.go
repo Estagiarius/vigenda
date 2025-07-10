@@ -11,6 +11,7 @@ const (
 	QuestionBankView
 	ProofGenerationView
 	ConcreteDashboardView // Represents the actual dashboard content view
+	LessonManagementView  // Added Lesson Management View
 	// Add other views as needed
 )
 
@@ -23,6 +24,7 @@ func (v View) String() string {
 		"Gerenciar Avaliações e Notas",
 		"Banco de Questões",
 		"Gerar Provas",
-		"Painel de Controle", // String for ConcreteDashboardView
+		"Painel de Controle",     // String for ConcreteDashboardView
+		"Gerenciar Aulas/Lições", // String for LessonManagementView
 	}[v]
 }

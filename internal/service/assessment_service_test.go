@@ -8,9 +8,9 @@ import (
 
 // MockAssessmentRepository is a mock implementation of AssessmentRepository for testing.
 type MockAssessmentRepository struct {
-	CreateAssessmentFunc      func(ctx context.Context, assessment *models.Assessment) error
-	GetAssessmentByIDFunc     func(ctx context.Context, id int64) (*models.Assessment, error)
-	CreateGradeFunc           func(ctx context.Context, grade *models.Grade) error
+	CreateAssessmentFunc        func(ctx context.Context, assessment *models.Assessment) error
+	GetAssessmentByIDFunc       func(ctx context.Context, id int64) (*models.Assessment, error)
+	CreateGradeFunc             func(ctx context.Context, grade *models.Grade) error
 	GetGradesByAssessmentIDFunc func(ctx context.Context, assessmentID int64) ([]*models.Grade, error)
 	GetAssessmentsByClassIDFunc func(ctx context.Context, classID int64) ([]*models.Assessment, error)
 }

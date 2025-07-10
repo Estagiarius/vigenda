@@ -15,7 +15,7 @@ var (
 			Background(lipgloss.Color("236")). // Dark gray background
 			Foreground(lipgloss.Color("250"))  // Light gray text
 
-	statusTextLeftStyle = lipgloss.NewStyle().Align(lipgloss.Left)
+	statusTextLeftStyle  = lipgloss.NewStyle().Align(lipgloss.Left)
 	statusTextRightStyle = lipgloss.NewStyle().Align(lipgloss.Right)
 
 	separator = " | "
@@ -56,7 +56,6 @@ type SetEphemeralStatusMsg struct {
 	Text string
 	TTL  time.Duration // Optional: if zero, uses default TTL
 }
-
 
 func (m StatusBarModel) Update(msg tea.Msg) (StatusBarModel, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -136,23 +135,21 @@ func (m StatusBarModel) View() string {
 		if len(runes) > availableWidth {
 			left = statusTextLeftStyle.Render(string(runes[:availableWidth-3]) + "...")
 		} else {
-             left = statusTextLeftStyle.Render(string(runes))
-        }
+			left = statusTextLeftStyle.Render(string(runes))
+		}
 	}
 
-
 	// Ensure the total content does not exceed the bar width
-    // This is tricky with lipgloss alignment. We'll render the full bar and let lipgloss handle it.
-    // The statusBarStyle will clip if content is too wide.
+	// This is tricky with lipgloss alignment. We'll render the full bar and let lipgloss handle it.
+	// The statusBarStyle will clip if content is too wide.
 
-    // We need to fill the space between left and right.
-    // Calculate the width of the gap
-    gapWidth := m.width - lipgloss.Width(left) - lipgloss.Width(right)
-    if gapWidth < 0 {
-        gapWidth = 0 // Should not happen if truncation is correct
-    }
-    gap := strings.Repeat(" ", gapWidth)
-
+	// We need to fill the space between left and right.
+	// Calculate the width of the gap
+	gapWidth := m.width - lipgloss.Width(left) - lipgloss.Width(right)
+	if gapWidth < 0 {
+		gapWidth = 0 // Should not happen if truncation is correct
+	}
+	gap := strings.Repeat(" ", gapWidth)
 
 	return statusBarStyle.Width(m.width).Render(left + gap + right)
 }

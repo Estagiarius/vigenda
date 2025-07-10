@@ -12,6 +12,7 @@ import (
 	"vigenda/internal/app/assessments" // Import for the assessments module
 	"vigenda/internal/app/classes"     // Import for the classes module
 	"vigenda/internal/app/dashboard"   // Import for the new dashboard module
+	"vigenda/internal/app/lessons"     // Import for the lessons module
 	"vigenda/internal/app/proofs"      // Import for the proofs module
 	"vigenda/internal/app/questions"   // Import for the questions module
 	"vigenda/internal/app/tasks"       // Import for the tasks module
@@ -33,6 +34,7 @@ type Model struct {
 	questionsModel   *questions.Model
 	proofsModel      *proofs.Model
 	dashboardModel   *dashboard.Model // Added dashboard model field
+	lessonsModel     *lessons.Model   // Added lessons model field
 	// Add other sub-models here as they are developed
 	width    int
 	height   int
@@ -68,6 +70,7 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 		menuItem{title: AssessmentManagementView.String(), view: AssessmentManagementView},
 		menuItem{title: QuestionBankView.String(), view: QuestionBankView},
 		menuItem{title: ProofGenerationView.String(), view: ProofGenerationView},
+		menuItem{title: LessonManagementView.String(), view: LessonManagementView}, // Added Lesson Management menu item
 	}
 
 	l := list.New(menuItems, list.NewDefaultDelegate(), 0, 0)
@@ -90,6 +93,10 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 	qm := questions.New(qs)
 	pm := proofs.New(ps)
 	dshModel := dashboard.New(ts, cs, as, ls) // Initialize dashboard model, passing necessary services
+	// Initialize lessonsModel, assuming initialUserID = 1 for now, and 0,0 for width/height
+	initialUserID := int64(1)
+	lessonsMdl := lessons.New(ls, cs, initialUserID, 0, 0)
+
 	return &Model{ // Return pointer
 		list:              l,
 		currentView:       DashboardView, // Start with the main menu (DashboardView acts as the container)
@@ -103,8 +110,9 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 		questionService:   qs,
 		proofsModel:       pm,
 		proofService:      ps,
-		lessonService:     ls,         // Store lessonService
-		dashboardModel:    dshModel, // Assign initialized dashboard model
+		lessonService:     ls,          // Store lessonService
+		lessonsModel:      &lessonsMdl, // Assign initialized lessons model
+		dashboardModel:    dshModel,    // Assign initialized dashboard model
 	}
 }
 
@@ -161,6 +169,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		tempModel, subCmd = m.proofsModel.Update(msg)
 		m.proofsModel = tempModel.(*proofs.Model)
 		cmds = append(cmds, subCmd)
+
+		// Lessons model
+		tempModel, subCmd = m.lessonsModel.Update(msg)
+		if mdl, ok := tempModel.(lessons.Model); ok { // lessons.Model is not a pointer
+			m.lessonsModel = &mdl
+		} else if mdlPtr, ok := tempModel.(*lessons.Model); ok { // if it returns a pointer
+			m.lessonsModel = mdlPtr
+		}
+		cmds = append(cmds, subCmd)
+
 		return m, tea.Batch(cmds...)
 
 	case tea.KeyMsg:
@@ -197,6 +215,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cmds = append(cmds, m.questionsModel.Init())
 					case ProofGenerationView:
 						cmds = append(cmds, m.proofsModel.Init())
+					case LessonManagementView:
+						cmds = append(cmds, m.lessonsModel.Init())
 					}
 				}
 			} else if key.Matches(msg, key.NewBinding(key.WithKeys("q"))) {
@@ -275,12 +295,39 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.proofsModel = updatedModel.(*proofs.Model)
 		cmds = append(cmds, submodelCmd)
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
-			if !m.proofsModel.IsFocused() {
-				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerar Provas.")
+			// Check if proofsModel has an IsFocused method or similar
+			// For now, assume 'esc' always returns if not handled internally by proofsModel for a more specific purpose
+			m.currentView = DashboardView
+			log.Println("AppModel: Voltando para o Menu Principal a partir de Gerar Provas.")
+		}
+
+	case LessonManagementView:
+		// Check for GoBackMsg from lessonsModel
+		if _, ok := msg.(lessons.GoBackMsg); ok {
+			m.currentView = DashboardView
+			log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Aulas/Lições (via GoBackMsg).")
+		} else {
+			updatedModel, submodelCmd = m.lessonsModel.Update(msg)
+			// lessons.Model.Update returns tea.Model, which is lessons.Model (not pointer)
+			if mdl, ok := updatedModel.(lessons.Model); ok {
+				m.lessonsModel = &mdl
+			} else {
+				// Log error or handle unexpected type
+				log.Printf("AppModel: Erro, tipo inesperado do lessonsModel.Update: %T", updatedModel)
+			}
+			cmds = append(cmds, submodelCmd)
+
+			// Handle 'esc' to go back to main menu if not handled by GoBackMsg
+			// This might be redundant if lessonsModel's Esc always sends GoBackMsg
+			if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+				// Check if lessonsModel has an IsFocused method if needed
+				// For now, this 'esc' is a fallback if GoBackMsg wasn't sent
+				// m.currentView = DashboardView
+				// log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Aulas/Lições (via Esc).")
 			}
 		}
-	// DashboardView (main menu) list updates are handled in the tea.KeyMsg section of the first switch.
+
+		// DashboardView (main menu) list updates are handled in the tea.KeyMsg section of the first switch.
 	}
 
 	return m, tea.Batch(cmds...)
@@ -326,6 +373,10 @@ func (m *Model) View() string {
 	case ProofGenerationView:
 		viewContent = m.proofsModel.View()
 		help = "\nPressione 'esc' para voltar ao menu principal."
+	case LessonManagementView:
+		viewContent = m.lessonsModel.View()
+		// Help for LessonManagementView is handled by lessonsModel itself
+		help = "" // Or a generic "Pressione 'esc' para voltar ao menu principal" if not handled by sub-model.
 	default: // Should not happen if all views are handled
 		viewContent = fmt.Sprintf("Visão desconhecida: %s (%d)", m.currentView.String(), m.currentView)
 		help = "\nPressione 'esc' ou 'q' para tentar voltar ao menu principal."

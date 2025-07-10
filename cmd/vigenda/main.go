@@ -24,7 +24,7 @@ import (
 	"vigenda/internal/tui"
 )
 
-var db *sql.DB // Global database connection pool
+var db *sql.DB       // Global database connection pool
 var logFile *os.File // Global para o arquivo de log, para poder fechar no final
 
 var taskService service.TaskService
@@ -157,7 +157,7 @@ Você pode fornecer uma descrição detalhada, associar a tarefa a uma turma esp
 e definir um prazo de conclusão utilizando as flags correspondentes.`,
 	Example: `  vigenda tarefa add "Corrigir provas bimestrais" --description "Corrigir as provas do 2º bimestre da turma 9A." --classid 1 --duedate 2024-07-20
   vigenda tarefa add "Planejar próxima unidade" --duedate 2024-08-01`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		title := args[0]
 		description, _ := cmd.Flags().GetString("description")
@@ -211,7 +211,7 @@ var taskListCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		classIDStr, _ := cmd.Flags().GetString("classid")
 		showAllStr, _ := cmd.Flags().GetString("all") // Check for the --all flag
-		showAll := showAllStr == "true" // Convert to boolean
+		showAll := showAllStr == "true"               // Convert to boolean
 
 		var tasks []models.Task
 		var err error
@@ -267,7 +267,6 @@ var taskListCmd = &cobra.Command{
 			return
 		}
 
-
 		if len(tasks) == 0 {
 			fmt.Println("No active tasks found matching criteria.")
 			return
@@ -309,7 +308,7 @@ var taskCompleteCmd = &cobra.Command{
 	Long:  `Marca uma tarefa específica como concluída, utilizando o seu ID numérico.`,
 	Example: `  vigenda tarefa complete 12
   vigenda tarefa complete 3`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		taskID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
@@ -340,7 +339,7 @@ func initializeServices(db *sql.DB) {
 	// If they use stubs for now or are basic passthroughs, that's fine.
 	// For now, let's assume they can take the real repos.
 	// If NewStubClassService was a placeholder for NewClassService:
-	classService = service.NewClassService(classRepo, subjectRepo) // Assuming ClassService might need SubjectRepo too, or just ClassRepo
+	classService = service.NewClassService(classRepo, subjectRepo)              // Assuming ClassService might need SubjectRepo too, or just ClassRepo
 	assessmentService = service.NewAssessmentService(assessmentRepo, classRepo) // AssessmentService might need ClassRepo to get students
 
 	questionService = service.NewQuestionService(questionRepo, subjectRepo)
@@ -368,7 +367,6 @@ func init() {
 	//_ = taskListCmd.MarkFlagRequired("classid") // No longer strictly mandatory if --all is used.
 	taskListCmd.Flags().String("classid", "", "ID da turma para filtrar as tarefas.")
 	taskListCmd.Flags().String("all", "false", "Listar todas as tarefas, incluindo tarefas de sistema/bugs (ignora --classid se presente).")
-
 
 	taskCmd.AddCommand(taskAddCmd, taskListCmd, taskCompleteCmd)
 	rootCmd.AddCommand(taskCmd)
@@ -440,7 +438,6 @@ func setupLogging() error {
 		logDir = "."
 	}
 
-
 	logFilePath := filepath.Join(logDir, "vigenda.log")
 
 	// Abrir o arquivo de log. Cria se não existir, anexa se existir.
@@ -470,7 +467,6 @@ func mustGetwd() string {
 	return cwd
 }
 
-
 var classCmd = &cobra.Command{
 	Use:   "turma",
 	Short: "Gerencia turmas e alunos (importar-alunos, atualizar-status)",
@@ -492,7 +488,7 @@ O ficheiro CSV deve conter as colunas 'numero_chamada', 'nome_completo', e opcio
 Consulte a documentação (README.md, Artefacto 9.1) para a estrutura detalhada do CSV.`,
 	Example: `  vigenda turma importar-alunos 1 ./lista_alunos_turma_a.csv
   vigenda turma importar-alunos 3 /documentos/alunos_turma_c.csv`,
-	Args:  cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		classID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
@@ -524,7 +520,7 @@ O ID do aluno é o identificador único na base de dados.
 Status permitidos: 'ativo', 'inativo', 'transferido'.`,
 	Example: `  vigenda turma atualizar-status 25 ativo
   vigenda turma atualizar-status 103 transferido`,
-	Args:  cobra.ExactArgs(2),
+	Args: cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		studentID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
@@ -565,7 +561,7 @@ var assessmentCreateCmd = &cobra.Command{
 o período/bimestre e o peso da avaliação na média final.`,
 	Example: `  vigenda avaliacao criar "Trabalho de História Moderna" --classid 2 --term 3 --weight 3.5
   vigenda avaliacao criar "Seminário de Literatura" --classid 1 --term 2 --weight 2.0`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		classIDStr, _ := cmd.Flags().GetString("classid")
@@ -630,7 +626,7 @@ será exibida, permitindo a inserção de cada nota.
 O ID da avaliação é o identificador numérico único da avaliação.`,
 	Example: `  vigenda avaliacao lancar-notas 7
   vigenda avaliacao lancar-notas 2`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		assessmentID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
@@ -681,7 +677,6 @@ O ID da avaliação é o identificador numérico único da avaliação.`,
 			studentGrades[studentID] = grade
 		}
 
-
 		if len(studentGrades) > 0 {
 			err = assessmentService.EnterGrades(context.Background(), assessmentID, studentGrades)
 			if err != nil {
@@ -703,7 +698,7 @@ considerando todas as avaliações e seus respectivos pesos.
 O ID da turma é o identificador numérico único da turma.`,
 	Example: `  vigenda avaliacao media-turma 1
   vigenda avaliacao media-turma 5`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		classID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
@@ -740,7 +735,7 @@ tópico, tipo de questão (múltipla escolha, dissertativa), dificuldade, enunci
 opções (para múltipla escolha) e resposta correta.`,
 	Example: `  vigenda bancoq add questoes_bimestre1.json
   vigenda bancoq add ../shared/questoes_revisao.json`,
-	Args:  cobra.ExactArgs(1),
+	Args: cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		jsonFilePath := args[0]
 		jsonData, err := os.ReadFile(jsonFilePath)
@@ -795,7 +790,7 @@ A prova gerada será exibida no terminal.`,
 			return
 		}
 
-		easyCount, _ := strconv.Atoi(easyCountStr)   // Default to 0 if not provided or invalid
+		easyCount, _ := strconv.Atoi(easyCountStr)     // Default to 0 if not provided or invalid
 		mediumCount, _ := strconv.Atoi(mediumCountStr) // Default to 0
 		hardCount, _ := strconv.Atoi(hardCountStr)     // Default to 0
 
@@ -854,7 +849,7 @@ func main() {
 		// Se Execute falhar, o log já deve ter sido configurado (ou tentado)
 		// e o erro de Execute pode ser logado no arquivo (se o log de arquivo estiver ok)
 		// ou no stderr (se o log de arquivo falhou).
-		log.Printf("CRITICAL: rootCmd.Execute failed: %v", err) // Vai para o arquivo de log se configurado
+		log.Printf("CRITICAL: rootCmd.Execute failed: %v", err)  // Vai para o arquivo de log se configurado
 		fmt.Fprintln(os.Stderr, "Error executing command:", err) // Também para stderr para visibilidade imediata
 		if logFile != nil {
 			logFile.Close()

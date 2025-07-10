@@ -23,15 +23,15 @@ type Model struct {
 	// Serviços para buscar dados
 	// Estes serão injetados através do construtor New.
 	taskService       service.TaskService
-	classService      service.ClassService       // Para buscar aulas, por exemplo (pode ser removido se LessonService for suficiente)
-	assessmentService service.AssessmentService  // Para buscar avaliações
-	lessonService     service.LessonService      // Adicionado para buscar lições
+	classService      service.ClassService      // Para buscar aulas, por exemplo (pode ser removido se LessonService for suficiente)
+	assessmentService service.AssessmentService // Para buscar avaliações
+	lessonService     service.LessonService     // Adicionado para buscar lições
 
 	// Dados a serem exibidos no Dashboard
 	// Estes campos serão populados pelas respostas dos serviços.
-	upcomingTasks       []models.Task        // Tarefas com prazos futuros
-	todaysLessons       []models.Lesson      // Lições agendadas para o dia atual
-	upcomingAssessments []models.Assessment  // Avaliações agendadas futuramente
+	upcomingTasks       []models.Task       // Tarefas com prazos futuros
+	todaysLessons       []models.Lesson     // Lições agendadas para o dia atual
+	upcomingAssessments []models.Assessment // Avaliações agendadas futuramente
 	// Poderíamos adicionar mais, como:
 	// recentGrades      []models.GradeSummary // Resumo de notas recentes lançadas
 	// systemMessages    []string              // Mensagens importantes do sistema ou lembretes
@@ -44,10 +44,11 @@ type Model struct {
 
 // New cria uma nova instância do Dashboard Model.
 // Parâmetros:
-//   ts: Instância de TaskService para buscar dados de tarefas.
-//   cs: Instância de ClassService (pode ser removido se não for mais usado diretamente pelo dashboard).
-//   as: Instância de AssessmentService para buscar dados de avaliações.
-//   ls: Instância de LessonService para buscar dados de lições.
+//
+//	ts: Instância de TaskService para buscar dados de tarefas.
+//	cs: Instância de ClassService (pode ser removido se não for mais usado diretamente pelo dashboard).
+//	as: Instância de AssessmentService para buscar dados de avaliações.
+//	ls: Instância de LessonService para buscar dados de lições.
 func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService, ls service.LessonService) *Model {
 	return &Model{
 		taskService:       ts,
@@ -181,7 +182,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Adicionar 'r' para recarregar dados do dashboard:
 		if msg.String() == "r" {
 			m.isLoading = true
-			m.err = nil // Limpar erro antes de recarregar
+			m.err = nil                   // Limpar erro antes de recarregar
 			cmds = append(cmds, m.Init()) // Re-chama Init para buscar dados novamente
 		}
 	}
@@ -260,7 +261,7 @@ func (m *Model) View() string {
 	// Usar Place para melhor controle do layout geral, especialmente se o conteúdo for menor que a tela.
 	// Para conteúdo que pode exceder a altura, o Place pode não ser ideal sem scroll.
 	// Por agora, vamos assumir que o conteúdo cabe.
-	return lipgloss.NewStyle().Padding(1,2).Render(sb.String())
+	return lipgloss.NewStyle().Padding(1, 2).Render(sb.String())
 	// return lipgloss.Place(m.width, m.height, lipgloss.Left, lipgloss.Top, sb.String(), lipgloss.WithMaxHeight(m.height), lipgloss.WithMaxWidth(m.width))
 }
 

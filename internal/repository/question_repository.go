@@ -168,7 +168,6 @@ func unmarshalOptions(jsonString sql.NullString) ([]string, error) {
 	return options, nil
 }
 
-
 // GetQuestionsByCriteria_ProofGeneration is a more specialized version for proof generation
 // that fetches a specific number of questions for each difficulty level.
 // It now uses repository.ProofCriteria.

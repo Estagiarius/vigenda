@@ -154,7 +154,6 @@ func (s *classServiceImpl) AddStudent(ctx context.Context, classID int64, fullNa
 	// 	return models.Student{}, fmt.Errorf("service.AddStudent: class not found or not accessible: %w", err)
 	// }
 
-
 	student := models.Student{
 		ClassID:      classID,
 		FullName:     fullName,
@@ -336,7 +335,6 @@ func (s *classServiceImpl) UpdateStudentStatus(ctx context.Context, studentID in
 	// if err != nil {
 	// 	return fmt.Errorf("service.UpdateStudentStatus: class not found or not accessible: %w", err)
 	// }
-
 
 	err := s.classRepo.UpdateStudentStatus(ctx, studentID, newStatus)
 	if err != nil {

@@ -86,7 +86,6 @@ func (r *lessonRepositoryImpl) GetLessonsByDateRange(ctx context.Context, userID
 	// Garantir que endDate seja o fim do dia para incluir todas as lições da data final.
 	endDate = time.Date(endDate.Year(), endDate.Month(), endDate.Day(), 23, 59, 59, 0, endDate.Location())
 
-
 	if userID > 0 {
 		query = `SELECT l.id, l.class_id, l.title, l.plan_content, l.scheduled_at
                  FROM lessons l

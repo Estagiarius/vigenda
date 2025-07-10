@@ -11,7 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"vigenda/internal/models" // Moved here
+	"vigenda/internal/models"  // Moved here
 	"vigenda/internal/service" // Moved here
 )
 
@@ -27,12 +27,12 @@ type mockClassService struct {
 	ImportStudentsFromCSVFunc func(ctx context.Context, classID int64, csvData []byte) (int, error)
 	UpdateStudentStatusFunc   func(ctx context.Context, studentID int64, newStatus string) error
 	// Added missing methods to satisfy the interface
-	UpdateClassFunc     func(ctx context.Context, classID int64, name string, subjectID int64) (models.Class, error)
-	DeleteClassFunc     func(ctx context.Context, classID int64) error
-	AddStudentFunc      func(ctx context.Context, classID int64, fullName string, enrollmentID string, status string) (models.Student, error)
-	GetStudentByIDFunc  func(ctx context.Context, studentID int64) (models.Student, error)
-	UpdateStudentFunc   func(ctx context.Context, studentID int64, fullName string, enrollmentID string, status string) (models.Student, error)
-	DeleteStudentFunc   func(ctx context.Context, studentID int64) error
+	UpdateClassFunc    func(ctx context.Context, classID int64, name string, subjectID int64) (models.Class, error)
+	DeleteClassFunc    func(ctx context.Context, classID int64) error
+	AddStudentFunc     func(ctx context.Context, classID int64, fullName string, enrollmentID string, status string) (models.Student, error)
+	GetStudentByIDFunc func(ctx context.Context, studentID int64) (models.Student, error)
+	UpdateStudentFunc  func(ctx context.Context, studentID int64, fullName string, enrollmentID string, status string) (models.Student, error)
+	DeleteStudentFunc  func(ctx context.Context, studentID int64) error
 }
 
 func (m *mockClassService) ListAllClasses(ctx context.Context) ([]models.Class, error) {
@@ -58,14 +58,12 @@ func (m *mockClassService) GetClassByID(ctx context.Context, classID int64) (mod
 	return models.Class{ID: classID, Name: "Mocked Class"}, nil // Example value
 }
 
-
 func (m *mockClassService) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {
 	if m.GetStudentsByClassIDFunc != nil {
 		return m.GetStudentsByClassIDFunc(ctx, classID)
 	}
 	return []models.Student{}, nil
 }
-
 
 func (m *mockClassService) ImportStudentsFromCSV(ctx context.Context, classID int64, csvData []byte) (int, error) {
 	if m.ImportStudentsFromCSVFunc != nil {
@@ -124,7 +122,6 @@ func (m *mockClassService) DeleteStudent(ctx context.Context, studentID int64) e
 	}
 	return nil
 }
-
 
 func TestClassesModel_InitialState(t *testing.T) {
 	mockService := &mockClassService{}
@@ -257,9 +254,9 @@ func TestClassesModel_Update_CreateClass_Success(t *testing.T) {
 
 	// Now set values on the prepared form
 	require.Len(t, model.formInputs.inputs, 2, "Formulário de criação não inicializado corretamente")
-	model.formInputs.inputs[0].SetValue(createdClassName)       // Name input
+	model.formInputs.inputs[0].SetValue(createdClassName)                    // Name input
 	model.formInputs.inputs[1].SetValue(fmt.Sprintf("%d", createdSubjectID)) // SubjectID input
-	model.formInputs.focusIndex = 1 // Assume o foco está no último campo para submeter com Enter
+	model.formInputs.focusIndex = 1                                          // Assume o foco está no último campo para submeter com Enter
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
 	updatedModelTea, cmdCreate := model.Update(keyEnter)
@@ -288,7 +285,6 @@ func TestClassesModel_Update_CreateClass_Success(t *testing.T) {
 	require.Len(t, m.table.Rows(), 1, "Tabela deve ter a nova turma")
 	assert.Equal(t, createdClassName, m.table.Rows()[0][1])
 }
-
 
 func TestClassesModel_Update_CreateClass_ServiceError(t *testing.T) {
 	serviceErr := errors.New("falha no serviço ao criar")
@@ -358,7 +354,6 @@ func TestClassesModel_Update_CreateClass_InvalidSubjectID(t *testing.T) {
 	require.NotNil(t, m2.err, "Erro deve ser definido para ID inválido")
 	assert.Contains(t, m2.err.Error(), "ID disciplina inválido", "Mensagem de erro deve indicar ID inválido") // Removido "da"
 }
-
 
 func TestClassesModel_Update_CreateClass_EmptyFields(t *testing.T) {
 	mockService := &mockClassService{}
@@ -457,7 +452,6 @@ func TestClassesModel_StudentsTable_Initialization(t *testing.T) {
 		assert.Equal(t, expected, actualColumns[i].Title, "Título da coluna %d incorreto", i)
 	}
 }
-
 
 func TestClassesModel_Update_ListView_EnterSelectsClassAndFetchesStudents(t *testing.T) {
 	initialClasses := []models.Class{
@@ -570,7 +564,6 @@ func TestClassesModel_Update_FetchClassStudentsCmd_ReturnsErrMsg(t *testing.T) {
 	assert.Nil(t, m.classStudents, "classStudents deve ser nil")
 	assert.Len(t, m.studentsTable.Rows(), 0, "studentsTable deve estar vazia")
 }
-
 
 func TestClassesModel_Update_DetailsView_EscReturnsToListView(t *testing.T) {
 	mockSvc := &mockClassService{}

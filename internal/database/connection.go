@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "github.com/lib/pq" // PostgreSQL driver
+	_ "github.com/lib/pq"           // PostgreSQL driver
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
 )
 
@@ -119,7 +119,6 @@ func DefaultSQLitePath() string {
 	}
 	return "vigenda.db" // Fallback to current working directory
 }
-
 
 // DefaultDbPath is added back for compatibility if it's used elsewhere,
 // but it should ideally be replaced by DefaultSQLitePath for clarity.

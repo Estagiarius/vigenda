@@ -146,7 +146,7 @@ func TestStatusBarModel_Update_ClearEphemeral(t *testing.T) {
 	// Simulate a ClearEphemeralMsg after TTL
 	model.ephemeralMsg = "Clear me now"
 	model.ephemeralTime = time.Now().Add(-6 * time.Second) // 6 seconds ago
-	model.ephemeralTTL = 5 * time.Second                  // TTL is 5s
+	model.ephemeralTTL = 5 * time.Second                   // TTL is 5s
 	updatedModel, _ = model.Update(ClearEphemeralMsg{})
 	if updatedModel.ephemeralMsg != "" {
 		t.Errorf("Ephemeral message should be cleared after TTL, got '%s'", updatedModel.ephemeralMsg)
@@ -188,7 +188,7 @@ func TestStatusBarModel_View(t *testing.T) {
 	model.status = "Back to Normal"
 	model.ephemeralMsg = "EXPIRED"
 	model.ephemeralTime = time.Now().Add(-5 * time.Second) // Expired 5s ago
-	model.ephemeralTTL = 1 * time.Second                  // TTL was 1s
+	model.ephemeralTTL = 1 * time.Second                   // TTL was 1s
 	// Note: The View() method itself doesn't clear the ephemeral message; Update() does via ClearEphemeralMsg.
 	// So, if ClearEphemeralMsg hasn't been processed, View() will still show it if not careful.
 	// The current View() logic re-checks the TTL.
@@ -202,7 +202,6 @@ func TestStatusBarModel_View(t *testing.T) {
 	if !strings.Contains(viewExpiredEph, "Back to Normal") {
 		t.Errorf("View should display normal status if ephemeral is expired. Got: %s", viewExpiredEph)
 	}
-
 
 	// Test 4: View with no width (should be empty)
 	model.width = 0
@@ -330,7 +329,6 @@ func TestStatusBarModel_View(t *testing.T) {
 	if strings.Contains(viewTooSmall, "Short") {
 		t.Errorf("With width 10, status 'Short' should not be visible. Got: %s", viewTooSmall)
 	}
-
 
 }
 

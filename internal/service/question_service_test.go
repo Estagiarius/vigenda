@@ -31,13 +31,12 @@ func (m *MockSubjectRepository) GetSubjectByID(ctx context.Context, id int64) (m
 // Este método é um exemplo, pode não existir na interface real do SubjectRepository.
 // Ajuste conforme a interface real do seu SubjectRepository.
 func (m *MockSubjectRepository) GetOrCreateByNameAndUser(ctx context.Context, name string, userID int64) (models.Subject, error) {
-    args := m.Called(ctx, name, userID)
-    if args.Get(0) == nil {
-        return models.Subject{}, args.Error(1)
-    }
-    return args.Get(0).(models.Subject), args.Error(1)
+	args := m.Called(ctx, name, userID)
+	if args.Get(0) == nil {
+		return models.Subject{}, args.Error(1)
+	}
+	return args.Get(0).(models.Subject), args.Error(1)
 }
-
 
 func TestQuestionService_AddQuestionsFromJSON(t *testing.T) {
 	ctx := context.Background()
@@ -74,10 +73,8 @@ func TestQuestionService_AddQuestionsFromJSON(t *testing.T) {
 		mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "Matemática", int64(1)).Return(models.Subject{ID: 1, Name: "Matemática", UserID: 1}, nil).Once()
 		mockSubjectRepo.On("GetOrCreateByNameAndUser", ctx, "História", int64(1)).Return(models.Subject{ID: 2, Name: "História", UserID: 1}, nil).Once()
 
-
 		// Configurar mock para AddQuestion
 		mockQuestionRepo.On("AddQuestion", ctx, mock.AnythingOfType("*models.Question")).Return(int64(1), nil).Twice()
-
 
 		count, err := questionService.AddQuestionsFromJSON(ctx, jsonData)
 
@@ -177,7 +174,6 @@ func TestQuestionService_AddQuestionsFromJSON(t *testing.T) {
 		assert.Error(t, err)
 		assert.EqualError(t, err, "questão 0: 'opcoes' não pode ser vazio para tipo 'multipla_escolha'")
 	})
-
 
 	t.Run("error_on_add_question_repository", func(t *testing.T) {
 		mockQuestionRepo := new(MockQuestionRepository)

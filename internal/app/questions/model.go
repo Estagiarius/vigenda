@@ -143,10 +143,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.state = AddQuestionsFormView
 						m.setupAddQuestionsForm()
 						cmds = append(cmds, m.textInputs[0].Focus())
-					// case "Listar Questões":
-					// m.state = ListQuestionsView
-					// m.isLoading = true
-					// cmds = append(cmds, m.loadQuestionsCmd()) // If implemented
+						// case "Listar Questões":
+						// m.state = ListQuestionsView
+						// m.isLoading = true
+						// cmds = append(cmds, m.loadQuestionsCmd()) // If implemented
 					}
 				}
 			}
@@ -211,7 +211,6 @@ func (m *Model) View() string {
 		b.WriteString(m.textInputs[0].View() + "\n\n")
 		b.WriteString("(Pressione Enter para submeter, Esc para cancelar)\n")
 		b.WriteString("Nota: Certifique-se que o caminho do arquivo é acessível pela aplicação.")
-
 
 	// case ListQuestionsView:
 	//  b.WriteString("Listagem de Questões (Não Implementado)\n")

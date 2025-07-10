@@ -35,6 +35,9 @@ func (m *mockTaskService) GetTaskByID(ctx context.Context, taskID int64) (*model
 }
 func (m *mockTaskService) UpdateTask(ctx context.Context, task *models.Task) error { return nil }
 func (m *mockTaskService) DeleteTask(ctx context.Context, taskID int64) error      { return nil }
+func (m *mockTaskService) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
+	return nil, nil // Placeholder implementation
+}
 
 type mockClassService struct{}
 
@@ -50,7 +53,9 @@ func (m *mockClassService) UpdateStudentStatus(ctx context.Context, studentID in
 func (m *mockClassService) GetClassByID(ctx context.Context, classID int64) (models.Class, error) { // Corrected return type
 	return models.Class{}, nil
 }
-func (m *mockClassService) ListAllClasses(ctx context.Context) ([]models.Class, error) { return nil, nil }
+func (m *mockClassService) ListAllClasses(ctx context.Context) ([]models.Class, error) {
+	return nil, nil
+}
 func (m *mockClassService) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {
 	return nil, nil
 }
@@ -103,6 +108,27 @@ func (m *mockProofService) GenerateProof(ctx context.Context, criteria service.P
 	return nil, nil
 }
 
+type mockLessonService struct{}
+
+func (m *mockLessonService) CreateLesson(ctx context.Context, classID int64, title string, planContent string, scheduledAt time.Time) (models.Lesson, error) {
+	return models.Lesson{}, nil
+}
+func (m *mockLessonService) GetLessonByID(ctx context.Context, lessonID int64) (models.Lesson, error) {
+	return models.Lesson{}, nil
+}
+func (m *mockLessonService) GetLessonsByClassID(ctx context.Context, classID int64) ([]models.Lesson, error) {
+	return nil, nil
+}
+func (m *mockLessonService) GetLessonsForDate(ctx context.Context, userID int64, date time.Time) ([]models.Lesson, error) {
+	return nil, nil
+}
+func (m *mockLessonService) UpdateLesson(ctx context.Context, lessonID int64, title string, planContent string, scheduledAt time.Time) (models.Lesson, error) {
+	return models.Lesson{}, nil
+}
+func (m *mockLessonService) DeleteLesson(ctx context.Context, lessonID int64) error {
+	return nil
+}
+
 // Helper to create a new model with all mock services
 func newTestAppModel() *Model {
 	return New(
@@ -111,6 +137,7 @@ func newTestAppModel() *Model {
 		&mockAssessmentService{},
 		&mockQuestionService{},
 		&mockProofService{},
+		&mockLessonService{}, // Added mockLessonService
 	)
 }
 
@@ -155,7 +182,7 @@ func TestModel_Update_NavigateToSubViewAndBack(t *testing.T) {
 	// For sub-views, 'esc' is handled by the sub-model if IsFocused, or by app model if not.
 	// Assuming tasksModel.IsFocused() is false when just viewing the table.
 	if m.tasksModel != nil { // Ensure tasksModel is initialized
-		m.tasksModel.formState = NoForm // Ensure it's not in a focused state like form editing
+		// m.tasksModel.formState = NoForm // Ensure it's not in a focused state like form editing // Commented out: formState undefined
 	}
 	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
 	nextModelTea, _ = m.Update(escMsg)
@@ -163,7 +190,6 @@ func TestModel_Update_NavigateToSubViewAndBack(t *testing.T) {
 
 	assert.Equal(t, initialView, m.currentView, "View should change back to DashboardView on Esc")
 }
-
 
 func TestModel_View_Content(t *testing.T) {
 	m := newTestAppModel()
@@ -186,7 +212,7 @@ func TestModel_View_Content(t *testing.T) {
 	m = updatedModelTea.(*Model)
 
 	if cmd != nil {
-		msg := cmd() // Execute command from tasksModel.Init()
+		msg := cmd()                       // Execute command from tasksModel.Init()
 		updatedModelTea, _ = m.Update(msg) // Process the message (e.g., tasksLoadedMsg)
 		m = updatedModelTea.(*Model)
 	}
@@ -196,7 +222,6 @@ func TestModel_View_Content(t *testing.T) {
 	// For this test, check that the main app help text changes.
 	assert.Contains(t, viewOutput, "Navegue na tabela com ↑/↓. Pressione 'esc' para voltar ao menu.", "View should contain help text for subview")
 }
-
 
 func TestModel_Update_WindowSize(t *testing.T) {
 	m := newTestAppModel()
@@ -260,13 +285,14 @@ func TestModel_Update_WithHelpers(t *testing.T) {
 	// Handle potential command from sub-model Init
 	if cmd != nil {
 		msg := cmd()
-		m, _ = m.Update(msg)
+		updatedModelTea, _ := m.Update(msg) // Assign to temporary tea.Model
+		m = updatedModelTea.(*Model)        // Assert type back to *Model
 	}
 	assert.Equal(t, TaskManagementView, m.currentView)
 
 	// To test 'esc' from subview, ensure subview is not focused (e.g., tasksModel.IsFocused() is false)
 	if m.tasksModel != nil {
-		m.tasksModel.formState = NoForm // Not in a form
+		// m.tasksModel.formState = NoForm // Not in a form // Commented out: formState undefined
 	}
 	m, _ = simulateEscPress(m)
 	assert.Equal(t, DashboardView, m.currentView)

@@ -119,7 +119,6 @@ func (s *questionServiceImpl) AddQuestionsFromJSON(ctx context.Context, jsonData
 			return addedCount, fmt.Errorf("questão %d: SubjectRepository não está disponível para resolver disciplina '%s'", i, qJSON.SubjectName)
 		}
 
-
 		var optionsStr *string
 		if qJSON.Type == "multipla_escolha" {
 			if qJSON.Options == nil {
@@ -136,7 +135,6 @@ func (s *questionServiceImpl) AddQuestionsFromJSON(ctx context.Context, jsonData
 			optionsStr = &s
 		}
 
-
 		questionModel := models.Question{
 			// UserID: qJSON.UserID, // Assumindo que UserID está no JSON ou vem do contexto
 			SubjectID:     subjectID, // Usar o ID obtido/simulado
@@ -148,19 +146,19 @@ func (s *questionServiceImpl) AddQuestionsFromJSON(ctx context.Context, jsonData
 			CorrectAnswer: qJSON.CorrectAnswer,
 		}
 		// O UserID deve ser preenchido, idealmente vindo do contexto da requisição (usuário logado)
-        // ou se cada questão no JSON pode pertencer a um usuário diferente (menos comum para este cenário).
-        // Para este exemplo, vamos assumir que o UserID é um valor fixo ou já está no qJSON.
-        // Se qJSON.UserID for 0 e UserID for obrigatório, adicionar validação.
-        // Aqui, vamos assumir que UserID está no modelo Question e será preenchido.
-        // Se UserID não está no JSON de entrada, ele precisaria ser injetado de outra forma.
-        // Por exemplo, se todas as questões são para o mesmo usuário:
+		// ou se cada questão no JSON pode pertencer a um usuário diferente (menos comum para este cenário).
+		// Para este exemplo, vamos assumir que o UserID é um valor fixo ou já está no qJSON.
+		// Se qJSON.UserID for 0 e UserID for obrigatório, adicionar validação.
+		// Aqui, vamos assumir que UserID está no modelo Question e será preenchido.
+		// Se UserID não está no JSON de entrada, ele precisaria ser injetado de outra forma.
+		// Por exemplo, se todas as questões são para o mesmo usuário:
 		// O UserID deve ser preenchido, idealmente vindo do contexto da requisição (usuário logado)
-        // ou se cada questão no JSON pode pertencer a um usuário diferente (menos comum para este cenário).
-        // Para este exemplo, vamos assumir que o UserID é um valor fixo ou já está no qJSON.
-        // Se qJSON.UserID for 0 e UserID for obrigatório, adicionar validação.
-        // Aqui, vamos assumir que UserID está no modelo Question e será preenchido.
-        // Se UserID não está no JSON de entrada, ele precisaria ser injetado de outra forma.
-        // Por exemplo, se todas as questões são para o mesmo usuário:
+		// ou se cada questão no JSON pode pertencer a um usuário diferente (menos comum para este cenário).
+		// Para este exemplo, vamos assumir que o UserID é um valor fixo ou já está no qJSON.
+		// Se qJSON.UserID for 0 e UserID for obrigatório, adicionar validação.
+		// Aqui, vamos assumir que UserID está no modelo Question e será preenchido.
+		// Se UserID não está no JSON de entrada, ele precisaria ser injetado de outra forma.
+		// Por exemplo, se todas as questões são para o mesmo usuário:
 		questionModel.UserID = qJSON.UserID // Corrigido: Atribuir UserID do JSON
 
 		questionsToAdd = append(questionsToAdd, questionModel)
