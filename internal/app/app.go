@@ -45,7 +45,7 @@ type Model struct {
 	assessmentService service.AssessmentService
 	questionService   service.QuestionService
 	proofService      service.ProofService
-	lessonService     service.LessonService // Adicionado
+	lessonService     service.LessonService
 	// ... other services
 }
 
@@ -90,7 +90,6 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 	qm := questions.New(qs)
 	pm := proofs.New(ps)
 	dshModel := dashboard.New(ts, cs, as, ls) // Initialize dashboard model, passing necessary services
-
 	return &Model{ // Return pointer
 		list:              l,
 		currentView:       DashboardView, // Start with the main menu (DashboardView acts as the container)

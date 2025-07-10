@@ -4,6 +4,7 @@ package repository
 
 import (
 	"context"
+	"time" // Adicionado import
 	"vigenda/internal/models"
 )
 

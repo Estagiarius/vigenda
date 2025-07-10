@@ -20,10 +20,10 @@ func (r *lessonRepositoryImpl) CreateLesson(ctx context.Context, lesson *models.
 	// TODO: Adicionar UserID à tabela lessons se as lições forem por usuário.
 	// Atualmente, models.Lesson não tem UserID, mas ClassID sim, que tem UserID.
 	// A propriedade pode ser inferida pela Class.
-	query := `INSERT INTO lessons (class_id, title, plan_content, scheduled_at, created_at, updated_at)
-              VALUES (?, ?, ?, ?, ?, ?)`
-	now := time.Now()
-	result, err := r.db.ExecContext(ctx, query, lesson.ClassID, lesson.Title, lesson.PlanContent, lesson.ScheduledAt, now, now)
+	// A tabela 'lessons' conforme 001_initial_schema.sql não possui created_at, updated_at.
+	query := `INSERT INTO lessons (class_id, title, plan_content, scheduled_at)
+              VALUES (?, ?, ?, ?)`
+	result, err := r.db.ExecContext(ctx, query, lesson.ClassID, lesson.Title, lesson.PlanContent, lesson.ScheduledAt)
 	if err != nil {
 		return 0, fmt.Errorf("lessonRepository.CreateLesson: %w", err)
 	}
@@ -35,12 +35,11 @@ func (r *lessonRepositoryImpl) CreateLesson(ctx context.Context, lesson *models.
 }
 
 func (r *lessonRepositoryImpl) GetLessonByID(ctx context.Context, lessonID int64) (*models.Lesson, error) {
-	query := `SELECT id, class_id, title, plan_content, scheduled_at, created_at, updated_at
+	query := `SELECT id, class_id, title, plan_content, scheduled_at
               FROM lessons WHERE id = ?`
 	row := r.db.QueryRowContext(ctx, query, lessonID)
 	lesson := &models.Lesson{}
-	// Adicionar CreatedAt e UpdatedAt ao Scan
-	err := row.Scan(&lesson.ID, &lesson.ClassID, &lesson.Title, &lesson.PlanContent, &lesson.ScheduledAt, &lesson.CreatedAt, &lesson.UpdatedAt)
+	err := row.Scan(&lesson.ID, &lesson.ClassID, &lesson.Title, &lesson.PlanContent, &lesson.ScheduledAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("lesson with ID %d not found", lessonID)
@@ -51,7 +50,7 @@ func (r *lessonRepositoryImpl) GetLessonByID(ctx context.Context, lessonID int64
 }
 
 func (r *lessonRepositoryImpl) GetLessonsByClassID(ctx context.Context, classID int64) ([]models.Lesson, error) {
-	query := `SELECT id, class_id, title, plan_content, scheduled_at, created_at, updated_at
+	query := `SELECT id, class_id, title, plan_content, scheduled_at
               FROM lessons WHERE class_id = ? ORDER BY scheduled_at ASC`
 	rows, err := r.db.QueryContext(ctx, query, classID)
 	if err != nil {
@@ -62,8 +61,7 @@ func (r *lessonRepositoryImpl) GetLessonsByClassID(ctx context.Context, classID 
 	var lessons []models.Lesson
 	for rows.Next() {
 		lesson := models.Lesson{}
-		// Adicionar CreatedAt e UpdatedAt ao Scan
-		if err := rows.Scan(&lesson.ID, &lesson.ClassID, &lesson.Title, &lesson.PlanContent, &lesson.ScheduledAt, &lesson.CreatedAt, &lesson.UpdatedAt); err != nil {
+		if err := rows.Scan(&lesson.ID, &lesson.ClassID, &lesson.Title, &lesson.PlanContent, &lesson.ScheduledAt); err != nil {
 			return nil, fmt.Errorf("lessonRepository.GetLessonsByClassID: scanning row: %w", err)
 		}
 		lessons = append(lessons, lesson)
@@ -90,14 +88,14 @@ func (r *lessonRepositoryImpl) GetLessonsByDateRange(ctx context.Context, userID
 
 
 	if userID > 0 {
-		query = `SELECT l.id, l.class_id, l.title, l.plan_content, l.scheduled_at, l.created_at, l.updated_at
+		query = `SELECT l.id, l.class_id, l.title, l.plan_content, l.scheduled_at
                  FROM lessons l
                  JOIN classes c ON l.class_id = c.id
                  WHERE c.user_id = ? AND l.scheduled_at >= ? AND l.scheduled_at <= ?
                  ORDER BY l.scheduled_at ASC`
 		args = append(args, userID, startDate, endDate)
 	} else { // Se userID for 0 ou negativo, busca para todas as turmas (comportamento de admin/sistema)
-		query = `SELECT id, class_id, title, plan_content, scheduled_at, created_at, updated_at
+		query = `SELECT id, class_id, title, plan_content, scheduled_at
                  FROM lessons
                  WHERE scheduled_at >= ? AND scheduled_at <= ?
                  ORDER BY scheduled_at ASC`
@@ -113,7 +111,7 @@ func (r *lessonRepositoryImpl) GetLessonsByDateRange(ctx context.Context, userID
 	var lessons []models.Lesson
 	for rows.Next() {
 		lesson := models.Lesson{}
-		if err := rows.Scan(&lesson.ID, &lesson.ClassID, &lesson.Title, &lesson.PlanContent, &lesson.ScheduledAt, &lesson.CreatedAt, &lesson.UpdatedAt); err != nil {
+		if err := rows.Scan(&lesson.ID, &lesson.ClassID, &lesson.Title, &lesson.PlanContent, &lesson.ScheduledAt); err != nil {
 			return nil, fmt.Errorf("lessonRepository.GetLessonsByDateRange: scanning row: %w", err)
 		}
 		lessons = append(lessons, lesson)
@@ -125,11 +123,12 @@ func (r *lessonRepositoryImpl) GetLessonsByDateRange(ctx context.Context, userID
 }
 
 func (r *lessonRepositoryImpl) UpdateLesson(ctx context.Context, lesson *models.Lesson) error {
-	query := `UPDATE lessons SET class_id = ?, title = ?, plan_content = ?, scheduled_at = ?, updated_at = ?
+	// A tabela 'lessons' não possui updated_at. Se precisarmos, deve ser adicionada ao schema.
+	query := `UPDATE lessons SET class_id = ?, title = ?, plan_content = ?, scheduled_at = ?
               WHERE id = ?`
 	// Idealmente, verificaríamos também o UserID da turma associada para garantir propriedade,
 	// mas isso é mais lógico na camada de serviço.
-	_, err := r.db.ExecContext(ctx, query, lesson.ClassID, lesson.Title, lesson.PlanContent, lesson.ScheduledAt, time.Now(), lesson.ID)
+	_, err := r.db.ExecContext(ctx, query, lesson.ClassID, lesson.Title, lesson.PlanContent, lesson.ScheduledAt, lesson.ID)
 	if err != nil {
 		return fmt.Errorf("lessonRepository.UpdateLesson: %w", err)
 	}
