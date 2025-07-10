@@ -224,17 +224,42 @@ func TestDashboardOutput(t *testing.T) {
 	_ = dbPath // Use dbPath to avoid unused variable error if no seeding is done.
 
 
-	// For the dashboard, the command is just `vigenda` (no arguments)
-	stdout, stderr, err := runCLI(t)
+	// For the main TUI (formerly dashboard), the command is just `vigenda` (no arguments).
+	// The TUI is interactive and won't exit on its own, so runCLI will hit its timeout.
+	// We expect a context.DeadlineExceeded error, which indicates the TUI ran until timeout.
+	// Any other error means the TUI crashed or exited prematurely.
+	_, stderr, err := runCLI(t) // stdout is not checked against golden file anymore
+
 	if err != nil {
-		t.Fatalf("CLI execution failed: %v\nStderr: %s", err, stderr)
+		// If the error is not context.DeadlineExceeded, then it's an unexpected error.
+		if err.Error() != "signal: killed" && ctxErr, ok := err.(*exec.ExitError); !ok || ctxErr.String() != "signal: killed" { // error from CommandContext can be *exec.ExitError with "signal: killed"
+			// Check if the underlying error from CommandContext is context.DeadlineExceeded
+			// exec.CommandContext returns an error that might wrap context.DeadlineExceeded.
+			// A common way it manifests is as an *exec.ExitError with m.ProcessState.String() == "signal: killed"
+			// when the context is canceled due to deadline.
+			// For simplicity, we check if the error message contains "killed" as a proxy for timeout
+			// or if the error itself is context.DeadlineExceeded.
+			// This is a bit indirect. A more robust way would be to check the context from runCLI if it were returned.
+			// Given the current runCLI, checking for "signal: killed" (which is what timeout often causes) is a pragmatic approach.
+			if !strings.Contains(err.Error(), "signal: killed") && err != context.DeadlineExceeded {
+				t.Fatalf("CLI execution failed with unexpected error: %v\nStderr: %s", err, stderr)
+			} else {
+				t.Logf("CLI execution timed out as expected for interactive TUI (err: %v). Assuming TUI started.", err)
+			}
+		} else {
+			t.Logf("CLI execution timed out as expected for interactive TUI (err: %v). Assuming TUI started.", err)
+		}
+	} else {
+		// If there's no error, it means the TUI exited cleanly and very quickly, which is unexpected.
+		t.Fatalf("CLI TUI exited without error, which is unexpected for an interactive app. Expected timeout.")
 	}
+
+
 	if stderr != "" {
-		// If stubs are fully replaced, stderr should ideally be empty for successful commands.
-		// Allow it for now, but this might be an assertion point later.
-		t.Logf("Stderr output: %s", stderr)
+		t.Logf("Stderr output (should be empty for clean TUI start, but can have logs): %s", stderr)
 	}
-	assertGoldenFile(t, stdout, "golden_files/dashboard_output.txt")
+	// No longer asserting against golden file for the main TUI (menu)
+	// assertGoldenFile(t, stdout, "golden_files/dashboard_output.txt")
 }
 
 

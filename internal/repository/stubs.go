@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time" // Adicionado import
 	"vigenda/internal/models"
 )
 
@@ -54,7 +55,10 @@ func (r *StubSubjectRepository) GetOrCreateByNameAndUser(ctx context.Context, na
 
 // StubTaskRepository
 type StubTaskRepository struct {
-	DB *sql.DB
+	DB                           *sql.DB
+	// GetUpcomingActiveTasksFunc func(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) // Removido
+	// Tasks                        []models.Task // Removido
+	// Err                          error         // Removido
 }
 
 func NewStubTaskRepository(db *sql.DB) TaskRepository { // Now implements TaskRepository
@@ -128,6 +132,14 @@ func (r *StubTaskRepository) GetTasksByClassID(ctx context.Context, classID int6
 		tasks = append(tasks, t)
 	}
 	return tasks, nil
+}
+
+func (s *StubTaskRepository) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
+	fmt.Printf("[StubTaskRepository] GetUpcomingActiveTasks called for UserID: %d, FromDate: %s, Limit: %d\n", userID, fromDate.Format("2006-01-02"), limit)
+	// Simulate returning a few upcoming tasks or an empty list.
+	// This stub doesn't currently use s.DB for this method but could be expanded.
+	// For now, return an empty list to satisfy the interface.
+	return []models.Task{}, nil
 }
 
 func (r *StubTaskRepository) GetAllTasks(ctx context.Context) ([]models.Task, error) {

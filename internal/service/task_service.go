@@ -146,6 +146,20 @@ func (s *taskServiceImpl) CreateTask(ctx context.Context, title, description str
 	return task, nil
 }
 
+func (s *taskServiceImpl) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
+	// TODO: Adicionar validação de userID se necessário (ex: > 0)
+	// TODO: Adicionar validação de limit se necessário (ex: > 0)
+
+	tasks, err := s.repo.GetUpcomingActiveTasks(ctx, userID, fromDate, limit)
+	if err != nil {
+		// Não vamos criar bug task para falhas de listagem simples, a menos que seja um erro inesperado do DB.
+		// O repositório já formata o erro.
+		logError("GetUpcomingActiveTasks: Failed to retrieve upcoming active tasks for UserID %d: %v", userID, err)
+		return nil, fmt.Errorf("serviço falhou ao buscar tarefas futuras ativas: %w", err)
+	}
+	return tasks, nil
+}
+
 // UpdateTask atualiza uma tarefa existente no sistema.
 // Valida se o título da tarefa não está vazio.
 // Em caso de falha na atualização (ex: erro no banco de dados), loga o erro e

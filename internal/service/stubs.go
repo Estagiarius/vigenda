@@ -104,6 +104,12 @@ func (s *stubTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task
 	return activeTasks, nil
 }
 
+func (s *stubTaskService) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
+	fmt.Printf("[StubTaskService] GetUpcomingActiveTasks called for UserID %d, FromDate %s, Limit %d\n", userID, fromDate.Format("2006-01-02"), limit)
+	// Chama o método correspondente do repositório (que pode ser um stub de repositório ou real)
+	return s.taskRepo.GetUpcomingActiveTasks(ctx, userID, fromDate, limit)
+}
+
 // StubClassService
 type stubClassService struct {
 	classRepo repository.ClassRepository

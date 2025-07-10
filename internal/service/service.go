@@ -21,6 +21,7 @@ type TaskService interface {
 	UpdateTask(ctx context.Context, task *models.Task) error             // Added for updating tasks
 	// DeleteTask removes a task by its ID.
 	DeleteTask(ctx context.Context, taskID int64) error                  // Added for deleting tasks
+	GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error)
 }
 
 // ClassService define os métodos para a gestão de turmas e alunos.
@@ -76,4 +77,16 @@ type ProofCriteria struct {
 	HardCount   int
 }
 
-// Adicionar outras interfaces de serviço aqui: SubjectService, LessonService, etc.
+// LessonService define os métodos para a gestão de aulas/lições.
+type LessonService interface {
+	CreateLesson(ctx context.Context, classID int64, title string, planContent string, scheduledAt time.Time) (models.Lesson, error)
+	GetLessonByID(ctx context.Context, lessonID int64) (models.Lesson, error)
+	GetLessonsByClassID(ctx context.Context, classID int64) ([]models.Lesson, error)
+	// GetLessonsForDate busca lições para um usuário em uma data específica.
+	// O userID é para futura filtragem por usuário.
+	GetLessonsForDate(ctx context.Context, userID int64, date time.Time) ([]models.Lesson, error)
+	UpdateLesson(ctx context.Context, lessonID int64, title string, planContent string, scheduledAt time.Time) (models.Lesson, error)
+	DeleteLesson(ctx context.Context, lessonID int64) error
+}
+
+// Adicionar outras interfaces de serviço aqui: SubjectService, etc.

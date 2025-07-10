@@ -158,21 +158,21 @@ func TestTasksModel_MarkTaskCompleted_MovesToCompletedTable(t *testing.T) {
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{completedTask}, nil).Once()
 
 	updatedModelTea, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
-	model = updatedModelTea.(*Model)
+	model = updatedModelTea.(*Model) // Correct: model is *Model, Update returns tea.Model
 	assert.True(t, model.isLoading)
 	assert.NotNil(t, cmd)
 
 	msg := cmd()
 	assert.IsType(t, taskMarkedCompletedMsg{}, msg)
-	updatedModelTea2, cmd := model.Update(msg)
-	model = updatedModelTea2.(*Model)
+	updatedModelTea2, cmdAfterMark := model.Update(msg)
+	model = updatedModelTea2.(*Model) // Correct
 
 
-	assert.NotNil(t, cmd)
-	msg = cmd() // This is tasksLoadedMsg from refresh
-	assert.IsType(t, tasksLoadedMsg{}, msg)
-	updatedModelTea3, _ := model.Update(msg)
-	model = updatedModelTea3.(*Model)
+	assert.NotNil(t, cmdAfterMark)
+	msgFromRefresh := cmdAfterMark() // This is tasksLoadedMsg from refresh
+	assert.IsType(t, tasksLoadedMsg{}, msgFromRefresh)
+	updatedModelTea3, _ := model.Update(msgFromRefresh)
+	model = updatedModelTea3.(*Model) // Correct
 
 
 	assert.False(t, model.isLoading)
@@ -283,41 +283,53 @@ func TestTasksModel_KeyBindings_CRUD_OnFocusedTable(t *testing.T) {
 
 	// Edit 'e' - should work on pending
 	mockService.On("GetTaskByID", mock.Anything, task1Pending.ID).Return(&task1Pending, nil).Once()
-	modelAfterEditKey, cmdEdit := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
-	assert.True(t, modelAfterEditKey.(*Model).isLoading)
+	updatedModelTea, cmdEdit := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	model = updatedModelTea.(*Model)
+	assert.True(t, model.isLoading)
 	assert.NotNil(t, cmdEdit)
-	modelAfterEditKey.(*Model).Update(cmdEdit())
-	assert.Equal(t, FormView, modelAfterEditKey.(*Model).currentView)
-	assert.Equal(t, EditingTask, modelAfterEditKey.(*Model).formSubState)
-	assert.Equal(t, task1Pending.ID, modelAfterEditKey.(*Model).editingTaskID)
 
+	updatedModelTea, _ = model.Update(cmdEdit()) // cmdEdit() is getTaskForEditingMsg
+	model = updatedModelTea.(*Model)
+	assert.Equal(t, FormView, model.currentView)
+	assert.Equal(t, EditingTask, model.formSubState)
+	assert.Equal(t, task1Pending.ID, model.editingTaskID)
+
+	// Reset model for next test part
 	model = New(mockService)
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
 	model.SetSize(80,30)
-	model.Update(model.Init()())
+	modelInterface, _ := model.Update(model.Init()())
+	model = modelInterface.(*Model)
 	model.pendingTasksTable.SetCursor(0)
 
-	modelAfterDeleteKey, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
-	assert.Equal(t, ConfirmDeleteView, modelAfterDeleteKey.(*Model).currentView)
-	assert.Equal(t, task1Pending.ID, modelAfterDeleteKey.(*Model).taskIDToDelete)
+	updatedModelTea, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	model = updatedModelTea.(*Model)
+	assert.Equal(t, ConfirmDeleteView, model.currentView)
+	assert.Equal(t, task1Pending.ID, model.taskIDToDelete)
 
+	// Reset model for next test part
 	model = New(mockService)
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
 	model.SetSize(80,30)
-	model.Update(model.Init()())
+	modelInterface, _ = model.Update(model.Init()())
+	model = modelInterface.(*Model)
 
-	model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+
+	updatedModelTea, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+	model = updatedModelTea.(*Model)
 	assert.Equal(t, CompletedTableFocus, model.focusedTable)
 	model.completedTasksTable.SetCursor(0)
 
-	modelBeforeEditAttempt := *model
-	modelAfterEditKeyOnCompleted, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
-	assert.Equal(t, modelBeforeEditAttempt.currentView, modelAfterEditKeyOnCompleted.(*Model).currentView)
-	assert.Equal(t, modelBeforeEditAttempt.formSubState, modelAfterEditKeyOnCompleted.(*Model).formSubState)
+	modelBeforeEditAttempt := *model // Salva o estado antes da tentativa de edição
+	updatedModelTea, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	model = updatedModelTea.(*Model) // Atualiza o modelo
+	assert.Equal(t, modelBeforeEditAttempt.currentView, model.currentView)
+	assert.Equal(t, modelBeforeEditAttempt.formSubState, model.formSubState)
 
-	modelAfterDeleteKeyOnCompleted, _ := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
-	assert.Equal(t, ConfirmDeleteView, modelAfterDeleteKeyOnCompleted.(*Model).currentView)
-	assert.Equal(t, task2Completed.ID, modelAfterDeleteKeyOnCompleted.(*Model).taskIDToDelete)
+	updatedModelTea, _ = model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	model = updatedModelTea.(*Model)
+	assert.Equal(t, ConfirmDeleteView, model.currentView)
+	assert.Equal(t, task2Completed.ID, model.taskIDToDelete)
 
 	mockService.AssertExpectations(t)
 }
@@ -331,29 +343,38 @@ func TestTasksModel_ViewDetails_OnFocusedTable(t *testing.T) {
     mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{taskPending, taskCompleted}, nil).Once()
     model := New(mockService)
     model.SetSize(80,30)
-    model.Update(model.Init()())
+    modelInterface, _ := model.Update(model.Init()())
+    model = modelInterface.(*Model)
     model.pendingTasksTable.SetCursor(0)
     assert.Equal(t, PendingTableFocus, model.focusedTable)
 
     mockService.On("GetTaskByID", mock.Anything, taskPending.ID).Return(&taskPending, nil).Once()
-    model, cmdViewPending := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+    modelInterface, cmdViewPending := model.Update(tea.KeyMsg{Type: tea.KeyEnter})
+    model = modelInterface.(*Model)
     assert.True(t, model.isLoading)
-    model.Update(cmdViewPending())
+    modelInterface, _ = model.Update(cmdViewPending())
+    model = modelInterface.(*Model)
     assert.Equal(t, DetailView, model.currentView)
     assert.Equal(t, taskPending.ID, model.selectedTaskForDetail.ID)
 
+	// Reset model for next part
     model = New(mockService)
     mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{taskPending, taskCompleted}, nil).Once()
     model.SetSize(80,30)
-    model.Update(model.Init()())
-    model, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+    modelInterface, _ = model.Update(model.Init()())
+    model = modelInterface.(*Model)
+
+    modelInterface, _ = model.Update(tea.KeyMsg{Type: tea.KeyTab})
+    model = modelInterface.(*Model)
     model.completedTasksTable.SetCursor(0)
     assert.Equal(t, CompletedTableFocus, model.focusedTable)
 
     mockService.On("GetTaskByID", mock.Anything, taskCompleted.ID).Return(&taskCompleted, nil).Once()
-    model, cmdViewCompleted := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+    modelInterface, cmdViewCompleted := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}})
+    model = modelInterface.(*Model)
     assert.True(t, model.isLoading)
-    model.Update(cmdViewCompleted())
+    modelInterface, _ = model.Update(cmdViewCompleted())
+    model = modelInterface.(*Model)
     assert.Equal(t, DetailView, model.currentView)
     assert.Equal(t, taskCompleted.ID, model.selectedTaskForDetail.ID)
 
@@ -369,16 +390,23 @@ func TestTasksModel_DeleteTask_ConfirmYes(t *testing.T) {
 	mockService.On("DeleteTask", mock.Anything, int64(1)).Return(nil).Once()
 	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{}, nil).Once()
 
-	m, cmdDelete := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
-	assert.True(t, m.(*Model).isLoading)
+	updatedModelTea, cmdDelete := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'s'}})
+	model = updatedModelTea.(*Model)
+	assert.True(t, model.isLoading)
 
 	deleteMsg := cmdDelete()
-	m, cmdRefresh := m.(*Model).Update(deleteMsg)
+	updatedModelTea, cmdRefresh := model.Update(deleteMsg)
+	model = updatedModelTea.(*Model)
 
-	assert.Equal(t, TableView, m.(*Model).currentView) // Check currentView resets
-	assert.Equal(t, int64(0), m.(*Model).taskIDToDelete)
-	assert.False(t, m.(*Model).isLoading)
+	assert.Equal(t, TableView, model.currentView) // Check currentView resets
+	assert.Equal(t, int64(0), model.taskIDToDelete)
+	assert.False(t, model.isLoading) // Should be false after refresh is processed, but refresh is not processed here yet.
+	                                 // Let's check isLoading after processing refresh.
+
 	assert.NotNil(t, cmdRefresh)
+	updatedModelTea, _ = model.Update(cmdRefresh())
+	model = updatedModelTea.(*Model)
+	assert.False(t, model.isLoading) // Now check isLoading
 
 	mockService.AssertExpectations(t)
 }
@@ -389,9 +417,10 @@ func TestTasksModel_DeleteTask_ConfirmNo(t *testing.T) {
 	model.currentView = ConfirmDeleteView // Set state for delete confirmation
 	model.taskIDToDelete = 1
 
-	m, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
-	assert.Equal(t, TableView, m.(*Model).currentView) // Check currentView resets
-	assert.Equal(t, int64(0), m.(*Model).taskIDToDelete)
+	updatedModelTea, cmd := model.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	model = updatedModelTea.(*Model)
+	assert.Equal(t, TableView, model.currentView) // Check currentView resets
+	assert.Equal(t, int64(0), model.taskIDToDelete)
 	assert.Nil(t, cmd)
 	mockService.AssertNotCalled(t, "DeleteTask", mock.Anything, mock.Anything)
 }

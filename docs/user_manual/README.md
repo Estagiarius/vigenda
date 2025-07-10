@@ -36,26 +36,32 @@ Bem-vindo ao Manual do Usuário do Vigenda! Este documento detalha todas as func
 
 O Vigenda é uma aplicação de linha de comando (CLI) projetada para ajudar professores a gerenciar tarefas, aulas, avaliações e outras atividades relacionadas ao ensino. Ele visa oferecer uma maneira focada e eficiente de organização, especialmente útil para aqueles que podem se beneficiar de uma interface direta e sem distrações.
 
-## 2. Dashboard Interativo
+## 2. Menu Principal e Painel de Controle (Dashboard)
 
-Ao executar o Vigenda sem subcomandos, você acessa o Dashboard Interativo:
+Ao executar o Vigenda sem subcomandos, você acessa o **Menu Principal** interativo:
 
 ```bash
 ./vigenda
 ```
 
-Este dashboard fornece uma visão geral da sua agenda do dia, tarefas urgentes e outras notificações importantes, permitindo que você comece o dia bem informado.
-Ele pode exibir informações como:
-*   **Tarefas com prazo para hoje ou atrasadas:** Um lembrete visual das suas prioridades imediatas.
-*   **Próximos eventos ou aulas:** (Se a funcionalidade de agenda estiver implementada) Um vislumbre do que está por vir.
-*   **Notificações do sistema:** Alertas sobre importações de alunos concluídas, erros na última operação, etc.
-*   **Resumo de progresso:** (Potencialmente) Percentual de tarefas concluídas na semana, média de notas recentes, etc.
+O Menu Principal lista todas as principais funcionalidades do Vigenda, permitindo que você navegue para diferentes módulos da aplicação.
 
-A aparência e o conteúdo exato podem variar dependendo da versão e configuração do Vigenda.
+Uma das opções neste menu é o **"Painel de Controle"**. Ao selecioná-lo, você acessa o dashboard da aplicação, que fornece uma visão geral da sua agenda do dia, tarefas urgentes e outras notificações importantes.
 
-### Dicas de Uso para o Dashboard
-*   **Comece seu dia aqui:** Execute `vigenda` como seu primeiro comando para ter um panorama rápido.
-*   **Verifique regularmente:** Se você usa o Vigenda ao longo do dia, revisitar o dashboard pode ajudar a manter o foco.
+O Painel de Controle pode exibir informações como:
+*   **Tarefas Próximas:** Uma lista de tarefas com prazos futuros.
+*   **Aulas de Hoje:** (Funcionalidade em desenvolvimento) Um resumo das aulas agendadas para o dia.
+*   **Próximas Avaliações:** (Funcionalidade em desenvolvimento) Um lembrete das avaliações que ocorrerão em breve.
+*   **Notificações do sistema:** (Potencial) Alertas ou mensagens importantes.
+*   **Resumo de progresso:** (Potencial) Percentual de tarefas concluídas, etc.
+
+A aparência e o conteúdo exato do Painel de Controle podem variar dependendo da versão e configuração do Vigenda.
+
+### Dicas de Uso
+*   **Navegue pelo Menu Principal:** Use as setas para cima/baixo e Enter para selecionar a funcionalidade desejada.
+*   **Acesse o Painel de Controle:** Selecione "Painel de Controle" no Menu Principal para ter um panorama rápido de suas atividades e pendências.
+*   **Recarregue o Painel de Controle:** Dentro do Painel de Controle, você pode pressionar 'r' para atualizar os dados exibidos.
+*   **Volte ao Menu:** De qualquer módulo, incluindo o Painel de Controle, pressione 'esc' para retornar ao Menu Principal.
 
 ## 3. Gestão de Tarefas
 

@@ -5,6 +5,7 @@ package repository
 import (
 	"context"
 	"vigenda/internal/models"
+	"time" // Movido para o final do bloco de import para forçar reavaliação
 )
 
 // QuestionQueryCriteria define os critérios para buscar questões.
@@ -58,6 +59,7 @@ type TaskRepository interface {
 	UpdateTask(ctx context.Context, task *models.Task) error                     // Added for updating tasks
 	// DeleteTask removes a task from the database by its ID.
 	DeleteTask(ctx context.Context, taskID int64) error                          // Added for deleting tasks
+	GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error)
 	// ... outros métodos
 }
 
@@ -74,6 +76,18 @@ type ClassRepository interface {
 	GetStudentByID(ctx context.Context, studentID int64) (*models.Student, error)
 	UpdateStudent(ctx context.Context, student *models.Student) error
 	DeleteStudent(ctx context.Context, studentID int64, classID int64) error
+}
+
+// LessonRepository define a interface para operações de persistência de aulas/lições.
+type LessonRepository interface {
+	CreateLesson(ctx context.Context, lesson *models.Lesson) (int64, error)
+	GetLessonByID(ctx context.Context, lessonID int64) (*models.Lesson, error)
+	GetLessonsByClassID(ctx context.Context, classID int64) ([]models.Lesson, error)
+	// GetLessonsByDateRange busca lições para um usuário dentro de um intervalo de datas.
+	// O userID pode ser usado para filtrar lições pertencentes a um usuário específico.
+	GetLessonsByDateRange(ctx context.Context, userID int64, startDate time.Time, endDate time.Time) ([]models.Lesson, error)
+	UpdateLesson(ctx context.Context, lesson *models.Lesson) error
+	DeleteLesson(ctx context.Context, lessonID int64) error
 }
 
 type AssessmentRepository interface {

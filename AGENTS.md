@@ -33,7 +33,11 @@ Olá, Agente! Este documento fornece diretrizes e informações para ajudá-lo a
         -   `internal/models/models.go`: Definições das estruturas de dados (structs Go) do domínio.
         -   `internal/repository/`: Camada de acesso a dados (operações CRUD), abstraindo o SQLite. Arquivos como `task_repository.go`.
         -   `internal/service/`: Camada de lógica de negócios, orquestrando operações. Arquivos como `task_service.go`.
-        -   `internal/tui/`: Componentes e lógica da Interface de Texto do Usuário (Bubbletea). Arquivos como `prompt.go`, `table.go`, `statusbar.go`.
+        -   `internal/app/`: Contém a lógica principal da Interface de Texto do Usuário (TUI) baseada em BubbleTea.
+            -   `internal/app/app.go`: Modelo principal da aplicação TUI, gerenciando as diferentes visualizações (views).
+            -   `internal/app/views.go`: Define as diferentes visualizações/módulos da TUI.
+            -   `internal/app/[nome_do_modulo]/[nome_do_modulo].go`: Padrão para componentes de TUI modulares (ex: `internal/app/dashboard/dashboard.go`, `internal/app/tasks/tasks.go`). Cada módulo geralmente implementa seu próprio `Model`, `Init`, `Update`, `View`.
+        -   `internal/tui/`: Pode conter componentes TUI mais genéricos ou uma estrutura TUI mais antiga/alternativa (ex: `prompt.go`, `table.go`). O desenvolvimento TUI principal atual está focado em `internal/app/`.
     -   `tests/`:
         -   `tests/integration/cli_integration_test.go`: Testes de integração da CLI.
         -   `tests/integration/golden_files/`: Arquivos de saída esperada para testes de integração.
@@ -61,7 +65,7 @@ Olá, Agente! Este documento fornece diretrizes e informações para ajudá-lo a
 ### 3.2. Implementando Novas Funcionalidades
 1.  **Planeje:**
     -   Certifique-se de que a funcionalidade está bem definida.
-    -   Identifique os arquivos e módulos que precisarão ser modificados ou criados (ex: novo comando Cobra, novo método de serviço, alterações no repositório, novo componente TUI).
+    -   Identifique os arquivos e módulos que precisarão ser modificados ou criados (ex: novo comando Cobra, novo método de serviço, alterações no repositório, novo componente TUI como `internal/app/meu_novo_modulo/meu_novo_modulo.go`).
     -   Considere como a nova funcionalidade se encaixa na arquitetura existente (consulte `TECHNICAL_SPECIFICATION.MD`).
 2.  **Escreva Testes Primeiro (TDD/BDD quando possível):**
     -   Consulte `TESTING.MD` para tipos de testes e ferramentas.
