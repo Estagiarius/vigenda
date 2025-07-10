@@ -4,8 +4,8 @@ package repository
 
 import (
 	"context"
-	"time" // Adicionado import
 	"vigenda/internal/models"
+	"time" // Movido para o final do bloco de import para forçar reavaliação
 )
 
 // QuestionQueryCriteria define os critérios para buscar questões.

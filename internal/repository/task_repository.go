@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	// "time" // Not used anymore
+	"time" // Adicionado import para GetUpcomingActiveTasks
 	"vigenda/internal/models"
 )
 
