@@ -7,41 +7,34 @@ e este projeto adere ao [Versionamento Semântico](https://semver.org/spec/v2.0.
 
 ## [Não Lançado]
 
+### Documentação
+-   **Atualização Geral da Documentação (realizada pelo Agente de IA):**
+    -   `README.md`: Revisado para refletir a primazia da TUI, atualizar instruções de execução e remover placeholders.
+    -   `INSTALLATION.md` e `TESTING.md`: Removidas versões duplicadas em minúsculas. Os arquivos corretos são `INSTALLATION.MD` e `TESTING.MD`.
+    -   `docs/user_manual/README.md`: Atualizado para refletir a funcionalidade da TUI sobre certos comandos CLI (como criação de turmas/disciplinas), e removidas referências a arquivos inexistentes (`getting_started/README.md`, `faq/README.md`).
+    -   `AGENTS.md`: Removida referência a `BUG_REPORTING.md` (inexistente). As referências a `INSTALLATION.MD` e `TESTING.MD` foram mantidas (assumindo que são as versões corretas). Atualizada a lista de documentos principais.
+    -   `CODE_OF_CONDUCT.md`: Preenchido o placeholder de contato com um email genérico.
+    -   `CONTRIBUTING.md`: Removidas URLs de repositório placeholder.
+    -   `API_DOCUMENTATION.md`: Simplificado para indicar que é uma CLI sem API de rede.
+    -   `TECHNICAL_SPECIFICATION.MD`: Corrigido o fluxo de dados para "Listar Tarefas de uma Disciplina" para refletir o esquema de banco de dados correto (tarefas ligadas a turmas, turmas a disciplinas). Adicionada nota sobre a necessidade de renderizar diagramas PlantUML.
+    -   `docs/diagrams/README.md`: Adicionada nota sobre a necessidade de renderizar diagramas PlantUML.
+
 ### Adicionado
--   Estrutura inicial da documentação do desenvolvedor (TASK-DOC-02):
-    -   `README.md`: Visão geral do projeto, instalação e contribuição.
-    -   `API_DOCUMENTATION.md`: Modelo para documentação de API (marcado como não aplicável para CLI).
-    -   `TECHNICAL_SPECIFICATION.MD`: Modelo para especificações técnicas.
-    -   `CONTRIBUTING.md`: Guia detalhado para contribuições.
-    -   `CHANGELOG.md`: Este arquivo, para rastrear mudanças.
-    -   `INSTALLATION.MD`: Modelo para documentação de instalação.
-    -   `TESTING.MD`: Modelo para documentação de testes.
-    -   `AGENTS.md`: Modelo para documentação específica para agentes de IA.
--   Configuração inicial do ambiente de desenvolvimento (instalação de Go e GCC).
+-   (Use esta seção para novas funcionalidades de código)
 
 ### Alterado
--   **Aprofundamento da Documentação do Desenvolvedor:**
-    -   `README.md`: Preenchido com detalhes específicos do projeto Vigenda, incluindo descrição, pré-requisitos (Go 1.23.0, GCC), instruções de instalação (`go mod tidy`), e execução (`go run`, `build.sh`).
-    -   `TECHNICAL_SPECIFICATION.MD`: Detalhada a arquitetura em camadas do Vigenda, componentes principais (pacotes Go), fluxo de dados com diagrama textual (Mermaid), escolhas tecnológicas (Go, Cobra, Bubbletea, SQLite), padrões de design, considerações de segurança, escalabilidade, desempenho e estratégia de testes.
-    -   `INSTALLATION.MD`: Especificados os sistemas operacionais suportados, versões de Go e GCC, instruções para MinGW (cross-compilação Windows), `go mod tidy`, instalação de `goimports` e `golangci-lint`. Detalhados os comandos de build (`./build.sh`, `go build`) e execução.
-    -   `TESTING.MD`: Detalhados os tipos de testes (Unitários, Integração, E2E, Performance), ferramentas (pacote `testing`, Testify, `os/exec`, Golden Files, `golangci-lint`, `goimports`), e comandos específicos para executar todos os testes, testes de pacotes, testes por nome, benchmarks e verificar cobertura de teste.
-    -   `AGENTS.md`: Adaptado significativamente para o projeto Vigenda, detalhando a visão geral, tecnologias, estrutura de diretórios Go, configuração de ambiente, e comandos úteis específicos (`go test`, `go run`, `go build`, `golangci-lint run`, `goimports -w`).
--   **Extensão Adicional da Documentação:**
-    -   `DATABASE_SCHEMA.md`: Novo arquivo criado para documentar o esquema do banco de dados SQLite, detalhando todas as tabelas, colunas e relacionamentos baseados em `001_initial_schema.sql`.
-    -   `TECHNICAL_SPECIFICATION.MD`: Expandido com uma subseção detalhando os módulos internos (`internal/config`, `internal/database`, `internal/models`, `internal/repository`, `internal/service`, `internal/tui`) e adicionados mais dois diagramas de fluxo de dados (Mermaid) para "Listar Tarefas" e "Iniciar Sessão de Foco".
-    -   `EXAMPLES.md`: Novo arquivo criado com exemplos de uso da CLI Vigenda para cenários comuns e avançados.
-    -   `INSTALLATION.MD`: Seção de "Solução de Problemas Comuns" expandida com mais cenários e soluções detalhadas (CGo, permissões, `go mod`, ferramentas de dev).
-    -   Comentários Godoc: Adicionados comentários Godoc iniciais para todas as structs e seus campos em `internal/models/models.go` e para a struct e funções públicas em `internal/service/task_service.go`.
-    -   `CODE_OF_CONDUCT.md`: Novo arquivo criado usando o template do Contributor Covenant v2.1.
+-   (Use esta seção para mudanças em funcionalidades de código existentes)
 
 ### Corrigido
--   Problemas de dessincronização de arquivos de documentação (`INSTALLATION.MD`, `TESTING.MD`, `AGENTS.MD`) que impediam atualizações, recriando-os quando necessário.
+-   (Use esta seção para correções de bugs no código)
 
 ### Removido
--   (Nada removido ainda)
+-   `INSTALLATION.md` (arquivo duplicado, mantido `INSTALLATION.MD`)
+-   `TESTING.md` (arquivo duplicado, mantido `TESTING.MD`)
+-   (Use esta seção para funcionalidades de código removidas)
 
 ### Segurança
--   (Nenhuma atualização de segurança ainda)
+-   (Use esta seção para atualizações de segurança no código)
 
 ---
 

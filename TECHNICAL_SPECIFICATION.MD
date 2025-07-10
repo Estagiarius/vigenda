@@ -153,29 +153,40 @@ Este fluxo demonstra a separação de responsabilidades: a TUI/CLI lida com a in
 
 #### a. Listar Tarefas de uma Disciplina (via TUI)
 
+**Nota sobre Diagramas Mermaid:** Para visualizar corretamente os diagramas `graph LR ...` abaixo, copie o bloco de código correspondente e cole-o em um renderizador Mermaid online (ex: [Mermaid Live Editor](https://mermaid.live/)) ou use uma extensão apropriada em seu editor de Markdown.
+
 ```mermaid
 graph LR
-    Usuario --> TUI_List[TUI: Solicita listar tarefas];
-    TUI_List -- ID da Disciplina --> Serv_ListTask[Service: TaskService.ListTasksBySubject];
-    Serv_ListTask -- SubjectID --> Repo_ListTask[Repository: TaskRepository.FindBySubjectID];
-    Repo_ListTask -- Consulta SQL --> DB_Task[Database: SQLite];
-    DB_Task -- Lista de Tarefas --> Repo_ListTask;
-    Repo_ListTask -- Lista de models.Task --> Serv_ListTask;
-    Serv_ListTask -- Lista de Tarefas Formatada --> TUI_List;
+    Usuario --> TUI_List[TUI: Seleciona Disciplina e Opção Listar Tarefas];
+    TUI_List -- SubjectID --> Serv_GetClasses[Service: ClassService.GetClassesBySubjectID];
+    Serv_GetClasses -- SubjectID --> Repo_GetClasses[Repository: ClassRepository.FindBySubjectID];
+    Repo_GetClasses -- Consulta SQL (SELECT * FROM classes WHERE subject_id = ?) --> DB_Classes[Database: SQLite];
+    DB_Classes -- Lista de models.Class --> Repo_GetClasses;
+    Repo_GetClasses -- Lista de models.Class --> Serv_GetClasses;
+    Serv_GetClasses -- Lista de ClassIDs --> Serv_ListTasks[Service: TaskService.ListTasksByClassIDs];
+    Serv_ListTasks -- Lista de ClassIDs --> Repo_ListTasks[Repository: TaskRepository.FindByClassIDs];
+    Repo_ListTasks -- Consulta SQL (SELECT * FROM tasks WHERE class_id IN (...)) --> DB_Tasks[Database: SQLite];
+    DB_Tasks -- Lista de models.Task --> Repo_ListTasks;
+    Repo_ListTasks -- Lista de models.Task --> Serv_ListTasks;
+    Serv_ListTasks -- Lista de Tarefas Formatada --> TUI_List;
     TUI_List -- Exibe Tabela de Tarefas --> Usuario;
 ```
 
-**Passos:**
-1.  O usuário, através da TUI, seleciona uma disciplina e a opção de listar suas tarefas.
-2.  A TUI envia o ID da disciplina para `TaskService`.
-3.  `TaskService` chama `TaskRepository.FindBySubjectID(subjectID)`.
-4.  `TaskRepository` executa uma consulta `SELECT * FROM tasks WHERE subject_id = ?` (ou similar, considerando a estrutura atual, `tasks` tem `class_id`, então o fluxo pode envolver buscar `classes` da `subject` primeiro, depois `tasks` dessas `classes`).
-5.  O banco de dados retorna as tarefas.
-6.  Os dados são mapeados para `[]models.Task` e retornados ao serviço.
-7.  O serviço pode formatar os dados e retorná-los à TUI.
-8.  A TUI renderiza uma tabela com as tarefas.
+**Passos Detalhados:**
+1.  **Usuário (TUI):** O usuário navega na TUI, seleciona uma disciplina específica e escolhe a opção para listar as tarefas associadas a essa disciplina.
+2.  **TUI (`internal/tui`):** A TUI captura o ID da disciplina selecionada.
+3.  **Chamada ao Serviço de Turmas:** A TUI (ou um coordenador na camada de aplicação) chama `ClassService.GetClassesBySubjectID(subjectID)` para obter todas as turmas pertencentes à disciplina.
+4.  **Repositório de Turmas (`internal/repository.ClassRepository`):** O `ClassService` delega a chamada para `ClassRepository.FindBySubjectID(subjectID)`.
+5.  **Consulta ao Banco (Turmas):** O `ClassRepository` executa uma consulta SQL (ex: `SELECT id, name FROM classes WHERE subject_id = ?`) para buscar as turmas.
+6.  **Retorno das Turmas:** O banco de dados retorna a lista de turmas (`[]models.Class`). O repositório mapeia os resultados e os retorna ao `ClassService`.
+7.  **Chamada ao Serviço de Tarefas:** O `ClassService` (ou o coordenador da TUI) extrai os IDs das turmas (`ClassIDs`) e chama `TaskService.ListTasksByClassIDs(classIDs)`.
+8.  **Repositório de Tarefas (`internal/repository.TaskRepository`):** O `TaskService` delega para `TaskRepository.FindByClassIDs(classIDs)`.
+9.  **Consulta ao Banco (Tarefas):** O `TaskRepository` executa uma consulta SQL (ex: `SELECT * FROM tasks WHERE class_id IN (?, ?, ...)`), usando os IDs das turmas obtidos.
+10. **Retorno das Tarefas:** O banco de dados retorna a lista de tarefas (`[]models.Task`) associadas a essas turmas. O repositório mapeia e retorna ao `TaskService`.
+11. **Formatação e Exibição:** O `TaskService` (ou a TUI diretamente) formata os dados das tarefas.
+12. **TUI (`internal/tui`):** A TUI renderiza uma tabela ou lista com as tarefas para o usuário.
 
-*(Nota: A tabela `tasks` atualmente tem `class_id` e não `subject_id` direto. O fluxo acima é uma simplificação. Um fluxo mais preciso envolveria: TUI -> Service (pede tarefas da disciplina) -> Service consulta ClassService/Repo para turmas da disciplina -> Service consulta TaskService/Repo para tarefas de cada turma OU TaskRepo faz um JOIN complexo.)*
+Este fluxo mais preciso reflete que as tarefas são diretamente associadas a `classes` (turmas), e as turmas são associadas a `subjects` (disciplinas), conforme o `DATABASE_SCHEMA.md`.
 
 #### b. Iniciar Sessão de Foco para uma Tarefa (via CLI)
 
@@ -289,14 +300,27 @@ Por ser uma aplicação CLI local, o escopo de preocupações de segurança é d
 -   **Dependências:** As dependências (listadas em `go.mod`) devem ser mantidas atualizadas para corrigir quaisquer vulnerabilidades conhecidas. Ferramentas como `govulncheck` podem ser usadas para verificar o projeto contra vulnerabilidades conhecidas nas dependências.
 -   **Segredos:** Atualmente, não parece haver gerenciamento de segredos externos (como chaves de API). Se isso fosse adicionado, eles não deveriam ser codificados diretamente, mas gerenciados via arquivos de configuração protegidos ou variáveis de ambiente.
 
-## 6. Escalabilidade e Desempenho
+## 6. Considerações de Segurança Adicionais (Detalhes da Seção 5)
 
-- **Autenticação e Autorização:** [Mecanismos detalhados.]
-- **Proteção contra Vulnerabilidades Comuns:** [OWASP Top 10 - XSS, SQL Injection, CSRF, etc. Como são mitigadas?]
-- **Gerenciamento de Segredos:** [Como senhas, chaves de API são armazenadas e acessadas.]
-- **Segurança de Dados em Trânsito e em Repouso:** [HTTPS/TLS, criptografia de banco de dados.]
+Reiterando e expandindo alguns pontos da seção 5 "Considerações de Segurança":
 
-## 6. Escalabilidade e Desempenho
+-   **Autenticação e Autorização:**
+    -   A aplicação possui uma tabela `users` com `username` e `password_hash`, sugerindo um mecanismo de autenticação local. A TUI principal provavelmente lida com o login.
+    -   A autorização parece ser baseada no `user_id` presente na maioria das tabelas, garantindo que os usuários só acessem seus próprios dados. Não há um sistema complexo de papéis ou permissões detalhado.
+
+-   **Proteção contra Vulnerabilidades Comuns (Escopo CLI):**
+    -   **Injeção de SQL:** Mitigada pelo uso de consultas parametrizadas na camada de repositório ao interagir com `database/sql`.
+    -   Outras vulnerabilidades web comuns (XSS, CSRF) são menos aplicáveis a uma CLI. A principal preocupação é a validação de todas as entradas do usuário para evitar crashes ou comportamento inesperado.
+
+-   **Gerenciamento de Segredos (Senhas):**
+    -   Senhas de usuário são armazenadas como hashes (`password_hash` na tabela `users`). A biblioteca ou método de hashing específico não está detalhado aqui, mas deve seguir as melhores práticas (ex: bcrypt, scrypt, Argon2).
+    -   Não há outros segredos (como chaves de API externas) mencionados.
+
+-   **Segurança de Dados em Trânsito e em Repouso:**
+    -   **Em Trânsito:** Não aplicável, pois é uma aplicação local sem comunicação de rede para dados do usuário.
+    -   **Em Repouso:** Os dados são armazenados no arquivo SQLite local. A segurança desse arquivo depende das permissões do sistema de arquivos do usuário e da criptografia de disco do sistema operacional, se habilitada pelo usuário. A aplicação em si não criptografa o arquivo SQLite.
+
+## 6.1. Escalabilidade e Desempenho
 
 -   **Escalabilidade:** Sendo uma aplicação CLI local, a escalabilidade se refere principalmente à capacidade de lidar com um volume crescente de dados do usuário (tarefas, aulas, etc.) de forma eficiente.
     -   A escolha do SQLite é adequada para volumes de dados pessoais, mas não para cenários de multiusuário concorrente em larga escala.

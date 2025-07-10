@@ -4,9 +4,49 @@ Bem-vindo ao nosso projeto! Este arquivo README fornece uma visão geral do proj
 
 ## Descrição
 
-**Vigenda** é uma aplicação de linha de comando (CLI) desenvolvida em Go, projetada para ajudar estudantes a gerenciar suas atividades acadêmicas. Ela oferece uma Interface de Texto do Usuário (TUI) para interações e parece incluir funcionalidades para gerenciamento de tarefas, aulas, disciplinas, avaliações e acompanhamento de progresso. O nome "Vigenda" sugere uma combinação de "vida" e "agenda", focando na organização da vida acadêmica.
+**Vigenda** é uma aplicação de linha de comando (CLI) desenvolvida em Go, projetada para ajudar professores e estudantes a gerenciar atividades acadêmicas. A principal forma de interação é através de uma Interface de Texto do Usuário (TUI) robusta, acessada executando `vigenda` sem subcomandos. A aplicação também oferece alguns subcomandos CLI para funcionalidades específicas.
 
-## Instalação e Execução
+Funcionalidades incluem:
+- Gerenciamento de Tarefas
+- Gestão de Turmas e Alunos
+- Planejamento de Aulas
+- Criação e Gestão de Avaliações
+- Lançamento de Notas
+- Banco de Questões e Geração de Provas
+- Ferramentas de Produtividade (como sessões de foco)
+
+O nome "Vigenda" sugere uma combinação de "vida" e "agenda", focando na organização da vida acadêmica.
+
+## Interação Principal: TUI (Interface de Texto do Usuário)
+
+A forma primária de utilizar o Vigenda é através de sua interface interativa no terminal:
+
+```bash
+go run ./cmd/vigenda/main.go
+```
+Ou, se você construiu o binário (ex: `vigenda_cli`):
+```bash
+./vigenda_cli
+```
+Isso iniciará a TUI, que oferece um menu principal para acessar todas as funcionalidades de forma interativa, incluindo a criação e gerenciamento de disciplinas, turmas, alunos, aulas, avaliações, etc.
+
+## Comandos CLI Adicionais
+
+Além da TUI principal, alguns subcomandos estão disponíveis para acesso direto a funcionalidades específicas. Para uma lista completa e atualizada, utilize:
+```bash
+go run ./cmd/vigenda/main.go --help
+# ou
+./vigenda_cli --help
+```
+Exemplos de subcomandos incluem (mas não se limitam a):
+- `tarefa listar`: Para listar tarefas.
+- `tarefa add`: Para adicionar tarefas rapidamente.
+- `avaliacao criar`: Para criar avaliações.
+- `bancoq add`: Para adicionar questões ao banco.
+
+Consulte `vigenda [comando] --help` para detalhes sobre cada subcomando.
+
+## Instalação
 
 Siga estas instruções para configurar o ambiente de desenvolvimento e executar o projeto. Para instruções mais detalhadas, consulte o arquivo `INSTALLATION.MD`.
 
@@ -23,14 +63,15 @@ Consulte `INSTALLATION.MD` para links e instruções de instalação detalhadas 
 ### Passos de Instalação
 
 1.  **Clone o repositório:**
+    (Se você tiver acesso ao repositório Git, substitua `[URL_DO_REPOSITORIO_GIT]` pela URL correta.)
     ```bash
-    git clone https://github.com/usuario/vigenda.git # Substitua pela URL correta do repositório
+    git clone [URL_DO_REPOSITORIO_GIT] vigenda
     cd vigenda
     ```
-    (Assumindo que o diretório do projeto é `vigenda` com base no `cmd/vigenda` e `go.mod`)
+    Se você recebeu os arquivos do projeto de outra forma, apenas navegue até o diretório raiz do projeto.
 
 2.  **Instale as dependências Go:**
-    Dentro do diretório do projeto (`vigenda`), execute:
+    Dentro do diretório raiz do projeto (`vigenda`), execute:
     ```bash
     go mod tidy
     ```
@@ -38,17 +79,22 @@ Consulte `INSTALLATION.MD` para links e instruções de instalação detalhadas 
 
 ### Executando o Projeto
 
-Para executar a aplicação a partir do código fonte (a partir da raiz do projeto `vigenda`):
+Conforme mencionado, a principal forma de interação é através da TUI:
 ```bash
-go run ./cmd/vigenda/main.go [comando_ou_argumentos]
+go run ./cmd/vigenda/main.go
 ```
-Exemplo: `go run ./cmd/vigenda/main.go tarefa listar`
+Para usar subcomandos CLI específicos:
+```bash
+go run ./cmd/vigenda/main.go [subcomando] [flags]
+```
+Exemplo: `go run ./cmd/vigenda/main.go tarefa listar --all`
 
 Para construir o binário e depois executá-lo:
-Consulte o script `build.sh` para as opções de build para diferentes plataformas. Um exemplo básico é:
+Consulte o script `build.sh` para as opções de build para diferentes plataformas. Um exemplo básico para sua plataforma atual é:
 ```bash
 go build -o vigenda_cli ./cmd/vigenda/main.go
-./vigenda_cli [comando_ou_argumentos]
+./vigenda_cli # Para iniciar a TUI
+./vigenda_cli [subcomando] [flags] # Para subcomandos CLI
 ```
 O script `build.sh` gera os executáveis no diretório `dist/`.
 
@@ -66,8 +112,8 @@ Agradecemos por seu interesse em contribuir!
 
 ## Licença
 
-[Especifique a licença sob a qual o projeto é distribuído, por exemplo: MIT, Apache 2.0, etc.]
+Este projeto é distribuído sob a licença [INSIRA A LICENÇA AQUI, ex: MIT, Apache 2.0, etc.]. Consulte o arquivo `LICENSE` para mais detalhes. (Nota: O arquivo `LICENSE` não foi encontrado na listagem inicial, mas é uma prática padrão. Se não houver um, esta seção pode precisar ser ajustada ou o arquivo `LICENSE` criado).
 
 ## Contato
 
-[Opcional: Adicione informações de contato ou links para canais de comunicação do projeto.]
+Para dúvidas, sugestões ou reporte de bugs, por favor, crie uma "Issue" no rastreador de issues do projeto (se disponível publicamente) ou entre em contato com o mantenedor do projeto através de [INSIRA O MÉTODO DE CONTATO AQUI, ex: email@example.com].

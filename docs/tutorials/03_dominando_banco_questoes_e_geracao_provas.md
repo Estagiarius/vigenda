@@ -3,9 +3,11 @@
 Este tutorial explora em profundidade como construir um banco de questões robusto no Vigenda e como utilizar seus recursos para gerar provas personalizadas. Cobriremos a criação de um arquivo JSON de questões mais elaborado, a importação para o banco e a geração de provas com diversos critérios.
 
 **Pré-requisitos:**
-*   Vigenda instalado e funcionando.
-*   Compreensão básica do formato JSON para importação de questões e dos comandos `vigenda bancoq add` e `vigenda prova gerar`. Consulte o [Manual do Usuário](../../user_manual/README.md) se necessário.
-*   Uma ou mais disciplinas cadastradas no sistema (vamos assumir que existe uma disciplina "Geografia" com `ID = 2` e "História" com `ID = 1`).
+*   Vigenda instalado e funcionando. Consulte [**INSTALLATION.MD**](../../INSTALLATION.MD).
+*   Uma ou mais **disciplinas** já devem ter sido criadas através da **Interface de Texto do Usuário (TUI)** do Vigenda.
+    *   Para iniciar a TUI: execute `vigenda` (ou `go run ./cmd/vigenda/main.go`).
+    *   No menu da TUI, crie as disciplinas necessárias (ex: "Geografia", "História"). Anote os IDs das disciplinas criadas (vamos assumir "Geografia" com `ID = 2` e "História" com `ID = 1` para este tutorial).
+*   Compreensão básica do formato JSON para importação de questões e dos comandos CLI `vigenda bancoq add` e `vigenda prova gerar`. Consulte o [Manual do Usuário](../../docs/user_manual/README.md) para detalhes.
 
 ## Passo 1: Criar um Arquivo JSON de Questões Detalhado
 

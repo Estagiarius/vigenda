@@ -1,201 +1,147 @@
-# Exemplos de Uso da CLI Vigenda
+# Exemplos de Uso do Vigenda
 
-Este arquivo fornece exemplos práticos de como usar a Interface de Linha de Comando (CLI) do Vigenda para realizar tarefas comuns e cenários mais avançados.
+Este arquivo fornece exemplos práticos de como usar o Vigenda, focando na interação através da Interface de Texto do Usuário (TUI) e nos comandos CLI disponíveis.
 
 **Nota:**
 - Assumimos que você já [instalou o Vigenda e configurou seu ambiente](INSTALLATION.MD).
-- Os comandos podem ser executados usando `go run ./cmd/vigenda/main.go <comando> [flags]` ou, se você construiu o binário, `./vigenda_cli <comando> [flags]` (ou o caminho para o binário em `dist/`). Para simplificar, usaremos `vigenda <comando> [flags]` nos exemplos abaixo.
-- Os IDs (`<disciplina_id>`, `<turma_id>`, `<tarefa_id>`, etc.) são exemplos e devem ser substituídos pelos IDs reais gerados pela aplicação ao criar entidades.
-- Alguns comandos podem abrir uma Interface de Texto do Usuário (TUI) para entrada de dados interativa se não forem fornecidos todos os argumentos via flags.
+- Para iniciar a TUI: `go run ./cmd/vigenda/main.go` ou `./vigenda_cli` (se compilado).
+- Para comandos CLI: `vigenda <comando> [flags]` (substitua `vigenda` por `go run ./cmd/vigenda/main.go` ou `./vigenda_cli` conforme sua execução).
+- IDs (`<disciplina_id>`, `<turma_id>`, etc.) são ilustrativos. Os IDs reais serão gerados pela aplicação.
 
-## 1. Gerenciamento de Disciplinas (Subjects)
+## 1. Interação Principal via TUI
 
-### Criar uma nova disciplina
-```bash
-vigenda disciplina criar --nome "Cálculo I"
-vigenda disciplina criar --nome "História Antiga"
-```
-(Isso provavelmente abrirá uma TUI para confirmar ou adicionar mais detalhes, ou se houver um comando direto não interativo)
+A maioria das operações de criação, listagem detalhada, edição e remoção de entidades como **Disciplinas, Turmas, Alunos (exceto importação/status), e Aulas** é realizada através da **TUI principal**.
 
-Se o comando for totalmente CLI:
-```bash
-# Assumindo que o comando `disciplina criar` aceita o nome diretamente
-# ou que ele abre uma TUI para entrada de nome.
-# O comando exato pode variar dependendo da implementação do Cobra.
-# Exemplo conceitual:
-# vigenda disciplina criar --nome "Física Quântica"
-```
-*(Nota: A implementação atual dos comandos `criar` parece focar na TUI. Os exemplos CLI diretos são conceituais se flags diretas não estiverem implementadas para todos os campos.)*
+**Exemplo de fluxo na TUI:**
 
-### Listar todas as disciplinas
-```bash
-vigenda disciplina listar
-```
-
-## 2. Gerenciamento de Turmas (Classes)
-
-### Criar uma nova turma para uma disciplina
-Primeiro, obtenha o ID da disciplina (ex: após listar as disciplinas). Suponha que "Cálculo I" tem ID `1`.
-```bash
-# Comando para criar turma (pode abrir TUI)
-vigenda turma criar --disciplinaID 1 --nome "Cálculo I - Turma A 2024"
-```
-
-### Listar todas as turmas (geral ou por disciplina)
-```bash
-vigenda turma listar
-```
-Para listar turmas de uma disciplina específica (ID `1`):
-```bash
-vigenda turma listar --disciplinaID 1
-```
-
-## 3. Gerenciamento de Tarefas (Tasks)
-
-### Criar uma nova tarefa para uma turma
-Suponha que a turma "Cálculo I - Turma A 2024" tem ID `1`.
-```bash
-# Comando para criar tarefa (pode abrir TUI)
-vigenda tarefa criar --turmaID 1 --titulo "Lista de Exercícios 1 - Limites" --descricao "Resolver os exercícios da seção 2.3 do livro." --dataEntrega "2024-08-15T23:59:00"
-```
-Se a data de entrega for opcional ou puder ser definida depois:
-```bash
-vigenda tarefa criar --turmaID 1 --titulo "Preparar apresentação sobre Derivadas"
-```
-
-### Criar uma tarefa pessoal (não associada a uma turma)
-```bash
-# Comando para criar tarefa (pode abrir TUI)
-vigenda tarefa criar --titulo "Comprar livro de Álgebra Linear" --dataEntrega "2024-08-01"
-```
-
-### Listar todas as tarefas
-```bash
-vigenda tarefa listar
-```
-
-### Listar tarefas de uma turma específica (ID `1`)
-```bash
-vigenda tarefa listar --turmaID 1
-```
-
-### Listar tarefas concluídas ou pendentes
-```bash
-vigenda tarefa listar --status pendente
-vigenda tarefa listar --status concluida
-```
-
-### Marcar uma tarefa como concluída (ID da tarefa `5`)
-```bash
-vigenda tarefa atualizar --id 5 --concluida
-```
-Ou, se houver um comando dedicado:
-```bash
-vigenda tarefa concluir --id 5
-```
-
-### Atualizar detalhes de uma tarefa (ID da tarefa `5`)
-```bash
-# Comando para atualizar tarefa (pode abrir TUI para edição)
-vigenda tarefa atualizar --id 5 --titulo "Lista de Exercícios 1 - Limites e Continuidade" --descricao "Resolver os exercícios das seções 2.3 e 2.4."
-```
-
-## 4. Sessões de Foco (Focus)
-
-### Iniciar uma sessão de foco para uma tarefa específica
-Suponha que a tarefa "Lista de Exercícios 1" tem ID `5`.
-```bash
-vigenda foco iniciar --tarefaID 5 --duracao 25m
-```
-Iniciar uma sessão de foco sem associar a uma tarefa:
-```bash
-vigenda foco iniciar --duracao 45m --atividade "Leitura de Artigo Científico"
-```
-(A flag `--atividade` é conceitual e dependeria da implementação do comando `foco iniciar`)
-
-### Visualizar histórico de sessões de foco
-```bash
-vigenda foco historico
-```
-
-## 5. Gerenciamento de Avaliações e Notas (Assessments & Grades) - Conceitual
-
-*(Os comandos exatos para avaliações e notas dependerão da implementação detalhada dos comandos Cobra e da TUI. Abaixo estão exemplos conceituais.)*
-
-### Criar uma nova avaliação para uma turma (ID da turma `1`)
-```bash
-# Pode abrir TUI
-vigenda avaliacao criar --turmaID 1 --nome "Prova Bimestral 1" --bimestre 1 --peso 4.0 --data "2024-08-20"
-```
-
-### Listar avaliações de uma turma
-```bash
-vigenda avaliacao listar --turmaID 1
-```
-
-### Lançar notas para uma avaliação (ID da avaliação `3`)
-Este comando provavelmente abrirá uma TUI para entrada interativa das notas dos alunos da turma associada à avaliação.
-```bash
-vigenda nota lancar --avaliacaoID 3
-```
-
-### Consultar notas de um aluno (ID do aluno `10`) ou de uma turma (ID da turma `1`)
-```bash
-vigenda nota consultar --alunoID 10
-vigenda nota consultar --turmaID 1
-```
-
-## 6. Banco de Questões (Questions) - Conceitual
-
-### Adicionar uma nova questão a uma disciplina (ID da disciplina `1`)
-```bash
-# Pode abrir TUI para detalhes da questão
-vigenda questao criar --disciplinaID 1 --tipo "multipla_escolha" --dificuldade "media" --topico "Limites Laterais" --enunciado "Qual o limite de f(x) = 1/x quando x tende a 0 pela direita?" --opcoes '["infinito", "-infinito", "0", "1"]' --respostaCorreta "infinito"
-```
-
-### Listar questões de uma disciplina
-```bash
-vigenda questao listar --disciplinaID 1
-```
-Filtrar por dificuldade ou tópico:
-```bash
-vigenda questao listar --disciplinaID 1 --dificuldade "dificil"
-vigenda questao listar --disciplinaID 1 --topico "Limites Laterais"
-```
-
-## Combinando Comandos (Workflow Example)
-
-1.  **Criar uma disciplina:**
+1.  **Iniciar o Vigenda (TUI):**
     ```bash
-    vigenda disciplina criar --nome "Programação Orientada a Objetos"
+    vigenda
     ```
-    (Suponha que o ID gerado para "Programação Orientada a Objetos" seja `2`)
+2.  **No Menu Principal da TUI:**
+    *   Navegue até "Disciplinas" (ou nome similar) e selecione "Criar Nova Disciplina". Preencha os detalhes solicitados.
+    *   Com uma disciplina criada (ex: "História", ID: 1), navegue até "Turmas", selecione a disciplina "História" e depois "Criar Nova Turma". Preencha os detalhes (ex: "História 9A"). Anote o ID da turma criada (ex: ID: 1).
+    *   Para adicionar alunos manualmente ou gerenciar aulas, explore as opções dentro da respectiva turma/disciplina na TUI.
 
-2.  **Criar uma turma para esta disciplina:**
-    ```bash
-    vigenda turma criar --disciplinaID 2 --nome "POO - T01 Manhã 2024.2"
-    ```
-    (Suponha que o ID gerado para a turma seja `3`)
+## 2. Gerenciamento de Tarefas (CLI e TUI)
 
-3.  **Adicionar uma tarefa para esta turma:**
-    ```bash
-    vigenda tarefa criar --turmaID 3 --titulo "Trabalho Prático 1: Classes e Objetos" --descricao "Implementar sistema de biblioteca em Java." --dataEntrega "2024-09-10T23:59:00"
-    ```
-    (Suponha que o ID gerado para a tarefa seja `7`)
+As tarefas podem ser gerenciadas tanto pela TUI quanto por comandos CLI.
 
-4.  **Iniciar uma sessão de foco para esta tarefa:**
-    ```bash
-    vigenda foco iniciar --tarefaID 7 --duracao 1h30m
-    ```
+### Criar uma nova tarefa (CLI)
+Para a Turma ID `1` (criada via TUI):
+```bash
+vigenda tarefa add "Revisar Capítulos 1-3 de História Antiga" --classid 1 --duedate 2024-09-15
+```
+Criar uma tarefa pessoal (sem ID de turma):
+```bash
+vigenda tarefa add "Comprar canetas novas" --description "Canetas azuis e pretas ponta fina"
+```
 
-5.  **Listar tarefas pendentes da turma:**
-    ```bash
-    vigenda tarefa listar --turmaID 3 --status pendente
-    ```
+### Listar tarefas (CLI)
+Listar tarefas ativas para a Turma ID `1`:
+```bash
+vigenda tarefa listar --classid 1
+```
+Listar todas as tarefas (de todas as turmas e do sistema/bugs):
+```bash
+vigenda tarefa listar --all
+```
 
-6.  **Marcar a tarefa como concluída:**
-    ```bash
-    vigenda tarefa concluir --id 7
-    ```
+### Marcar uma tarefa como concluída (CLI)
+Supondo que a tarefa "Revisar Capítulos 1-3" tem ID `5` (obtido ao criar ou listar):
+```bash
+vigenda tarefa complete 5
+```
 
-Estes exemplos visam ilustrar o potencial de uso da CLI Vigenda. Consulte a saída de `vigenda --help` e `vigenda <comando> --help` para obter a lista completa de comandos, subcomandos e flags disponíveis.
+## 3. Gerenciamento de Alunos (CLI para operações em lote)
+
+As turmas devem ser criadas primeiro via TUI.
+
+### Importar alunos para uma turma (CLI)
+Supondo que a Turma "História 9A" (ID `1`) existe:
+```bash
+vigenda turma importar-alunos 1 lista_alunos_hist9a.csv
+```
+Consulte o `docs/user_manual/README.md` para o formato do arquivo CSV.
+
+### Atualizar status de um aluno (CLI)
+Supondo que o Aluno ID `101` (de uma turma existente) precisa ser atualizado:
+```bash
+vigenda turma atualizar-status 101 transferido
+```
+
+## 4. Gerenciamento de Avaliações (CLI e TUI)
+
+Disciplinas e Turmas devem ser criadas primeiro via TUI.
+
+### Criar uma nova avaliação (CLI)
+Para a Turma ID `1` ("História 9A"):
+```bash
+vigenda avaliacao criar "Prova Mensal - Unidade 1" --classid 1 --term "1º Bimestre" --weight 4.0 --date 2024-08-20
+```
+
+### Lançar notas para uma avaliação (CLI, interativo)
+Para a Avaliação ID `3` (criada acima). Este comando abrirá um prompt interativo:
+```bash
+vigenda avaliacao lancar-notas 3
+```
+
+### Calcular média da turma (CLI)
+Para a Turma ID `1`:
+```bash
+vigenda avaliacao media-turma 1
+```
+
+## 5. Banco de Questões e Provas (CLI)
+
+Disciplinas devem ser criadas primeiro via TUI.
+
+### Adicionar questões ao banco (CLI)
+Supondo que o arquivo `historia_questoes.json` existe e a disciplina "História" (ID 1) está cadastrada:
+```bash
+vigenda bancoq add historia_questoes.json
+```
+No arquivo JSON, as questões devem referenciar o nome da disciplina existente (ex: "História"). Consulte o `docs/user_manual/README.md` para o formato JSON.
+
+### Gerar uma prova (CLI)
+Para a Disciplina "História" (ID `1`):
+```bash
+vigenda prova gerar --subjectid 1 --easy 5 --medium 3 --hard 2 --output prova_historia_u1.txt
+```
+
+## 6. Workflow Combinado (TUI e CLI)
+
+1.  **Na TUI:**
+    *   Inicie `vigenda`.
+    *   Crie a disciplina "Física Moderna". Anote seu ID (ex: `SubjectID = 2`).
+    *   Dentro de "Física Moderna", crie a turma "Física Moderna - T01". Anote seu ID (ex: `ClassID = 3`).
+
+2.  **No CLI:**
+    *   Adicione uma tarefa para a turma:
+        ```bash
+        vigenda tarefa add "Resolver lista de exercícios sobre Relatividade" --classid 3 --duedate 2024-10-01
+        ```
+        (Suponha que esta tarefa receba o ID `TaskID = 10`)
+    *   Importe alunos para a turma:
+        ```bash
+        vigenda turma importar-alunos 3 alunos_fisica_t01.csv
+        ```
+    *   Crie uma avaliação:
+        ```bash
+        vigenda avaliacao criar "P1 - Relatividade Especial" --classid 3 --term "1" --weight 5.0 --date 2024-10-15
+        ```
+        (Suponha que esta avaliação receba o ID `AssessmentID = 4`)
+    *   Lance as notas (será interativo):
+        ```bash
+        vigenda avaliacao lancar-notas 4
+        ```
+    *   Adicione questões de Física ao banco (o JSON deve referenciar a disciplina "Física Moderna"):
+        ```bash
+        vigenda bancoq add questoes_fisica_relatividade.json
+        ```
+    *   Gere uma prova:
+        ```bash
+        vigenda prova gerar --subjectid 2 --easy 3 --medium 2 --output prova_relatividade.txt
+        ```
+
+Estes exemplos ilustram como combinar a TUI para gerenciamento de entidades base e a CLI para operações rápidas ou em lote. Consulte sempre `vigenda --help` e `vigenda <comando> --help` para a lista mais atualizada de comandos e opções.
