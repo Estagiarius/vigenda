@@ -26,6 +26,9 @@ func (m *mockTaskService) ListActiveTasksByClass(ctx context.Context, classID in
 func (m *mockTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task, error) {
 	return nil, nil
 }
+func (m *mockTaskService) ListAllTasks(ctx context.Context) ([]models.Task, error) { // Added
+	return nil, nil
+}
 func (m *mockTaskService) MarkTaskAsCompleted(ctx context.Context, taskID int64) error { return nil }
 func (m *mockTaskService) GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error) {
 	return nil, nil
@@ -44,12 +47,30 @@ func (m *mockClassService) ImportStudentsFromCSV(ctx context.Context, classID in
 func (m *mockClassService) UpdateStudentStatus(ctx context.Context, studentID int64, newStatus string) error {
 	return nil
 }
-func (m *mockClassService) GetClassByID(ctx context.Context, classID int64) (*models.Class, error) { // Interface expects *models.Class
-	return &models.Class{}, nil
+func (m *mockClassService) GetClassByID(ctx context.Context, classID int64) (models.Class, error) { // Corrected return type
+	return models.Class{}, nil
 }
 func (m *mockClassService) ListAllClasses(ctx context.Context) ([]models.Class, error) { return nil, nil }
 func (m *mockClassService) GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error) {
 	return nil, nil
+}
+func (m *mockClassService) UpdateClass(ctx context.Context, classID int64, name string, subjectID int64) (models.Class, error) { // Added
+	return models.Class{}, nil
+}
+func (m *mockClassService) DeleteClass(ctx context.Context, classID int64) error { // Added
+	return nil
+}
+func (m *mockClassService) AddStudent(ctx context.Context, classID int64, fullName string, enrollmentID string, status string) (models.Student, error) { // Added
+	return models.Student{}, nil
+}
+func (m *mockClassService) GetStudentByID(ctx context.Context, studentID int64) (models.Student, error) { // Added
+	return models.Student{}, nil
+}
+func (m *mockClassService) UpdateStudent(ctx context.Context, studentID int64, fullName string, enrollmentID string, status string) (models.Student, error) { // Added
+	return models.Student{}, nil
+}
+func (m *mockClassService) DeleteStudent(ctx context.Context, studentID int64) error { // Added
+	return nil
 }
 
 type mockAssessmentService struct{}
@@ -123,7 +144,7 @@ func TestModel_Update_NavigateToSubViewAndBack(t *testing.T) {
 	initialView := m.currentView
 
 	// Simulate selecting the second item (TaskManagementView)
-	m.list.SetCursor(1) // Select "Gerenciar Tarefas"
+	m.list.Select(1) // Select "Gerenciar Tarefas"
 	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
 	nextModelTea, _ := m.Update(enterMsg)
 	m = nextModelTea.(*Model)
@@ -156,7 +177,7 @@ func TestModel_View_Content(t *testing.T) {
 	assert.Contains(t, viewOutput, "Navegue com ↑/↓", "View should contain help text for menu")
 
 	// Navigate to a sub-view (TaskManagementView)
-	m.list.SetCursor(1) // "Gerenciar Tarefas"
+	m.list.Select(1) // "Gerenciar Tarefas"
 	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
 
 	// If tasksModel.Init() dispatches a command, we need to handle its message
@@ -233,7 +254,7 @@ func simulateCtrlCPress(m *Model) (*Model, tea.Cmd) {
 func TestModel_Update_WithHelpers(t *testing.T) {
 	m := newTestAppModel()
 
-	m.list.SetCursor(1) // Select "Gerenciar Tarefas"
+	m.list.Select(1) // Select "Gerenciar Tarefas"
 	var cmd tea.Cmd
 	m, cmd = simulateEnterPress(m)
 	// Handle potential command from sub-model Init

@@ -392,6 +392,8 @@ func (m *Model) handleDetailsViewKeys(msg tea.KeyMsg) tea.Cmd {
 		} else {
 			m.state = ListView
 			m.selectedClass = nil
+			m.classStudents = nil // Limpar alunos da turma anterior
+			m.studentsTable.SetRows([]table.Row{}) // Limpar linhas da tabela de alunos
 			m.err = nil
 			m.table.Focus()
 		}
@@ -601,6 +603,7 @@ func (m *Model) handleClassCreated(msg classCreatedMsg) tea.Cmd {
 	m.err = nil
 	m.resetFormInputs()
 	m.table.Focus()
+	m.isLoading = true // Sinaliza que um novo fetch está prestes a acontecer
 	return m.fetchClassesCmd
 }
 
