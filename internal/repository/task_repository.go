@@ -195,6 +195,58 @@ func (r *taskRepository) MarkTaskCompleted(ctx context.Context, taskID int64) er
 	return nil
 }
 
+func (r *taskRepository) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
+	query := `
+		SELECT id, user_id, class_id, title, description, due_date, is_completed
+		FROM tasks
+		WHERE user_id = ?
+		  AND is_completed = false
+		  AND due_date >= ?
+		ORDER BY due_date ASC
+		LIMIT ?`
+
+	rows, err := r.db.QueryContext(ctx, query, userID, fromDate, limit)
+	if err != nil {
+		return nil, fmt.Errorf("taskRepository.GetUpcomingActiveTasks: querying tasks: %w", err)
+	}
+	defer rows.Close()
+
+	var tasks []models.Task
+	for rows.Next() {
+		task := models.Task{}
+		var classID sql.NullInt64
+		var description sql.NullString
+		var dueDate sql.NullTime
+
+		err := rows.Scan(
+			&task.ID,
+			&task.UserID,
+			&classID,
+			&task.Title,
+			&description,
+			&dueDate,
+			&task.IsCompleted,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("taskRepository.GetUpcomingActiveTasks: scanning task: %w", err)
+		}
+		if classID.Valid {
+			task.ClassID = &classID.Int64
+		}
+		if description.Valid {
+			task.Description = description.String
+		}
+		if dueDate.Valid {
+			task.DueDate = &dueDate.Time
+		}
+		tasks = append(tasks, task)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("taskRepository.GetUpcomingActiveTasks: iterating rows: %w", err)
+	}
+	return tasks, nil
+}
+
 func (r *taskRepository) DeleteTask(ctx context.Context, taskID int64) error {
 	query := `DELETE FROM tasks WHERE id = ?`
 	result, err := r.db.ExecContext(ctx, query, taskID)

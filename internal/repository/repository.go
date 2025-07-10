@@ -59,6 +59,7 @@ type TaskRepository interface {
 	UpdateTask(ctx context.Context, task *models.Task) error                     // Added for updating tasks
 	// DeleteTask removes a task from the database by its ID.
 	DeleteTask(ctx context.Context, taskID int64) error                          // Added for deleting tasks
+	GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error)
 	// ... outros métodos
 }
 

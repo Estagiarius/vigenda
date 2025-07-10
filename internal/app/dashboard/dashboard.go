@@ -3,6 +3,7 @@ package dashboard
 import (
 	"context"
 	"fmt"
+	"log" // Adicionado para depuração
 	"strings"
 	"time"
 
@@ -81,20 +82,20 @@ func (m *Model) fetchUpcomingTasks() tea.Cmd {
 		// Por enquanto, retorna dados mockados ou vazios.
 		// Supondo que TaskService tenha um método como ListActiveTasks (ou similar)
 		// e precisaremos filtrar por data.
-		// Para este exemplo, vamos retornar uma lista vazia para evitar dependência de métodos não existentes.
-		tasks, err := m.taskService.ListAllActiveTasks(context.Background()) // Este método lista todas, idealmente filtraríamos por data
+		// Usar o novo método GetUpcomingActiveTasks do TaskService.
+		// TODO: Obter UserID do contexto/configuração quando a autenticação estiver implementada.
+		userID := int64(1) // Placeholder
+		limit := 5         // Mostrar até 5 tarefas futuras
+
+		// Usar o início do dia atual para fromDate para incluir todas as tarefas de hoje.
+		now := time.Now()
+		fromDate := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+
+		tasks, err := m.taskService.GetUpcomingActiveTasks(context.Background(), userID, fromDate, limit)
 		if err != nil {
 			return dashboardErrorMsg{fmt.Errorf("buscar tarefas futuras: %w", err)}
 		}
-		// Filtro manual de placeholder (isto deve ser feito no serviço/repositório idealmente)
-		var upcoming []models.Task
-		now := time.Now()
-		for _, task := range tasks {
-			if task.DueDate != nil && task.DueDate.After(now) {
-				upcoming = append(upcoming, task)
-			}
-		}
-		return upcomingTasksLoadedMsg{tasks: upcoming}
+		return upcomingTasksLoadedMsg{tasks: tasks}
 	}
 }
 
@@ -157,6 +158,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case upcomingTasksLoadedMsg:
 		m.upcomingTasks = msg.tasks
+		// Log para depuração
+		log.Printf("DashboardModel: upcomingTasksLoadedMsg - %d tarefas recebidas", len(msg.tasks))
+		for i, task := range msg.tasks {
+			log.Printf("  Tarefa %d: ID %d, Título '%s', DueDate: %v", i+1, task.ID, task.Title, task.DueDate)
+		}
 		// Não definir isLoading = false aqui, esperar todas as cargas
 	case todaysLessonsLoadedMsg: // Corrigido
 		m.todaysLessons = msg.lessons // Corrigido

@@ -21,6 +21,7 @@ type TaskService interface {
 	UpdateTask(ctx context.Context, task *models.Task) error             // Added for updating tasks
 	// DeleteTask removes a task by its ID.
 	DeleteTask(ctx context.Context, taskID int64) error                  // Added for deleting tasks
+	GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error)
 }
 
 // ClassService define os métodos para a gestão de turmas e alunos.
