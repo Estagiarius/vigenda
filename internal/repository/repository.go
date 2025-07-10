@@ -76,6 +76,18 @@ type ClassRepository interface {
 	DeleteStudent(ctx context.Context, studentID int64, classID int64) error
 }
 
+// LessonRepository define a interface para operações de persistência de aulas/lições.
+type LessonRepository interface {
+	CreateLesson(ctx context.Context, lesson *models.Lesson) (int64, error)
+	GetLessonByID(ctx context.Context, lessonID int64) (*models.Lesson, error)
+	GetLessonsByClassID(ctx context.Context, classID int64) ([]models.Lesson, error)
+	// GetLessonsByDateRange busca lições para um usuário dentro de um intervalo de datas.
+	// O userID pode ser usado para filtrar lições pertencentes a um usuário específico.
+	GetLessonsByDateRange(ctx context.Context, userID int64, startDate time.Time, endDate time.Time) ([]models.Lesson, error)
+	UpdateLesson(ctx context.Context, lesson *models.Lesson) error
+	DeleteLesson(ctx context.Context, lessonID int64) error
+}
+
 type AssessmentRepository interface {
 	CreateAssessment(ctx context.Context, assessment *models.Assessment) (int64, error)
 	GetAssessmentByID(ctx context.Context, assessmentID int64) (*models.Assessment, error)

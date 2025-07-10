@@ -52,7 +52,7 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 		// Launch the BubbleTea application
 		// PersistentPreRunE ensures all necessary services are initialized.
 		// Pass the initialized services to the TUI application.
-		app.StartApp(taskService, classService, assessmentService, questionService, proofService)
+		app.StartApp(taskService, classService, assessmentService, questionService, proofService, lessonService)
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Setup logging to file first
@@ -345,7 +345,15 @@ func initializeServices(db *sql.DB) {
 
 	questionService = service.NewQuestionService(questionRepo, subjectRepo)
 	proofService = service.NewProofService(questionRepo) // ProofService uses QuestionRepository for GetQuestionsByCriteriaProofGeneration
+
+	// Initialize LessonService
+	lessonRepo := repository.NewLessonRepository(db)
+	// LessonService precisa do ClassRepository para validação de propriedade da turma
+	lessonService = service.NewLessonService(lessonRepo, classRepo)
 }
+
+// Variável global para LessonService para ser acessível pelo rootCmd.Run e app.StartApp
+var lessonService service.LessonService
 
 func init() {
 	// Cobra command definitions and flag setups remain in init()

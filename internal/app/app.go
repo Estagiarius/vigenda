@@ -45,6 +45,7 @@ type Model struct {
 	assessmentService service.AssessmentService
 	questionService   service.QuestionService
 	proofService      service.ProofService
+	lessonService     service.LessonService // Adicionado
 	// ... other services
 }
 
@@ -57,7 +58,7 @@ func (m *Model) Init() tea.Cmd {
 // New creates a new instance of the application model.
 // It requires services to be injected for its sub-models.
 // Changed to return *Model
-func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /* add other services as params */) *Model {
+func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService, ls service.LessonService /* add other services as params */) *Model {
 	// Define menu items using the View enum for safer mapping
 	menuItems := []list.Item{
 		// DashboardView (as main menu) does not need an item for itself, it IS the list.
@@ -88,7 +89,7 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 	am := assessments.New(as)
 	qm := questions.New(qs)
 	pm := proofs.New(ps)
-	dshModel := dashboard.New(ts, cs, as) // Initialize dashboard model, passing necessary services
+	dshModel := dashboard.New(ts, cs, as, ls) // Initialize dashboard model, passing necessary services
 
 	return &Model{ // Return pointer
 		list:              l,
@@ -103,6 +104,7 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 		questionService:   qs,
 		proofsModel:       pm,
 		proofService:      ps,
+		lessonService:     ls,         // Store lessonService
 		dashboardModel:    dshModel, // Assign initialized dashboard model
 	}
 }
@@ -341,9 +343,9 @@ func (m *Model) View() string {
 
 // StartApp is a helper to run the BubbleTea program.
 // It requires services to be passed for initializing the main model.
-func StartApp(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService /*, other services */) {
+func StartApp(ts service.TaskService, cs service.ClassService, as service.AssessmentService, qs service.QuestionService, ps service.ProofService, ls service.LessonService /*, other services */) {
 	// New now returns *Model, so model is already a pointer.
-	model := New(ts, cs, as, qs, ps /*, other services */)
+	model := New(ts, cs, as, qs, ps, ls /*, other services */)
 	// tea.NewProgram expects tea.Model, and *Model now implements tea.Model.
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {

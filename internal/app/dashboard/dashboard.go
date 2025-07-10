@@ -22,13 +22,14 @@ type Model struct {
 	// Serviços para buscar dados
 	// Estes serão injetados através do construtor New.
 	taskService       service.TaskService
-	classService      service.ClassService       // Para buscar aulas, por exemplo
+	classService      service.ClassService       // Para buscar aulas, por exemplo (pode ser removido se LessonService for suficiente)
 	assessmentService service.AssessmentService  // Para buscar avaliações
+	lessonService     service.LessonService      // Adicionado para buscar lições
 
 	// Dados a serem exibidos no Dashboard
 	// Estes campos serão populados pelas respostas dos serviços.
 	upcomingTasks       []models.Task        // Tarefas com prazos futuros
-	todaysClasses       []models.Class       // Aulas agendadas para o dia atual
+	todaysLessons       []models.Lesson      // Lições agendadas para o dia atual
 	upcomingAssessments []models.Assessment  // Avaliações agendadas futuramente
 	// Poderíamos adicionar mais, como:
 	// recentGrades      []models.GradeSummary // Resumo de notas recentes lançadas
@@ -43,15 +44,17 @@ type Model struct {
 // New cria uma nova instância do Dashboard Model.
 // Parâmetros:
 //   ts: Instância de TaskService para buscar dados de tarefas.
-//   cs: Instância de ClassService para buscar dados de turmas/aulas.
+//   cs: Instância de ClassService (pode ser removido se não for mais usado diretamente pelo dashboard).
 //   as: Instância de AssessmentService para buscar dados de avaliações.
-func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService) *Model {
+//   ls: Instância de LessonService para buscar dados de lições.
+func New(ts service.TaskService, cs service.ClassService, as service.AssessmentService, ls service.LessonService) *Model {
 	return &Model{
 		taskService:       ts,
-		classService:      cs,
+		classService:      cs, // Manter por enquanto, pode ser removido se não usado
 		assessmentService: as,
+		lessonService:     ls,
 		isLoading:         true, // Inicia em estado de carregamento por padrão
-		// upcomingTasks, todaysClasses, upcomingAssessments são inicializados como slices vazios (nil)
+		// upcomingTasks, todaysLessons, upcomingAssessments são inicializados como slices vazios (nil)
 	}
 }
 
@@ -60,8 +63,8 @@ func New(ts service.TaskService, cs service.ClassService, as service.AssessmentS
 // upcomingTasksLoadedMsg é enviada quando as tarefas futuras são carregadas.
 type upcomingTasksLoadedMsg struct{ tasks []models.Task }
 
-// todaysClassesLoadedMsg é enviada quando as aulas de hoje são carregadas.
-type todaysClassesLoadedMsg struct{ classes []models.Class }
+// todaysLessonsLoadedMsg é enviada quando as lições de hoje são carregadas.
+type todaysLessonsLoadedMsg struct{ lessons []models.Lesson }
 
 // upcomingAssessmentsLoadedMsg é enviada quando as próximas avaliações são carregadas.
 type upcomingAssessmentsLoadedMsg struct{ assessments []models.Assessment }
@@ -95,28 +98,15 @@ func (m *Model) fetchUpcomingTasks() tea.Cmd {
 	}
 }
 
-func (m *Model) fetchTodaysClasses() tea.Cmd {
+func (m *Model) fetchTodaysLessons() tea.Cmd {
 	return func() tea.Msg {
-		// TODO: Implementar a lógica real de busca no ClassService.
-		// Exemplo: classes, err := m.classService.GetClassesScheduledFor(context.Background(), time.Now())
-		// Por enquanto, retorna dados mockados ou vazios.
-		// Supondo que ClassService precise de um método específico para isso.
-		// Por agora, vamos simular com ListAllClasses e filtrar manualmente (não ideal).
-		allClasses, err := m.classService.ListAllClasses(context.Background())
+		// TODO: Obter UserID do contexto/configuração quando a autenticação estiver implementada.
+		userID := int64(1) // Placeholder
+		lessons, err := m.lessonService.GetLessonsForDate(context.Background(), userID, time.Now())
 		if err != nil {
-			return dashboardErrorMsg{fmt.Errorf("buscar todas as turmas: %w", err)}
+			return dashboardErrorMsg{fmt.Errorf("buscar lições de hoje: %w", err)}
 		}
-		// Placeholder: Filtro manual para simular "aulas de hoje".
-		// Numa aplicação real, isso seria mais complexo (horários, dias da semana, etc.)
-		// Aqui, vamos apenas retornar uma pequena parte para demonstração, se houver.
-		var today []models.Class
-		if len(allClasses) > 0 {
-			// Simplesmente pega a primeira para demonstração, não é uma lógica real de "aulas de hoje"
-			// today = append(today, allClasses[0])
-		}
-		// Retornando vazio por enquanto até termos lógica de agendamento
-		_ = today // Evitar erro de não uso
-		return todaysClassesLoadedMsg{classes: []models.Class{}}
+		return todaysLessonsLoadedMsg{lessons: lessons}
 	}
 }
 
@@ -151,7 +141,7 @@ func (m *Model) Init() tea.Cmd {
 	m.err = nil // Limpar erros anteriores
 	return tea.Batch(
 		m.fetchUpcomingTasks(),
-		m.fetchTodaysClasses(),
+		m.fetchTodaysLessons(), // Corrigido
 		m.fetchUpcomingAssessments(),
 	)
 }
@@ -168,8 +158,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case upcomingTasksLoadedMsg:
 		m.upcomingTasks = msg.tasks
 		// Não definir isLoading = false aqui, esperar todas as cargas
-	case todaysClassesLoadedMsg:
-		m.todaysClasses = msg.classes
+	case todaysLessonsLoadedMsg: // Corrigido
+		m.todaysLessons = msg.lessons // Corrigido
 	case upcomingAssessmentsLoadedMsg:
 		m.upcomingAssessments = msg.assessments
 		// Assumindo que esta é a última mensagem de dados esperada do batch em Init:
@@ -234,12 +224,14 @@ func (m *Model) View() string {
 
 	// Seção: Aulas de Hoje
 	sb.WriteString(sectionTitleStyle.Render("Aulas de Hoje") + "\n")
-	if len(m.todaysClasses) == 0 {
+	if len(m.todaysLessons) == 0 {
 		sb.WriteString(noDataStyle.Render("Nenhuma aula programada para hoje.") + "\n")
 	} else {
-		for _, class := range m.todaysClasses {
-			// TODO: Adicionar mais detalhes da aula se disponível (horário, disciplina)
-			sb.WriteString(listItemStyle.Render(fmt.Sprintf("• %s", class.Name)) + "\n")
+		for _, lesson := range m.todaysLessons {
+			sb.WriteString(listItemStyle.Render(fmt.Sprintf("• %s (%s)", lesson.Title, lesson.ScheduledAt.Format("15:04"))))
+			// TODO: Adicionar nome da turma se lesson.ClassID for usado para buscar detalhes da turma
+			// Ex: className := m.getClassName(lesson.ClassID) // precisaria de acesso ao classService ou um mapa
+			sb.WriteString("\n")
 		}
 	}
 
