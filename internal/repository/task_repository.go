@@ -201,10 +201,11 @@ func (r *taskRepository) GetUpcomingActiveTasks(ctx context.Context, userID int6
 		FROM tasks
 		WHERE user_id = ?
 		  AND is_completed = false
-		  AND due_date >= ?
+		  AND date(due_date) >= date(?) -- Modificado aqui
 		ORDER BY due_date ASC
 		LIMIT ?`
 
+	// fromDate já é o início do dia, então date(fromDate) funcionará bem.
 	rows, err := r.db.QueryContext(ctx, query, userID, fromDate, limit)
 	if err != nil {
 		return nil, fmt.Errorf("taskRepository.GetUpcomingActiveTasks: querying tasks: %w", err)
