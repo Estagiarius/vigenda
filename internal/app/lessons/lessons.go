@@ -478,17 +478,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Processar inputs do formulário se estiver em modo de formulário e focado
 	if m.currentView == CreatingView || m.currentView == EditingView {
 		var formCmd tea.Cmd
-		// Atualizar o input focado
-		if m.focusedIndex >= 0 && m.focusedIndex < len(m.formFocusOrder) {
-			focusedInput := m.formFocusOrder[m.focusedIndex]
-			switch input := focusedInput.(type) {
-			case *textinput.Model:
-				*input, formCmd = input.Update(msg)
-			case *textarea.Model:
-				*input, formCmd = input.Update(msg)
-			}
-			cmds = append(cmds, formCmd)
+		// Atualizar o input focado.
+		// A msg é passada para o input que está atualmente focado.
+		// Os métodos Update dos inputs (textinput, textarea) retornam o modelo atualizado e um comando.
+		switch m.focusedIndex {
+		case 0: // classIDInput
+			m.classIDInput, formCmd = m.classIDInput.Update(msg)
+		case 1: // titleInput
+			m.titleInput, formCmd = m.titleInput.Update(msg)
+		case 2: // planContentInput
+			m.planContentInput, formCmd = m.planContentInput.Update(msg)
+		case 3: // scheduledAtInput
+			m.scheduledAtInput, formCmd = m.scheduledAtInput.Update(msg)
 		}
+		cmds = append(cmds, formCmd)
 	}
 
 	// Atualizar tabela se estiver visível
