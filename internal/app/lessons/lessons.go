@@ -127,12 +127,6 @@ func New(ls service.LessonService, cs service.ClassService, initialUserID int64,
 	scheduledAtInput.CharLimit = 16 // Length of "YYYY-MM-DD HH:MM"
 	scheduledAtInput.Width = 20
 
-	formFocusOrder := []formFocusableInput{
-		&classIDInput,
-		&titleInput,
-		&planContentInput, // textarea precisa de um wrapper ou que bubbles a faça implementar formFocusableInput
-		&scheduledAtInput,
-	}
 	// Wrapper para textarea.Model para adaptá-la a formFocusableInput
 	// No entanto, textarea.Model já possui Focus(), Blur(), Focused(), SetValue(), Value()
 	// então a conversão direta para a interface deve funcionar se os métodos tiverem a mesma assinatura.
@@ -141,7 +135,24 @@ func New(ls service.LessonService, cs service.ClassService, initialUserID int64,
 	// func (t *textAreaWrapper) Focus() tea.Cmd { return t.Model.Focus() } ... etc.
 	// Mas vamos tentar direto primeiro.
 
-	// --- Model Initialization ---
+	// --- Table and Help Initialization (moved before m so they can be used) ---
+	tbl := table.New(
+		table.WithColumns(columns), // columns defined earlier
+		table.WithFocused(true),
+		table.WithHeight(10), // Placeholder height
+	)
+	s := table.DefaultStyles()
+	s.Header = s.Header.
+		BorderStyle(lipgloss.NormalBorder()).
+		BorderForeground(lipgloss.Color("240")).
+		BorderBottom(true).
+		Bold(false)
+	s.Selected = s.Selected.
+		Foreground(lipgloss.Color("229")).
+		Background(lipgloss.Color("57")).
+		Bold(false)
+	tbl.SetStyles(s)
+
 	helpModel := help.New()
 	helpModel.Width = width // Initial width
 
@@ -151,6 +162,7 @@ func New(ls service.LessonService, cs service.ClassService, initialUserID int64,
 	successStyle := lipgloss.NewStyle().Foreground(styles.Colors.SuccessColor) // Use new package
 	helpStyle := lipgloss.NewStyle().Foreground(styles.Colors.HelpColor)       // Use new package
 
+	// --- Construct the Model instance ---
 	m := Model{
 		lessonService:    ls,
 		classService:     cs,
@@ -161,8 +173,8 @@ func New(ls service.LessonService, cs service.ClassService, initialUserID int64,
 		titleInput:       titleInput,
 		planContentInput: planContentInput,
 		scheduledAtInput: scheduledAtInput,
-		formFocusOrder:   formFocusOrder,
-		focusedIndex:     0,    // Foca no primeiro input do formulário por padrão ao entrar no modo de formulário
+		// formFocusOrder will be set next
+		focusedIndex:     0,
 		isLoading:        true, // Começa carregando
 		help:             helpModel,
 		keyMap:           DefaultKeyMap(),
@@ -174,6 +186,15 @@ func New(ls service.LessonService, cs service.ClassService, initialUserID int64,
 		successStyle:     successStyle,
 		helpStyle:        helpStyle,
 	}
+
+	// --- Initialize formFocusOrder using pointers to m's fields ---
+	m.formFocusOrder = []formFocusableInput{
+		&m.classIDInput,
+		&m.titleInput,
+		&m.planContentInput,
+		&m.scheduledAtInput,
+	}
+
 	return m
 }
 
@@ -792,7 +813,14 @@ func (m Model) View() string {
 	case CreatingView:
 		s.WriteString(m.viewFormView("Nova Lição"))
 	case EditingView:
-		s.WriteString(m.viewFormView(fmt.Sprintf("Editando Lição ID: %d", m.selectedLesson.ID)))
+		if m.selectedLesson != nil {
+			s.WriteString(m.viewFormView(fmt.Sprintf("Editando Lição ID: %d", m.selectedLesson.ID)))
+		} else {
+			// This case should ideally not be reached if logic is correct,
+			// but as a safeguard:
+			s.WriteString(m.errorStyle.Render("Erro: Nenhuma lição selecionada para edição."))
+			// Consider also setting m.currentView = ListView and m.errorMessage
+		}
 	case ConfirmDeleteView:
 		s.WriteString(m.viewConfirmDeleteView())
 	case ErrorView: // Se ErrorView for um estado principal
