@@ -135,25 +135,14 @@ func New(ls service.LessonService, cs service.ClassService, initialUserID int64,
 	// func (t *textAreaWrapper) Focus() tea.Cmd { return t.Model.Focus() } ... etc.
 	// Mas vamos tentar direto primeiro.
 
-	// --- Table and Help Initialization (moved before m so they can be used) ---
-	tbl := table.New(
-		table.WithColumns(columns), // columns defined earlier
-		table.WithFocused(true),
-		table.WithHeight(10), // Placeholder height
-	)
-	s := table.DefaultStyles()
-	s.Header = s.Header.
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(lipgloss.Color("240")).
-		BorderBottom(true).
-		Bold(false)
-	s.Selected = s.Selected.
-		Foreground(lipgloss.Color("229")).
-		Background(lipgloss.Color("57")).
-		Bold(false)
-	tbl.SetStyles(s)
+	// Note: The following block for tbl, s, and helpModel initialization was duplicated.
+	// The first initialization of tbl, s (using columns) and the single initialization of helpModel are kept.
+	// The duplicated block has been removed.
 
-	helpModel := help.New()
+	// helpModel was correctly initialized only once.
+	// Ensure helpModel is initialized here if it wasn't with the first table block.
+	// Re-checking... helpModel should be initialized after inputs and before m.
+	helpModel := help.New() // This is the single, correct initialization for helpModel
 	helpModel.Width = width // Initial width
 
 	// Estilos básicos (idealmente de um pacote de tema ou tui)
@@ -174,17 +163,17 @@ func New(ls service.LessonService, cs service.ClassService, initialUserID int64,
 		planContentInput: planContentInput,
 		scheduledAtInput: scheduledAtInput,
 		// formFocusOrder will be set next
-		focusedIndex:     0,
-		isLoading:        true, // Começa carregando
-		help:             helpModel,
-		keyMap:           DefaultKeyMap(),
-		width:            width,
-		height:           height,
-		classCache:       make(map[int64]string),
-		listHeaderStyle:  listHeaderStyle,
-		errorStyle:       errorStyle,
-		successStyle:     successStyle,
-		helpStyle:        helpStyle,
+		focusedIndex:    0,
+		isLoading:       true, // Começa carregando
+		help:            helpModel,
+		keyMap:          DefaultKeyMap(),
+		width:           width,
+		height:          height,
+		classCache:      make(map[int64]string),
+		listHeaderStyle: listHeaderStyle,
+		errorStyle:      errorStyle,
+		successStyle:    successStyle,
+		helpStyle:       helpStyle,
 	}
 
 	// --- Initialize formFocusOrder using pointers to m's fields ---
@@ -261,9 +250,9 @@ func fetchLessonsCmd(service service.LessonService, userID int64, classID *int64
 			// Simulação: Usar GetLessonsForDate com um range amplo.
 			// Esta não é uma solução ideal, mas demonstra o uso do serviço.
 			// Um método dedicado no serviço seria melhor.
-	// startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC) // endDate was unused. startDate also unused with current logic.
-	// endDate := time.Date(2070, 1, 1, 0, 0, 0, 0, time.UTC) // Unused
-	// lessons, err = service.GetLessonsForDate(ctx, userID, today) // This line was problematic and is removed/handled by the else block
+			// startDate := time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC) // endDate was unused. startDate also unused with current logic.
+			// endDate := time.Date(2070, 1, 1, 0, 0, 0, 0, time.UTC) // Unused
+			// lessons, err = service.GetLessonsForDate(ctx, userID, today) // This line was problematic and is removed/handled by the else block
 			// Para um range, o repo tem GetLessonsByDateRange.
 			// O serviço precisa expor isso.
 			// Assumindo que LessonService é atualizado para ter GetLessonsByDateRange(ctx, userID, startDate, endDate)
