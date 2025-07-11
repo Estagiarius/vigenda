@@ -1,110 +1,85 @@
-// Package main é o ponto de entrada da aplicação Vigenda.
-// Ele configura a CLI usando o pacote Cobra, inicializa serviços,
-// e gerencia o ciclo de vida da aplicação, incluindo logging e conexão com banco de dados.
-// Se nenhum subcomando for fornecido, a TUI principal (gerenciada por internal/app) é iniciada.
+// Package main is the entry point of the Vigenda application.
+// It handles the main function and Cobra CLI configuration.
 package main
 
 import (
 	"context"
 	"database/sql"
-	"encoding/json" // Adicionado para exibir opções de questões de múltipla escolha.
+	"encoding/json" // Added missing import
 	"fmt"
-	"log" // Usado para logging em arquivo.
+	"log" // Adicionado para logging
 	"os"
-	"path/filepath" // Para manipulação de caminhos de arquivo para logging.
+	"path/filepath" // Adicionado para manipulação de caminhos de arquivo
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/table" // Usado para formatação de tabelas na CLI.
-	"github.com/spf13/cobra"                // Framework CLI.
-	"vigenda/internal/app"                  // Pacote da TUI principal.
-	"vigenda/internal/database"             // Pacote de configuração e conexão com DB.
-	"vigenda/internal/models"               // Structs de modelo do domínio.
-	"vigenda/internal/repository"           // Interfaces e implementações de repositório.
-	"vigenda/internal/service"              // Interfaces e implementações de serviço.
-	"vigenda/internal/tui"                  // Componentes TUI reutilizáveis (ex: prompt).
+	"github.com/charmbracelet/bubbles/table" // Reativado para columns e rows
+	"github.com/spf13/cobra"
+	"vigenda/internal/app" // Import for the new BubbleTea app
+	"vigenda/internal/database"
+	"vigenda/internal/models" // Added import for models package
+	"vigenda/internal/repository"
+	"vigenda/internal/service"
+	"vigenda/internal/tui"
 )
 
-// db é a conexão global com o banco de dados, inicializada em PersistentPreRunE.
-var db *sql.DB
+var db *sql.DB // Global database connection pool
+var logFile *os.File // Global para o arquivo de log, para poder fechar no final
 
-// logFile é o descritor de arquivo para o arquivo de log global.
-// É necessário para fechar o arquivo corretamente no final da execução da aplicação.
-var logFile *os.File
+var taskService service.TaskService
+var classService service.ClassService
+var assessmentService service.AssessmentService
+var questionService service.QuestionService
+var proofService service.ProofService
 
-// Variáveis globais para os serviços da aplicação.
-// São inicializadas em PersistentPreRunE após a conexão com o banco de dados ser estabelecida.
-// Esta abordagem com variáveis globais para serviços é comum em CLIs simples com Cobra,
-// mas para aplicações maiores ou mais complexas, a injeção de dependência via construtores
-// para os comandos Cobra (se possível) ou um container de DI seriam alternativas.
-var (
-	taskService       service.TaskService
-	classService      service.ClassService
-	assessmentService service.AssessmentService
-	questionService   service.QuestionService
-	proofService      service.ProofService
-	// lessonService é declarado separadamente abaixo devido à ordem de inicialização.
-)
-
-// rootCmd é o comando raiz da aplicação Vigenda.
-// Quando executado sem subcomandos, ele inicia a Interface de Texto do Usuário (TUI).
-// PersistentPreRunE é usado para inicializar o logging, a conexão com o banco de dados
-// e os serviços antes da execução de qualquer comando (incluindo o Run do rootCmd ou subcomandos).
 var rootCmd = &cobra.Command{
 	Use:   "vigenda",
-	Short: "Vigenda é uma CLI para auxiliar na gestão de atividades acadêmicas.",
-	Long: `Vigenda é uma aplicação de linha de comando (CLI) com uma robusta Interface de Texto do Usuário (TUI),
-projetada para ajudar professores e estudantes a organizar tarefas, aulas, avaliações e outras
+	Short: "Vigenda é uma ferramenta CLI para auxiliar professores na gestão de suas atividades.",
+	Long: `Vigenda é uma aplicação de linha de comando (CLI) projetada para ajudar professores,
+especialmente aqueles com TDAH, a organizar tarefas, aulas, avaliações e outras
 atividades pedagógicas de forma eficiente.
 
-A principal forma de interação é através da TUI, iniciada executando 'vigenda' sem subcomandos.
-Subcomandos CLI também estão disponíveis para acesso direto a funcionalidades específicas.
-
-Funcionalidades Principais (acessíveis majoritariamente via TUI):
-  - Painel de Controle: Visão geral da agenda, tarefas urgentes e notificações.
+Funcionalidades Principais:
+  - Dashboard: Visão geral da agenda do dia, tarefas urgentes e notificações.
   - Gestão de Tarefas: Crie, liste e marque tarefas como concluídas.
-  - Gestão de Disciplinas e Turmas: Administre disciplinas, turmas e alunos.
-  - Gestão de Aulas: Planeje e visualize aulas.
+  - Gestão de Turmas: Administre turmas, alunos (incluindo importação) e seus status.
   - Gestão de Avaliações: Crie avaliações, lance notas e calcule médias.
-  - Banco de Questões e Geração de Provas: Mantenha um banco de questões e gere provas.
-  - Ferramentas de Produtividade: Como sessões de foco (funcionalidade futura).
+  - Banco de Questões: Mantenha um banco de questões e gere provas.
 
-Use "vigenda [comando] --help" para mais informações sobre um subcomando específico.`,
+Use "vigenda [comando] --help" para mais informações sobre um comando específico.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		// Inicia a aplicação TUI principal.
-		// PersistentPreRunE garante que todos os serviços necessários já foram inicializados.
-		// Os serviços são passados para a TUI para que ela possa interagir com a lógica de negócios.
+		// Launch the BubbleTea application
+		// PersistentPreRunE ensures all necessary services are initialized.
+		// Pass the initialized services to the TUI application.
 		app.StartApp(taskService, classService, assessmentService, questionService, proofService, lessonService)
 	},
-	// PersistentPreRunE é executado antes do Run de qualquer comando (rootCmd ou subcomandos).
-	// É usado aqui para garantir que o logging e a conexão com o banco de dados,
-	// bem como a inicialização dos serviços, ocorram uma única vez.
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// Configura o logging para arquivo.
-		// Se falhar, um aviso é impresso no stderr, mas a aplicação tenta continuar.
+		// Setup logging to file first
 		if err := setupLogging(); err != nil {
-			fmt.Fprintf(os.Stderr, "AVISO: Falha ao configurar o logging para arquivo: %v. Logando para stderr.\n", err)
+			// Se não conseguir configurar o log, ainda tenta continuar, mas loga no stderr.
+			// Ou pode-se decidir que é um erro fatal: return fmt.Errorf("failed to setup logging: %w", err)
+			fmt.Fprintf(os.Stderr, "Warning: failed to setup file logging: %v. Logging to stderr.\n", err)
 		}
 
-		// Inicializa a conexão com o banco de dados e os serviços, se ainda não o foram.
-		if db == nil { // Garante a inicialização única.
-			// Determina a configuração do banco de dados com base em variáveis de ambiente.
-			// Prioriza VIGENDA_DB_DSN, depois VIGENDA_DB_TYPE, e então variáveis específicas
-			// como VIGENDA_DB_PATH (para SQLite) ou VIGENDA_DB_HOST/USER/etc. (para PostgreSQL).
+		// This function will run before any command, ensuring DB is initialized.
+		if db == nil { // Initialize only once
 			dbType := os.Getenv("VIGENDA_DB_TYPE")
-			dbDSN := os.Getenv("VIGENDA_DB_DSN")
+			dbDSN := os.Getenv("VIGENDA_DB_DSN") // Generic DSN
 
+			// Specific environment variables for constructing DSN if VIGENDA_DB_DSN is not set
 			dbHost := os.Getenv("VIGENDA_DB_HOST")
 			dbPort := os.Getenv("VIGENDA_DB_PORT")
 			dbUser := os.Getenv("VIGENDA_DB_USER")
 			dbPassword := os.Getenv("VIGENDA_DB_PASSWORD")
 			dbName := os.Getenv("VIGENDA_DB_NAME")
-			dbSSLMode := os.Getenv("VIGENDA_DB_SSLMODE")
+			dbSSLMode := os.Getenv("VIGENDA_DB_SSLMODE") // Primarily for PostgreSQL
 
-			config := database.DBConfig{}
+			// Use the non-conflicting DBConfig type from connection.go
+			config := database.DBConfig{} // This should refer to database.DBConfig from connection.go
+
 			if dbType == "" {
-				dbType = "sqlite" // Padrão para SQLite.
+				dbType = "sqlite" // Default to SQLite
 			}
 			config.DBType = dbType
 
@@ -113,9 +88,11 @@ Use "vigenda [comando] --help" para mais informações sobre um subcomando espec
 				if dbDSN != "" {
 					config.DSN = dbDSN
 				} else {
+					// VIGENDA_DB_PATH is specific to SQLite if VIGENDA_DB_DSN is not used
 					sqlitePath := os.Getenv("VIGENDA_DB_PATH")
 					if sqlitePath == "" {
-						sqlitePath = database.DefaultSQLitePath() // Caminho padrão definido em internal/database.
+						// Use the non-conflicting DefaultSQLitePath from connection.go
+						sqlitePath = database.DefaultSQLitePath()
 					}
 					config.DSN = sqlitePath
 				}
@@ -123,73 +100,64 @@ Use "vigenda [comando] --help" para mais informações sobre um subcomando espec
 				if dbDSN != "" {
 					config.DSN = dbDSN
 				} else {
-					// Constrói DSN para PostgreSQL a partir de variáveis de ambiente individuais.
-					// Validações para campos obrigatórios (usuário, nome do banco) são feitas.
+					// Construct PostgreSQL DSN from individual parts
 					if dbHost == "" {
-						dbHost = "localhost"
+						dbHost = "localhost" // Default host
 					}
 					if dbPort == "" {
-						dbPort = "5432"
+						dbPort = "5432" // Default PostgreSQL port
 					}
 					if dbUser == "" {
-						return fmt.Errorf("VIGENDA_DB_USER deve ser definida para conexão PostgreSQL")
+						// User must be provided for PostgreSQL typically
+						return fmt.Errorf("VIGENDA_DB_USER must be set for PostgreSQL connection")
 					}
 					if dbName == "" {
-						return fmt.Errorf("VIGENDA_DB_NAME deve ser definida para conexão PostgreSQL")
+						// DB Name must be provided
+						return fmt.Errorf("VIGENDA_DB_NAME must be set for PostgreSQL connection")
 					}
 					if dbSSLMode == "" {
-						dbSSLMode = "disable" // Padrão SSLMode.
+						dbSSLMode = "disable" // Default SSLMode
 					}
+					// Password can be empty if auth method allows (e.g. peer auth)
+					// Note: Real applications should handle password securely (e.g. from secrets manager)
 					config.DSN = fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 						dbHost, dbPort, dbUser, dbPassword, dbName, dbSSLMode)
 				}
 			default:
-				return fmt.Errorf("tipo de banco de dados não suportado VIGENDA_DB_TYPE: %s. Tipos suportados: 'sqlite', 'postgres'", dbType)
+				return fmt.Errorf("unsupported VIGENDA_DB_TYPE: %s. Supported types are 'sqlite', 'postgres'", dbType)
 			}
 
 			var err error
-			db, err = database.GetDBConnection(config) // Obtém a conexão com o DB.
+			// Use the non-conflicting GetDBConnection from connection.go
+			db, err = database.GetDBConnection(config)
 			if err != nil {
-				// Loga o erro fatal, pois a aplicação não pode funcionar sem DB.
-				// O log irá para o arquivo, se configurado, e para stderr.
-				log.Fatalf("CRÍTICO: Falha ao inicializar o banco de dados (tipo: %s): %v", config.DBType, err)
-				// return fmt.Errorf(...) // log.Fatalf já encerra a aplicação.
+				return fmt.Errorf("failed to initialize database (type: %s): %w", config.DBType, err)
 			}
-			initializeServices(db) // Inicializa todos os serviços da aplicação.
+			// Initialize services here, after DB is ready
+			initializeServices(db)
 		}
 		return nil
 	},
 }
 
-// taskCmd é o comando pai para todas as operações relacionadas a tarefas.
-// Ele agrupa subcomandos como 'add', 'listar', 'complete'.
 var taskCmd = &cobra.Command{
 	Use:   "tarefa",
 	Short: "Gerencia tarefas (add, listar, complete)",
-	Long: `O comando 'tarefa' permite gerenciar todas as suas atividades e pendências.
-Você pode adicionar novas tarefas, listar tarefas existentes (filtrando por turma ou todas)
-e marcar tarefas como concluídas. Muitas dessas funcionalidades também estão disponíveis
-de forma mais interativa através da TUI principal (executando 'vigenda' sem subcomandos).`,
+	Long:  `O comando 'tarefa' permite gerenciar todas as suas atividades e pendências. Você pode adicionar novas tarefas, listar tarefas existentes (filtrando por turma) e marcar tarefas como concluídas.`,
 	Example: `  vigenda tarefa add "Preparar aula de Revolução Francesa" --classid 1 --duedate 2024-07-15
   vigenda tarefa listar --classid 1
-  vigenda tarefa listar --all
   vigenda tarefa complete 5`,
 }
 
-// taskAddCmd define o subcomando 'vigenda tarefa add'.
-// Permite adicionar uma nova tarefa com título, descrição opcional, ID de turma e data de vencimento.
-// Se a descrição não for fornecida via flag, e a entrada for um TTY, ela será solicitada interativamente.
 var taskAddCmd = &cobra.Command{
 	Use:   "add [título]",
 	Short: "Adiciona uma nova tarefa",
 	Long: `Adiciona uma nova tarefa ao sistema.
-O título da tarefa é obrigatório.
-Você pode fornecer uma descrição detalhada, associar a tarefa a uma turma específica (usando --classid)
-e definir um prazo de conclusão (usando --duedate no formato AAAA-MM-DD).
-Se a descrição não for fornecida pela flag --description, ela será solicitada interativamente.`,
+Você pode fornecer uma descrição detalhada, associar a tarefa a uma turma específica
+e definir um prazo de conclusão utilizando as flags correspondentes.`,
 	Example: `  vigenda tarefa add "Corrigir provas bimestrais" --description "Corrigir as provas do 2º bimestre da turma 9A." --classid 1 --duedate 2024-07-20
   vigenda tarefa add "Planejar próxima unidade" --duedate 2024-08-01`,
-	Args:  cobra.ExactArgs(1), // Requer exatamente um argumento (o título da tarefa).
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		title := args[0]
 		description, _ := cmd.Flags().GetString("description")
@@ -200,7 +168,7 @@ Se a descrição não for fornecida pela flag --description, ela será solicitad
 		if classIDStr != "" {
 			cid, err := strconv.ParseInt(classIDStr, 10, 64)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Erro ao parsear ID da turma: %v\n", err)
+				fmt.Println("Error parsing class ID:", err)
 				return
 			}
 			classID = &cid
@@ -208,58 +176,42 @@ Se a descrição não for fornecida pela flag --description, ela será solicitad
 
 		var dueDate *time.Time
 		if dueDateStr != "" {
-			parsedDate, err := time.Parse("2006-01-02", dueDateStr) // Formato AAAA-MM-DD.
+			parsedDate, err := time.Parse("2006-01-02", dueDateStr)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Erro ao parsear data de conclusão (use o formato AAAA-MM-DD): %v\n", err)
+				fmt.Println("Error parsing due date (use YYYY-MM-DD format):", err)
 				return
 			}
 			dueDate = &parsedDate
 		}
 
-		// Se a descrição não foi fornecida via flag, tenta obter interativamente.
 		if description == "" {
-			// Utiliza tui.GetInput, que lida com TTY e entrada redirecionada.
-			desc, err := tui.GetInput("Digite a descrição da tarefa (opcional):", os.Stdout, os.Stdin)
+			desc, err := tui.GetInput("Enter task description (optional):", os.Stdout, os.Stdin)
 			if err != nil {
-				// Se GetInput retornar erro (ex: usuário cancelou), não prossegue.
-				// Não é necessariamente um erro fatal para a aplicação, apenas para este comando.
-				fmt.Fprintf(os.Stderr, "Falha ao obter descrição: %v\n", err)
-				// Decide-se não prosseguir se a obtenção interativa falhar ou for cancelada.
-				// Alternativamente, poderia prosseguir com descrição vazia se o erro não for crítico.
-				// return // Comentado para permitir criação de tarefa sem descrição se o prompt falhar.
+				fmt.Println("Error getting description:", err)
+				// Decide if we should proceed or return
 			}
-			description = desc // Usa a descrição obtida, que pode ser vazia se o usuário não digitou nada.
+			description = desc
 		}
 
-		// Chama o serviço para criar a tarefa.
-		// O UserID é gerenciado internamente pelo serviço (atualmente fixo, mas deveria vir do contexto de auth).
 		task, err := taskService.CreateTask(context.Background(), title, description, classID, dueDate)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao criar tarefa: %v\n", err)
-			log.Printf("ERRO CMD: Falha ao criar tarefa '%s': %v", title, err) // Loga o erro também.
+			fmt.Println("Error creating task:", err)
 			return
 		}
-		fmt.Printf("Tarefa '%s' (ID: %d) criada com sucesso.\n", task.Title, task.ID)
-		log.Printf("INFO CMD: Tarefa '%s' (ID: %d) criada.", task.Title, task.ID)
+		fmt.Printf("Task '%s' (ID: %d) created successfully.\n", task.Title, task.ID)
 	},
 }
 
-// taskListCmd define o subcomando 'vigenda tarefa listar'.
-// Lista tarefas ativas. Requer a flag --classid para filtrar por turma ou --all para listar todas as tarefas.
-// A saída é formatada como uma tabela simples no console.
 var taskListCmd = &cobra.Command{
 	Use:   "listar",
 	Short: "Lista tarefas ativas",
-	Long:  `Lista tarefas ativas.
-Use a flag --classid para filtrar tarefas de uma turma específica.
-Use a flag --all para listar todas as tarefas ativas de todas as turmas e tarefas do sistema (bugs).
-Uma dessas duas flags (--classid ou --all) é obrigatória.`,
+	Long:  `Lista todas as tarefas ativas. É obrigatório filtrar as tarefas por um ID de turma específico usando a flag --classid.`,
 	Example: `  vigenda tarefa listar --classid 1
-  vigenda tarefa listar --all`,
+  vigenda tarefa listar --classid 3`,
 	Run: func(cmd *cobra.Command, args []string) {
 		classIDStr, _ := cmd.Flags().GetString("classid")
-		showAllStr, _ := cmd.Flags().GetString("all")
-		showAll, _ := strconv.ParseBool(showAllStr) // Converte para booleano, erro é ignorado (false por padrão).
+		showAllStr, _ := cmd.Flags().GetString("all") // Check for the --all flag
+		showAll := showAllStr == "true" // Convert to boolean
 
 		var tasks []models.Task
 		var err error
@@ -268,54 +220,66 @@ Uma dessas duas flags (--classid ou --all) é obrigatória.`,
 		if classIDStr != "" {
 			classID, parseErr := strconv.ParseInt(classIDStr, 10, 64)
 			if parseErr != nil {
-				fmt.Fprintf(os.Stderr, "Erro ao parsear ID da turma: %v\n", parseErr)
+				fmt.Println("Error parsing class ID:", parseErr)
 				return
 			}
-			// Lista tarefas ativas para a turma especificada.
 			tasks, err = taskService.ListActiveTasksByClass(context.Background(), classID)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Erro ao listar tarefas da turma: %v\n", err)
-				log.Printf("ERRO CMD: Falha ao listar tarefas da turma %d: %v", classID, err)
+				fmt.Println("Error listing tasks:", err)
 				return
 			}
-			// Tenta obter o nome da turma para o cabeçalho.
 			class, classErr := classService.GetClassByID(context.Background(), classID)
 			if classErr == nil && class.ID != 0 {
-				headerMsg = fmt.Sprintf("TAREFAS ATIVAS PARA: %s (ID: %d)", class.Name, classID)
+				headerMsg = fmt.Sprintf("TAREFAS PARA: %s", class.Name) // Restaurado
 			} else {
-				headerMsg = fmt.Sprintf("TAREFAS ATIVAS PARA: Turma ID %d", classID)
+				headerMsg = fmt.Sprintf("TAREFAS PARA: Class ID %d", classID) // Restaurado
 			}
 		} else if showAll {
-			// Lista todas as tarefas ativas (incluindo de sistema/bugs).
-			tasks, err = taskService.ListAllActiveTasks(context.Background())
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Erro ao listar todas as tarefas ativas: %v\n", err)
-				log.Printf("ERRO CMD: Falha ao listar todas as tarefas ativas: %v", err)
+			// This part needs a new service method: ListAllActiveTasks (or similar)
+			// For now, let's assume such a method exists or we adapt.
+			// taskService.ListAllActiveTasks() would be ideal.
+			// As a placeholder, we'll log that it's not fully supported yet without a classID unless a new service method is added.
+			// However, the goal is to list *all* tasks, including bug tasks (which have nil classID).
+			// So, we need a service method that fetches tasks with classID IS NULL OR classID = ? (if provided).
+			// For now, to list bug tasks, we can simulate by calling ListActiveTasksByClass with a non-existent classID
+			// if the repository's GetTasksByClassID is adapted or a new ListTasks(filter) method is made.
+			// The current ListActiveTasksByClass filters by a *specific* class ID.
+			// To list system/bug tasks (nil ClassID), we need a new service method.
+			// Let's add a conceptual ListAllTasks to TaskService and its stub.
+			// For this step, we'll assume taskService.ListAllTasks() exists and fetches all tasks.
+			// If not, we'll need to add it in a subsequent step.
+			// For now, let's call ListActiveTasksByClass with a dummy ID that might be handled by a more flexible repo.
+			// This is a simplification for now. A proper implementation needs ListAllTasks in service and repo.
+			// tasks, err = taskService.ListActiveTasksByClass(context.Background(), 0) // Assuming 0 or a special value might mean "all" or "no specific class"
+			tasks, err = taskService.ListAllActiveTasks(context.Background()) // Use the new method
+			// A better approach would be a new method: taskService.ListTasks(ctx context.Context, filter TaskFilter)
+			// where filter could specify ClassID (optional) and IsCompleted (optional).
+			// For now, we'll just say "All Tasks"
+			if err != nil { // No longer need to check for "not found" as ListAllActiveTasks doesn't depend on a classID
+				fmt.Println("Error listing all tasks:", err)
 				return
 			}
-			headerMsg = "TODAS AS TAREFAS ATIVAS (INCLUINDO BUGS DO SISTEMA)"
+			headerMsg = "TODAS AS TAREFAS (INCLUINDO BUGS DO SISTEMA)" // Restaurado
 		} else {
-			// Nenhuma flag válida fornecida.
-			fmt.Fprintln(os.Stderr, "Erro: Especifique --classid <ID> para listar tarefas de uma turma OU use --all para listar todas as tarefas ativas.")
-			fmt.Fprintln(os.Stderr, "Exemplo: vigenda tarefa listar --classid 1")
-			fmt.Fprintln(os.Stderr, "Exemplo: vigenda tarefa listar --all")
+			fmt.Println("Erro: Especifique --classid OU use --all para listar todas as tarefas (incluindo bugs).")
+			fmt.Println("Exemplo: vigenda tarefa listar --classid 1")
+			fmt.Println("Exemplo: vigenda tarefa listar --all")
 			return
 		}
+
 
 		if len(tasks) == 0 {
-			fmt.Println("Nenhuma tarefa ativa encontrada para os critérios fornecidos.")
+			fmt.Println("No active tasks found matching criteria.")
 			return
 		}
 
-		fmt.Printf("\n%s\n\n", headerMsg) // Adiciona nova linha antes do cabeçalho.
+		fmt.Printf("%s\n\n", headerMsg) // Restaurado \n\n para espaço antes da tabela
 
-		// Define colunas para a tabela de saída.
+		// Reativar a definição de colunas e o preenchimento de rows
 		columns := []table.Column{
-			{Title: "ID", Width: 4},
-			{Title: "TAREFA (TÍTULO)", Width: 40},
-			{Title: "DESCRIÇÃO", Width: 50},
-			{Title: "PRAZO", Width: 12},
-			{Title: "TURMA ID", Width: 10},
+			{Title: "ID", Width: 3},
+			{Title: "TAREFA", Width: 35},
+			{Title: "PRAZO", Width: 10},
 		}
 		var rows []table.Row
 		for _, task := range tasks {
@@ -323,146 +287,118 @@ Uma dessas duas flags (--classid ou --all) é obrigatória.`,
 			if task.DueDate != nil {
 				dueDateStr = task.DueDate.Format("02/01/2006")
 			}
-			classIDDisplay := "N/A"
-			if task.ClassID != nil {
-				classIDDisplay = fmt.Sprintf("%d", *task.ClassID)
-			}
 			rows = append(rows, table.Row{
 				fmt.Sprintf("%d", task.ID),
 				task.Title,
-				task.Description, // Adicionada coluna de descrição
 				dueDateStr,
-				classIDDisplay,
 			})
 		}
 
-		// Imprime a tabela manualmente para melhor controle de formatação e sem dependência de tui.ShowTable aqui.
-		// Imprime cabeçalho.
-		for i, col := range columns {
-			fmt.Printf("%-*s", col.Width+2, col.Title) // +2 para padding e separador "|"
-			if i < len(columns)-1 {
-				fmt.Print("| ")
-			}
-		}
-		fmt.Println()
-		// Imprime linha separadora.
-		for i, col := range columns {
-			fmt.Printf("%s", strings.Repeat("-", col.Width+2))
-			if i < len(columns)-1 {
-				fmt.Print("+-"); // Separador mais robusto
-			}
-		}
-		fmt.Println()
-		// Imprime linhas de dados.
+		// Reativar impressão manual da tabela
+		fmt.Printf("%-*s | %-*s | %s\n", columns[0].Width, columns[0].Title, columns[1].Width, columns[1].Title, columns[2].Title)
+		fmt.Printf("%s | %s | %s\n", strings.Repeat("-", columns[0].Width), strings.Repeat("-", columns[1].Width), strings.Repeat("-", columns[2].Width))
 		for _, row := range rows {
-			for i, cell := range row {
-				// Trunca células se excederem a largura da coluna para evitar quebra de layout.
-				content := fmt.Sprintf("%s", cell)
-				if len(content) > columns[i].Width {
-					content = content[:columns[i].Width-3] + "..."
-				}
-				fmt.Printf("%-*s", columns[i].Width+2, content)
-				if i < len(columns)-1 {
-					fmt.Print("| ")
-				}
-			}
-			fmt.Println()
+			fmt.Printf("%-*s | %-*s | %s\n", columns[0].Width, row[0], columns[1].Width, row[1], row[2])
 		}
 	},
 }
 
-// taskCompleteCmd define o subcomando 'vigenda tarefa complete'.
-// Marca uma tarefa existente como concluída usando seu ID.
 var taskCompleteCmd = &cobra.Command{
-	Use:     "complete [ID_da_tarefa]",
-	Short:   "Marca uma tarefa como concluída",
-	Long:    `Marca uma tarefa específica como concluída, utilizando o seu ID numérico.`,
-	Example: `  vigenda tarefa complete 12`,
-	Args:    cobra.ExactArgs(1), // Requer exatamente um argumento (ID da tarefa).
+	Use:   "complete [ID_da_tarefa]",
+	Short: "Marca uma tarefa como concluída",
+	Long:  `Marca uma tarefa específica como concluída, utilizando o seu ID numérico.`,
+	Example: `  vigenda tarefa complete 12
+  vigenda tarefa complete 3`,
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		taskID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao parsear ID da tarefa: %v\n", err)
+			fmt.Println("Error parsing task ID:", err)
 			return
 		}
 		err = taskService.MarkTaskAsCompleted(context.Background(), taskID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao marcar tarefa como concluída: %v\n", err)
-			log.Printf("ERRO CMD: Falha ao completar tarefa ID %d: %v", taskID, err)
+			fmt.Println("Error marking task as completed:", err)
 			return
 		}
-		fmt.Printf("Tarefa ID %d marcada como concluída.\n", taskID)
-		log.Printf("INFO CMD: Tarefa ID %d completada.", taskID)
+		fmt.Printf("Task ID %d marked as completed.\n", taskID)
 	},
 }
 
-// initializeServices configura as instâncias dos serviços da aplicação,
-// injetando as dependências de repositório necessárias.
-// É chamada após a conexão com o banco de dados ser estabelecida.
+// initializeServices sets up the service layer instances with their repository dependencies.
 func initializeServices(db *sql.DB) {
-	// Inicializa os repositórios concretos com a conexão db.
+	// Initialize real repositories with the db connection
 	taskRepo := repository.NewTaskRepository(db)
 	classRepo := repository.NewClassRepository(db)
 	assessmentRepo := repository.NewAssessmentRepository(db)
 	questionRepo := repository.NewQuestionRepository(db)
-	subjectRepo := repository.NewSubjectRepository(db) // Assumindo que existe e é necessário.
-	lessonRepo := repository.NewLessonRepository(db)   // Assumindo que existe.
+	subjectRepo := repository.NewSubjectRepository(db)
 
-	// Inicializa os serviços com suas implementações de repositório.
+	// Initialize services with real repository implementations
 	taskService = service.NewTaskService(taskRepo)
-	classService = service.NewClassService(classRepo, subjectRepo) // SubjectRepo pode ser necessário para validações.
-	assessmentService = service.NewAssessmentService(assessmentRepo, classRepo) // ClassRepo pode ser usado para buscar alunos.
+	// Assuming NewClassService, NewAssessmentService exist or will be created.
+	// If they use stubs for now or are basic passthroughs, that's fine.
+	// For now, let's assume they can take the real repos.
+	// If NewStubClassService was a placeholder for NewClassService:
+	classService = service.NewClassService(classRepo, subjectRepo) // Assuming ClassService might need SubjectRepo too, or just ClassRepo
+	assessmentService = service.NewAssessmentService(assessmentRepo, classRepo) // AssessmentService might need ClassRepo to get students
+
 	questionService = service.NewQuestionService(questionRepo, subjectRepo)
-	proofService = service.NewProofService(questionRepo)
-	lessonService = service.NewLessonService(lessonRepo, classRepo) // ClassRepo para validação de propriedade da turma.
-	log.Println("INFO CMD: Todos os serviços foram inicializados.")
+	proofService = service.NewProofService(questionRepo) // ProofService uses QuestionRepository for GetQuestionsByCriteriaProofGeneration
+
+	// Initialize LessonService
+	lessonRepo := repository.NewLessonRepository(db)
+	// LessonService precisa do ClassRepository para validação de propriedade da turma
+	lessonService = service.NewLessonService(lessonRepo, classRepo)
 }
 
-// lessonService é uma variável global para o serviço de aulas,
-// declarada separadamente para ser acessível pelo Run do rootCmd
-// ao iniciar a TUI principal.
+// Variável global para LessonService para ser acessível pelo rootCmd.Run e app.StartApp
 var lessonService service.LessonService
 
-// init configura todos os comandos e flags da CLI usando Cobra.
-// Esta função é chamada automaticamente pelo Go na inicialização do pacote.
 func init() {
-	// Configuração das flags para 'tarefa add'.
+	// Cobra command definitions and flag setups remain in init()
+
+	// Setup flags for task add command
 	taskAddCmd.Flags().StringP("description", "d", "", "Descrição detalhada da tarefa.")
 	taskAddCmd.Flags().String("classid", "", "ID da turma para associar a tarefa (opcional).")
-	taskAddCmd.Flags().String("duedate", "", "Data de conclusão da tarefa no formato AAAA-MM-DD (opcional).")
+	taskAddCmd.Flags().String("duedate", "", "Data de conclusão da tarefa no formato YYYY-MM-DD (opcional).")
 
-	// Configuração das flags para 'tarefa listar'.
+	// Setup flags for task list command
+	//taskListCmd.Flags().String("classid", "", "ID da turma para filtrar as tarefas (obrigatório).")
+	//_ = taskListCmd.MarkFlagRequired("classid") // No longer strictly mandatory if --all is used.
 	taskListCmd.Flags().String("classid", "", "ID da turma para filtrar as tarefas.")
-	taskListCmd.Flags().Bool("all", false, "Listar todas as tarefas ativas (ignora --classid se presente).")
+	taskListCmd.Flags().String("all", "false", "Listar todas as tarefas, incluindo tarefas de sistema/bugs (ignora --classid se presente).")
 
-	// Adiciona subcomandos ao comando 'tarefa'.
+
 	taskCmd.AddCommand(taskAddCmd, taskListCmd, taskCompleteCmd)
-	// Adiciona o comando 'tarefa' ao comando raiz.
 	rootCmd.AddCommand(taskCmd)
 
-	// Configuração e adição do comando 'turma' e seus subcomandos.
-	// O comando 'turma criar' foi removido da CLI, pois a criação de turmas
-	// agora é primariamente feita via TUI principal.
+	// Class Service Commands
+	// classCreateCmd foi removido pois a criação de turmas agora é feita via TUI.
+	// Mantemos os comandos de importar alunos e atualizar status.
+	// Se classCreateCmd tivesse flags específicas que ainda são relevantes para outros comandos de turma,
+	// essas flags precisariam ser gerenciadas ou removidas cuidadosamente.
+	// Neste caso, subjectid era específico para classCreateCmd.
+
 	classCmd.AddCommand(classImportStudentsCmd, classUpdateStudentStatusCmd)
 	rootCmd.AddCommand(classCmd)
 
-	// Configuração das flags para 'avaliacao criar'.
+	// Assessment Service Commands
 	assessmentCreateCmd.Flags().String("classid", "", "ID da turma para a qual a avaliação será criada (obrigatório).")
-	_ = assessmentCreateCmd.MarkFlagRequired("classid") // Marca a flag como obrigatória.
+	_ = assessmentCreateCmd.MarkFlagRequired("classid")
 	assessmentCreateCmd.Flags().String("term", "", "Período/bimestre da avaliação (ex: 1, 2) (obrigatório).")
 	_ = assessmentCreateCmd.MarkFlagRequired("term")
 	assessmentCreateCmd.Flags().String("weight", "", "Peso da avaliação na média final (ex: 4.0) (obrigatório).")
 	_ = assessmentCreateCmd.MarkFlagRequired("weight")
 
-	// Adiciona subcomandos ao comando 'avaliacao'.
 	assessmentCmd.AddCommand(assessmentCreateCmd, assessmentEnterGradesCmd, assessmentClassAverageCmd)
 	rootCmd.AddCommand(assessmentCmd)
 
-	// Configuração e adição do comando 'bancoq' (banco de questões).
+	// Question Service (bancoq) initialization and commands
 	questionBankCmd.AddCommand(questionBankAddCmd)
 	rootCmd.AddCommand(questionBankCmd)
 
-	// Configuração das flags e adição do comando 'prova'.
+	// Proof Service (prova) initialization and commands
 	proofGenerateCmd.Flags().String("subjectid", "", "ID da disciplina para gerar a prova (obrigatório).")
 	_ = proofGenerateCmd.MarkFlagRequired("subjectid")
 	proofGenerateCmd.Flags().String("topic", "", "Tópico específico para filtrar questões (opcional).")
@@ -473,389 +409,374 @@ func init() {
 	rootCmd.AddCommand(proofCmd)
 }
 
-// setupLogging configura o sistema de logging para escrever em um arquivo.
-// O arquivo de log é nomeado 'vigenda.log' e é colocado no diretório de configuração
-// do usuário (ex: ~/.config/vigenda/ no Linux) ou no diretório de trabalho atual
-// como fallback.
-// Retorna um erro se a configuração do log falhar.
+// setupLogging configura o logging para um arquivo.
 func setupLogging() error {
 	logDir := ""
+	// Tentar usar o diretório de configuração do usuário
 	userConfigDir, err := os.UserConfigDir()
 	if err == nil {
 		logDir = filepath.Join(userConfigDir, "vigenda")
 	} else {
-		// Se não conseguir obter o diretório de config do usuário, tenta o diretório atual.
+		// Fallback para o diretório atual se não conseguir obter o diretório de config
 		cwd, errCwd := os.Getwd()
 		if errCwd == nil {
-			logDir = cwd // Usa o diretório atual como logDir.
+			logDir = cwd
 		} else {
-			// Em caso de falha total em determinar um diretório, loga um aviso.
-			// O log ainda será configurado para stderr pelo pacote log padrão.
-			log.Printf("AVISO: Não foi possível determinar o diretório de configuração do usuário ou o diretório de trabalho atual para logs. Tentando logar no diretório atual se possível, ou stderr.")
-			// Não retorna erro aqui, pois o log padrão para stderr ainda funcionará.
+			// Se tudo falhar, não será possível criar um subdiretório de forma confiável
+			// Então apenas tentaremos criar o log no diretório atual.
+			log.Println("Warning: Could not determine user config directory or current working directory for logs. Attempting to log in current directory.")
 		}
 	}
 
-	// Se um logDir foi determinado (mesmo que seja o diretório atual),
-	// tenta criar o subdiretório 'vigenda' se não for o diretório atual direto.
-	// Isso é para o caso de userConfigDir ter sucesso, mas o subdiretório 'vigenda' não existir.
-	if logDir != "" && logDir != "." && logDir != mustGetwd() {
-		// Tenta criar o diretório de log (ex: ~/.config/vigenda/).
+	// Se logDir foi definido (mesmo que seja CWD), tenta criar o subdiretório vigenda se não for CWD direto
+	if logDir != "" && logDir != "." && logDir != mustGetwd() { // mustGetwd para evitar erro em CWD
 		if err := os.MkdirAll(logDir, 0755); err != nil {
-			// Se não conseguir criar o diretório específico, tenta logar no diretório atual como último recurso.
-			log.Printf("AVISO: Não foi possível criar o diretório de log %s: %v. Tentando logar no diretório de trabalho atual.", logDir, err)
-			logDir = "." // Define para o diretório de trabalho atual.
+			// Se não conseguir criar o diretório específico, tenta logar no CWD como último recurso
+			logDir = "." // Define para CWD
+			log.Printf("Warning: Could not create log directory %s: %v. Attempting to log in current directory.", filepath.Join(logDir, "vigenda"), err)
 		}
 	}
-	// Se logDir ainda estiver vazio (caso extremo), define para diretório atual.
-	if logDir == "" {
+	if logDir == "" { // Caso extremo onde nem CWD pode ser determinado
 		logDir = "."
 	}
 
+
 	logFilePath := filepath.Join(logDir, "vigenda.log")
 
-	// Abre o arquivo de log. Cria se não existir, anexa se existir.
+	// Abrir o arquivo de log. Cria se não existir, anexa se existir.
 	var errOpen error
 	logFile, errOpen = os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if errOpen != nil {
-		return fmt.Errorf("falha ao abrir arquivo de log %s: %w", logFilePath, errOpen)
+		return fmt.Errorf("failed to open log file %s: %w", logFilePath, errOpen)
 	}
 
-	// Configura a saída do log para o arquivo.
+	// Configurar a saída do log para o arquivo
 	log.SetOutput(logFile)
-	// Adiciona flags para incluir data, hora, microssegundos e arquivo:linha no log.
-	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds)
+	// Adicionar flags para incluir data, hora e arquivo:linha no log
+	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmicroseconds) // Adicionado Lmicroseconds para maior precisão
 
-	log.Println("INFO: Logging inicializado para arquivo:", logFilePath)
+	log.Println("INFO: Logging initialized to file:", logFilePath)
 	return nil
 }
 
-// mustGetwd é uma função auxiliar para obter o diretório de trabalho atual (CWD).
-// Retorna "." em caso de erro, simplificando a lógica de fallback para o logging.
+// mustGetwd é uma helper para obter o CWD ou panic, usado para simplificar a lógica de fallback.
 func mustGetwd() string {
 	cwd, err := os.Getwd()
 	if err != nil {
-		// Em um cenário real, um tratamento mais robusto pode ser necessário.
-		// Para a lógica de fallback do log, se CWD falhar, "." é um fallback razoável.
+		// Em um cenário real, pode-se querer um tratamento mais robusto
+		// mas para a lógica de fallback do log, se CWD falhar, "." é um fallback razoável.
 		return "."
 	}
 	return cwd
 }
 
-// classCmd é o comando pai para todas as operações relacionadas a turmas e alunos.
-// A criação de turmas é primariamente feita via TUI.
+
 var classCmd = &cobra.Command{
 	Use:   "turma",
 	Short: "Gerencia turmas e alunos (importar-alunos, atualizar-status)",
-	Long: `O comando 'turma' é usado para administrar funcionalidades relacionadas a turmas,
-como a importação de listas de alunos de ficheiros CSV e a atualização do status de alunos.
-A criação e edição detalhada de turmas é feita através da interface interativa principal
-(executando 'vigenda' sem subcomandos).`,
+	Long: `O comando 'turma' é usado para administrar turmas,
+incluindo a importação de listas de alunos de ficheiros CSV
+e a atualização do status de alunos individuais (ex: ativo, inativo, transferido).
+A criação de turmas é feita através da interface interativa principal (executando 'vigenda' sem subcomandos).`,
 	Example: `  vigenda turma importar-alunos 1 alunos_9a.csv
   vigenda turma atualizar-status 15 transferido`,
 }
 
-// classImportStudentsCmd define o subcomando 'vigenda turma importar-alunos'.
-// Importa uma lista de alunos de um arquivo CSV para uma turma existente.
+// var classCreateCmd = &cobra.Command{...} // Removido
+
 var classImportStudentsCmd = &cobra.Command{
 	Use:   "importar-alunos [ID_da_turma] [caminho_do_ficheiro_csv]",
 	Short: "Importa alunos de um ficheiro CSV para uma turma",
 	Long: `Importa uma lista de alunos de um ficheiro CSV para uma turma existente.
-A turma deve ser criada previamente através da TUI principal.
-O ficheiro CSV deve conter as colunas 'numero_chamada' (opcional), 'nome_completo' (obrigatório),
-e 'situacao' (opcional; padrões para 'ativo'). Consulte a documentação para a estrutura detalhada.`,
+O ficheiro CSV deve conter as colunas 'numero_chamada', 'nome_completo', e opcionalmente 'situacao'.
+Consulte a documentação (README.md, Artefacto 9.1) para a estrutura detalhada do CSV.`,
 	Example: `  vigenda turma importar-alunos 1 ./lista_alunos_turma_a.csv
   vigenda turma importar-alunos 3 /documentos/alunos_turma_c.csv`,
-	Args:  cobra.ExactArgs(2), // Requer ID da turma e caminho do CSV.
+	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		classID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao parsear ID da turma: %v\n", err)
+			fmt.Println("Error parsing Class ID:", err)
 			return
 		}
 		csvFilePath := args[1]
 
 		csvData, err := os.ReadFile(csvFilePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao ler arquivo CSV '%s': %v\n", csvFilePath, err)
+			fmt.Println("Error reading CSV file:", err)
 			return
 		}
 
 		count, err := classService.ImportStudentsFromCSV(context.Background(), classID, csvData)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao importar alunos: %v\n", err)
-			log.Printf("ERRO CMD: Falha ao importar alunos para turma ID %d: %v", classID, err)
+			fmt.Println("Error importing students:", err)
 			return
 		}
-		fmt.Printf("%d aluno(s) importado(s) com sucesso para a turma ID %d.\n", count, classID)
-		log.Printf("INFO CMD: %d aluno(s) importado(s) para turma ID %d.", count, classID)
+		fmt.Printf("%d students imported successfully into class ID %d.\n", count, classID)
 	},
 }
 
-// classUpdateStudentStatusCmd define o subcomando 'vigenda turma atualizar-status'.
-// Atualiza o status de um aluno existente (ex: 'ativo', 'inativo', 'transferido').
 var classUpdateStudentStatusCmd = &cobra.Command{
 	Use:   "atualizar-status [ID_do_aluno] [novo_status]",
 	Short: "Atualiza o status de um aluno",
 	Long: `Atualiza o status de um aluno específico (ex: 'ativo', 'inativo', 'transferido').
-O ID do aluno é o identificador numérico único na base de dados.
+O ID do aluno é o identificador único na base de dados.
 Status permitidos: 'ativo', 'inativo', 'transferido'.`,
 	Example: `  vigenda turma atualizar-status 25 ativo
   vigenda turma atualizar-status 103 transferido`,
-	Args:  cobra.ExactArgs(2), // Requer ID do aluno e novo status.
+	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		studentID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao parsear ID do aluno: %v\n", err)
+			fmt.Println("Error parsing Student ID:", err)
 			return
 		}
 		newStatus := args[1]
-		// A validação do valor de newStatus é feita na camada de serviço.
+		// TODO: Validate newStatus against allowed values ('ativo', 'inativo', 'transferido')
+		// This could be done here or in the service layer. For now, assume service layer handles it.
 
 		err = classService.UpdateStudentStatus(context.Background(), studentID, newStatus)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao atualizar status do aluno: %v\n", err)
-			log.Printf("ERRO CMD: Falha ao atualizar status do aluno ID %d para '%s': %v", studentID, newStatus, err)
+			fmt.Println("Error updating student status:", err)
 			return
 		}
-		fmt.Printf("Status do aluno ID %d atualizado para '%s'.\n", studentID, newStatus)
-		log.Printf("INFO CMD: Status do aluno ID %d atualizado para '%s'.", studentID, newStatus)
+		fmt.Printf("Status of student ID %d updated to '%s'.\n", studentID, newStatus)
 	},
 }
 
-// assessmentCmd é o comando pai para operações relacionadas a avaliações.
+// Removed the second, duplicate init() function. All initializations are now in the first init().
+
 var assessmentCmd = &cobra.Command{
 	Use:   "avaliacao",
 	Short: "Gerencia avaliações e notas (criar, lancar-notas, media-turma)",
-	Long: `O comando 'avaliacao' permite gerenciar o ciclo de vida das avaliações,
-desde a sua criação para uma turma existente, o lançamento interativo de notas,
-até o cálculo da média da turma. A criação de turmas é feita via TUI.`,
+	Long: `O comando 'avaliacao' permite gerenciar todo o ciclo de vida das avaliações,
+desde a sua criação, passando pelo lançamento interativo de notas dos alunos,
+até o cálculo da média final da turma para uma avaliação específica.`,
 	Example: `  vigenda avaliacao criar "Prova Bimestral 1" --classid 1 --term 1 --weight 4.0
   vigenda avaliacao lancar-notas 1
   vigenda avaliacao media-turma 1`,
 }
 
-// assessmentCreateCmd define o subcomando 'vigenda avaliacao criar'.
-// Cria uma nova avaliação para uma turma, especificando nome, período e peso.
 var assessmentCreateCmd = &cobra.Command{
 	Use:   "criar [nome_da_avaliacao]",
 	Short: "Cria uma nova avaliação para uma turma",
 	Long: `Cria uma nova avaliação associada a uma turma específica.
-A turma deve existir e ser identificada pela flag --classid.
-É necessário fornecer o nome da avaliação, o período/bimestre (--term) e o peso (--weight).
-Se alguma flag obrigatória não for fornecida, será solicitada interativamente.`,
+É necessário fornecer o nome da avaliação e, através de flags, o ID da turma,
+o período/bimestre e o peso da avaliação na média final.`,
 	Example: `  vigenda avaliacao criar "Trabalho de História Moderna" --classid 2 --term 3 --weight 3.5
   vigenda avaliacao criar "Seminário de Literatura" --classid 1 --term 2 --weight 2.0`,
-	Args:  cobra.ExactArgs(1), // Requer o nome da avaliação como argumento.
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		classIDStr, _ := cmd.Flags().GetString("classid")
 		termStr, _ := cmd.Flags().GetString("term")
 		weightStr, _ := cmd.Flags().GetString("weight")
 
-		var err error // Declarar err aqui para ser acessível em todos os blocos if.
-
-		// Solicita interativamente as flags obrigatórias se não fornecidas.
+		// Interactive prompts for missing required flags
+		var err error
 		if classIDStr == "" {
-			classIDStr, err = tui.GetInput("Digite o ID da Turma para a avaliação:", os.Stdout, os.Stdin)
+			classIDStr, err = tui.GetInput("Enter Class ID for the assessment:", os.Stdout, os.Stdin)
 			if err != nil || classIDStr == "" {
-				fmt.Fprintln(os.Stderr, "ID da Turma é obrigatório.")
+				fmt.Println("Class ID is required.")
 				return
 			}
 		}
 		if termStr == "" {
-			termStr, err = tui.GetInput("Digite o Período/Bimestre (ex: 1, 2) para a avaliação:", os.Stdout, os.Stdin)
+			termStr, err = tui.GetInput("Enter Term (e.g., 1, 2, 3, 4) for the assessment:", os.Stdout, os.Stdin)
 			if err != nil || termStr == "" {
-				fmt.Fprintln(os.Stderr, "Período/Bimestre é obrigatório.")
+				fmt.Println("Term is required.")
 				return
 			}
 		}
 		if weightStr == "" {
-			weightStr, err = tui.GetInput("Digite o Peso (ex: 4.0) para a avaliação:", os.Stdout, os.Stdin)
+			weightStr, err = tui.GetInput("Enter Weight (e.g., 4.0) for the assessment:", os.Stdout, os.Stdin)
 			if err != nil || weightStr == "" {
-				fmt.Fprintln(os.Stderr, "Peso é obrigatório.")
+				fmt.Println("Weight is required.")
 				return
 			}
 		}
 
-		classID, errConv := strconv.ParseInt(classIDStr, 10, 64)
-		if errConv != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao parsear ID da Turma: %v\n", errConv)
+		classID, err := strconv.ParseInt(classIDStr, 10, 64)
+		if err != nil {
+			fmt.Println("Error parsing Class ID:", err)
 			return
 		}
-		term, errConv := strconv.Atoi(termStr)
-		if errConv != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao parsear Período/Bimestre: %v\n", errConv)
+		term, err := strconv.Atoi(termStr)
+		if err != nil {
+			fmt.Println("Error parsing Term:", err)
 			return
 		}
-		weight, errConv := strconv.ParseFloat(weightStr, 64)
-		if errConv != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao parsear Peso: %v\n", errConv)
+		weight, err := strconv.ParseFloat(weightStr, 64)
+		if err != nil {
+			fmt.Println("Error parsing Weight:", err)
 			return
 		}
 
-		assessment, errService := assessmentService.CreateAssessment(context.Background(), name, classID, term, weight)
-		if errService != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao criar avaliação: %v\n", errService)
-			log.Printf("ERRO CMD: Falha ao criar avaliação '%s': %v", name, errService)
+		assessment, err := assessmentService.CreateAssessment(context.Background(), name, classID, term, weight)
+		if err != nil {
+			fmt.Println("Error creating assessment:", err)
 			return
 		}
-		fmt.Printf("Avaliação '%s' (ID: %d) criada para Turma ID %d, Período %d, Peso %.1f.\n", assessment.Name, assessment.ID, classID, term, weight)
-		log.Printf("INFO CMD: Avaliação '%s' (ID: %d) criada.", assessment.Name, assessment.ID)
+		fmt.Printf("Assessment '%s' (ID: %d) created for Class ID %d, Term %d, Weight %.1f.\n", assessment.Name, assessment.ID, classID, term, weight)
 	},
 }
 
-// assessmentEnterGradesCmd define o subcomando 'vigenda avaliacao lancar-notas'.
-// Inicia um processo interativo para lançar notas para uma avaliação específica.
-// TODO: A implementação atual da Run deste comando é um placeholder e simula a entrada.
-//       Uma TUI mais completa para lançamento de notas seria ideal, possivelmente
-//       integrada ao módulo `internal/app/assessments`.
 var assessmentEnterGradesCmd = &cobra.Command{
 	Use:   "lancar-notas [ID_da_avaliacao]",
 	Short: "Lança notas para os alunos de uma avaliação",
 	Long: `Inicia um processo interativo para lançar ou editar as notas dos alunos
 para uma avaliação específica. A lista de alunos da turma associada à avaliação
 será exibida, permitindo a inserção de cada nota.
-O ID da avaliação é o identificador numérico único da avaliação.
-NOTA: A interatividade deste comando CLI é básica. Para uma experiência completa,
-use a funcionalidade de lançamento de notas na TUI principal.`,
-	Example: `  vigenda avaliacao lancar-notas 7`,
-	Args:  cobra.ExactArgs(1), // Requer o ID da avaliação.
+O ID da avaliação é o identificador numérico único da avaliação.`,
+	Example: `  vigenda avaliacao lancar-notas 7
+  vigenda avaliacao lancar-notas 2`,
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		assessmentID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao parsear ID da Avaliação: %v\n", err)
+			fmt.Println("Error parsing Assessment ID:", err)
 			return
 		}
 
-		// A implementação atual é um placeholder e simula a entrada de notas.
-		// Uma TUI dedicada (possivelmente em `internal/app/assessments`) seria melhor.
-		fmt.Printf("Entrada de notas interativa para Avaliação ID %d (CLI placeholder).\n", assessmentID)
-		fmt.Println("Para uma experiência completa, use a TUI principal.")
-		fmt.Println("Simulando entrada de notas (digite StudentID:Nota, ou 'done' para finalizar):")
+		// TODO: This is where the more complex TUI interaction for grade entry will go.
+		// 1. Fetch students for the class associated with the assessmentID.
+		//    (This might require adding a method to AssessmentService or ClassService,
+		//     or having AssessmentService return student info needed for grading).
+		// 2. Display students in a list/table, allowing navigation and grade input.
+		//    tui.GetInput can be used for each grade, or a more sophisticated BubbleTea model.
+		// 3. Collect all grades into a map[int64]float64 (studentID -> grade).
+		// 4. Call assessmentService.EnterGrades().
 
+		fmt.Printf("Interactive grade entry for Assessment ID %d is not yet fully implemented.\n", assessmentID)
+		fmt.Println("Simulating grade entry for now...")
+
+		// Placeholder for student grades map
 		studentGrades := make(map[int64]float64)
+		// Example: studentGrades[101] = 8.5
+		// Example: studentGrades[102] = 9.0
+		// In a real scenario, this map would be populated via TUI.
+
+		// For now, let's assume the user will input studentID:grade pairs via flags or prompts
+		// For a better UX as per Artefact 7 (golden_files/notas_lancar_interativo_output.txt),
+		// a full BubbleTea model would be needed here.
+		// We will simulate a simple input loop for now.
+
+		fmt.Println("Enter student grades (StudentID:Grade). Type 'done' when finished.")
 		for {
-			input, _ := tui.GetInput("Digite IDdoAluno:Nota (ou 'done'):", os.Stdout, os.Stdin)
-			if strings.ToLower(input) == "done" {
+			input, _ := tui.GetInput("Enter StudentID:Grade (or 'done'):", os.Stdout, os.Stdin)
+			if input == "done" {
 				break
 			}
 			parts := strings.Split(input, ":")
 			if len(parts) != 2 {
-				fmt.Fprintln(os.Stderr, "Formato inválido. Use IDdoAluno:Nota.")
+				fmt.Println("Invalid format. Use StudentID:Grade.")
 				continue
 			}
 			studentID, errS := strconv.ParseInt(strings.TrimSpace(parts[0]), 10, 64)
 			grade, errG := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
 			if errS != nil || errG != nil {
-				fmt.Fprintln(os.Stderr, "ID do Aluno ou Nota inválido(a).")
+				fmt.Println("Invalid StudentID or Grade value.")
 				continue
 			}
 			studentGrades[studentID] = grade
 		}
 
+
 		if len(studentGrades) > 0 {
 			err = assessmentService.EnterGrades(context.Background(), assessmentID, studentGrades)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "Erro ao lançar notas: %v\n", err)
-				log.Printf("ERRO CMD: Falha ao lançar notas para Avaliação ID %d: %v", assessmentID, err)
+				fmt.Println("Error entering grades:", err)
 				return
 			}
-			fmt.Printf("Notas lançadas com sucesso para Avaliação ID %d.\n", assessmentID)
-			log.Printf("INFO CMD: Notas lançadas para Avaliação ID %d.", assessmentID)
+			fmt.Println("Grades entered successfully for Assessment ID", assessmentID)
 		} else {
-			fmt.Println("Nenhuma nota foi lançada.")
+			fmt.Println("No grades were entered.")
 		}
 	},
 }
 
-// assessmentClassAverageCmd define o subcomando 'vigenda avaliacao media-turma'.
-// Calcula e exibe a média geral ponderada das notas para uma turma específica.
 var assessmentClassAverageCmd = &cobra.Command{
 	Use:   "media-turma [ID_da_turma]",
 	Short: "Calcula a média geral das notas de uma turma",
 	Long: `Calcula e exibe a média geral ponderada das notas para uma turma específica,
-considerando todas as avaliações e seus respectivos pesos para aquela turma.
+considerando todas as avaliações e seus respectivos pesos.
 O ID da turma é o identificador numérico único da turma.`,
-	Example: `  vigenda avaliacao media-turma 1`,
-	Args:  cobra.ExactArgs(1), // Requer o ID da turma.
+	Example: `  vigenda avaliacao media-turma 1
+  vigenda avaliacao media-turma 5`,
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		classID, err := strconv.ParseInt(args[0], 10, 64)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao parsear ID da Turma: %v\n", err)
+			fmt.Println("Error parsing Class ID:", err)
 			return
 		}
 
 		average, err := assessmentService.CalculateClassAverage(context.Background(), classID)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao calcular média da turma: %v\n", err)
-			log.Printf("ERRO CMD: Falha ao calcular média para Turma ID %d: %v", classID, err)
+			fmt.Println("Error calculating class average:", err)
 			return
 		}
-		fmt.Printf("Média geral para Turma ID %d: %.2f\n", classID, average)
+		fmt.Printf("Average grade for Class ID %d: %.2f\n", classID, average)
 	},
 }
 
-// questionBankCmd é o comando pai para operações relacionadas ao banco de questões.
+// --- Question Bank (bancoq) Commands ---
 var questionBankCmd = &cobra.Command{
 	Use:   "bancoq",
 	Short: "Gerencia o banco de questões (add)",
 	Long: `O comando 'bancoq' (Banco de Questões) permite adicionar novas questões ao sistema
-a partir de um ficheiro JSON formatado. A criação de disciplinas (às quais as questões
-são associadas) é feita via TUI principal.`,
-	Example: `  vigenda bancoq add ./minhas_questoes_historia.json`,
+a partir de um ficheiro JSON formatado.
+Consulte a documentação (README.md, Artefacto 9.3) para a estrutura detalhada do JSON.`,
+	Example: `  vigenda bancoq add ./minhas_questoes_historia.json
+  vigenda bancoq add /usr/share/vigenda/questoes_padrao_matematica.json`,
 }
 
-// questionBankAddCmd define o subcomando 'vigenda bancoq add'.
-// Adiciona questões de um arquivo JSON para o banco de questões.
 var questionBankAddCmd = &cobra.Command{
 	Use:   "add [caminho_do_ficheiro_json]",
 	Short: "Adiciona questões de um ficheiro JSON ao banco",
 	Long: `Adiciona um conjunto de questões de um ficheiro JSON para o banco de questões central.
-O ficheiro JSON deve seguir uma estrutura específica, e as disciplinas referenciadas
-nas questões devem existir (criadas via TUI). Consulte a documentação para o formato do JSON.`,
-	Example: `  vigenda bancoq add questoes_bimestre1.json`,
-	Args:  cobra.ExactArgs(1), // Requer o caminho do arquivo JSON.
+O ficheiro JSON deve seguir uma estrutura específica contendo detalhes como disciplina,
+tópico, tipo de questão (múltipla escolha, dissertativa), dificuldade, enunciado,
+opções (para múltipla escolha) e resposta correta.`,
+	Example: `  vigenda bancoq add questoes_bimestre1.json
+  vigenda bancoq add ../shared/questoes_revisao.json`,
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		jsonFilePath := args[0]
 		jsonData, err := os.ReadFile(jsonFilePath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao ler arquivo JSON '%s': %v\n", jsonFilePath, err)
+			fmt.Println("Error reading JSON file:", err)
 			return
 		}
 
 		count, err := questionService.AddQuestionsFromJSON(context.Background(), jsonData)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao adicionar questões do JSON: %v\n", err)
-			log.Printf("ERRO CMD: Falha ao adicionar questões do JSON '%s': %v", jsonFilePath, err)
+			fmt.Println("Error adding questions from JSON:", err)
 			return
 		}
-		fmt.Printf("%d questão(ões) adicionada(s) com sucesso ao banco.\n", count)
-		log.Printf("INFO CMD: %d questão(ões) adicionada(s) do JSON '%s'.", count, jsonFilePath)
+		fmt.Printf("%d questions added successfully to the bank.\n", count)
 	},
 }
 
-// proofCmd é o comando pai para operações relacionadas à geração de provas.
+// --- Proof (prova) Commands ---
 var proofCmd = &cobra.Command{
 	Use:   "prova",
 	Short: "Gerencia e gera provas (gerar)",
-	Long: `O comando 'prova' permite gerar provas textuais a partir do banco de questões.
+	Long: `O comando 'prova' permite gerar provas (avaliações textuais) a partir do banco de questões.
 Você pode especificar critérios como disciplina, tópico e o número desejado de questões
-por nível de dificuldade. Disciplinas devem ser criadas via TUI.`,
-	Example: `  vigenda prova gerar --subjectid 1 --easy 5 --medium 3 --hard 2`,
+por nível de dificuldade (fácil, médio, difícil).`,
+	Example: `  vigenda prova gerar --subjectid 1 --easy 5 --medium 3 --hard 2
+  vigenda prova gerar --subjectid 2 --topic "Segunda Guerra Mundial" --medium 10`,
 }
 
-// proofGenerateCmd define o subcomando 'vigenda prova gerar'.
-// Gera uma nova prova com base em critérios como disciplina, tópico e contagem de dificuldades.
 var proofGenerateCmd = &cobra.Command{
 	Use:   "gerar",
 	Short: "Gera uma nova prova com base em critérios especificados",
 	Long: `Gera uma prova selecionando questões do banco de questões.
-É obrigatório especificar o ID da disciplina (--subjectid).
-Opcionalmente, pode-se filtrar por tópico (--topic) e definir o número de questões
-para cada nível de dificuldade (--easy, --medium, --hard).
-A prova gerada será exibida no terminal ou pode ser salva em um arquivo com --output.`,
-	Example: `  vigenda prova gerar --subjectid 1 --easy 5 --medium 3 --hard 2 --topic "Revolução Industrial" --output prova.txt
+É obrigatório especificar o ID da disciplina. Opcionalmente, pode-se filtrar por tópico
+e definir o número de questões para cada nível de dificuldade (fácil, médio, difícil).
+A prova gerada será exibida no terminal.`,
+	Example: `  vigenda prova gerar --subjectid 1 --easy 5 --medium 3 --hard 2 --topic "Revolução Industrial"
   vigenda prova gerar --subjectid 3 --medium 10 --hard 5`,
 	Run: func(cmd *cobra.Command, args []string) {
 		subjectIDStr, _ := cmd.Flags().GetString("subjectid")
@@ -863,24 +784,23 @@ A prova gerada será exibida no terminal ou pode ser salva em um arquivo com --o
 		easyCountStr, _ := cmd.Flags().GetString("easy")
 		mediumCountStr, _ := cmd.Flags().GetString("medium")
 		hardCountStr, _ := cmd.Flags().GetString("hard")
-		// outputFilePath, _ := cmd.Flags().GetString("output") // Descomentar se for usar
 
 		if subjectIDStr == "" {
-			fmt.Fprintln(os.Stderr, "Erro: ID da disciplina (--subjectid) é obrigatório.")
+			fmt.Println("Subject ID (--subjectid) is required.")
 			return
 		}
 		subjectID, err := strconv.ParseInt(subjectIDStr, 10, 64)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro: ID da disciplina inválido: %v\n", err)
+			fmt.Println("Invalid Subject ID:", err)
 			return
 		}
 
-		easyCount, _ := strconv.Atoi(easyCountStr)
-		mediumCount, _ := strconv.Atoi(mediumCountStr)
-		hardCount, _ := strconv.Atoi(hardCountStr)
+		easyCount, _ := strconv.Atoi(easyCountStr)   // Default to 0 if not provided or invalid
+		mediumCount, _ := strconv.Atoi(mediumCountStr) // Default to 0
+		hardCount, _ := strconv.Atoi(hardCountStr)     // Default to 0
 
 		if easyCount == 0 && mediumCount == 0 && hardCount == 0 {
-			fmt.Fprintln(os.Stderr, "Erro: Pelo menos uma contagem de dificuldade (--easy, --medium, --hard) deve ser maior que zero.")
+			fmt.Println("At least one difficulty count (--easy, --medium, --hard) must be greater than zero.")
 			return
 		}
 
@@ -891,30 +811,25 @@ A prova gerada será exibida no terminal ou pode ser salva em um arquivo com --o
 			HardCount:   hardCount,
 		}
 		if topic != "" {
-			criteria.Topic = &topic // Define o tópico se fornecido.
+			criteria.Topic = &topic
 		}
 
 		questions, err := proofService.GenerateProof(context.Background(), criteria)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao gerar prova: %v\n", err)
-			log.Printf("ERRO CMD: Falha ao gerar prova para Subject ID %d: %v", subjectID, err)
+			fmt.Println("Error generating proof:", err)
 			return
 		}
 
 		if len(questions) == 0 {
-			fmt.Println("Nenhuma questão encontrada para os critérios fornecidos. A prova não pôde ser gerada.")
+			fmt.Println("No questions matched the criteria to generate the proof.")
 			return
 		}
 
-		// TODO: Implementar salvamento em arquivo se outputFilePath for fornecido.
-		//       Por enquanto, imprime no console.
-		fmt.Printf("\n--- Prova Gerada (%d Questões) ---\n\n", len(questions))
+		fmt.Printf("Proof generated successfully with %d questions:\n\n", len(questions))
+		// Display questions using TUI table or simple print
+		// For now, a simple print. Later, can use tui.ShowTable.
 		for i, q := range questions {
-			fmt.Printf("**Questão %d (%s, %s)**\n", i+1, q.Difficulty, q.Type)
-			if q.Topic != "" {
-				fmt.Printf("Tópico: %s\n", q.Topic)
-			}
-			fmt.Printf("%s\n", q.Statement)
+			fmt.Printf("Q%d (%s, %s): %s\n", i+1, q.Difficulty, q.Type, q.Statement)
 			if q.Options != nil && *q.Options != "" && *q.Options != "null" {
 				var opts []string
 				if json.Unmarshal([]byte(*q.Options), &opts) == nil {
@@ -923,37 +838,33 @@ A prova gerada será exibida no terminal ou pode ser salva em um arquivo com --o
 					}
 				}
 			}
-			fmt.Printf("   Resposta Correta: %s\n\n", q.CorrectAnswer)
+			fmt.Printf("   Answer: %s\n\n", q.CorrectAnswer)
 		}
-		fmt.Println("--- Fim da Prova ---")
-		log.Printf("INFO CMD: Prova gerada com %d questões para Subject ID %d.", len(questions), subjectID)
 	},
 }
 
-// main é a função principal da aplicação.
-// Ela configura e executa o comando raiz do Cobra.
-// Garante que o arquivo de log seja fechado corretamente ao final da execução.
 func main() {
-	// PersistentPreRunE (no rootCmd) já chama setupLogging.
-	// É crucial fechar logFile no final.
+	// PersistentPreRunE já chama setupLogging.
+	// Precisamos garantir que logFile seja fechado ao final da execução.
+	// rootCmd.Execute() é bloqueante.
+	// Uma forma de garantir o fechamento é adiar para main.
+	// No entanto, setupLogging pode falhar e logFile ser nil.
+
 	if err := rootCmd.Execute(); err != nil {
-		// Erros de execução de comando Cobra são geralmente impressos pelo Cobra.
-		// Logar adicionalmente aqui pode ser redundante se o Cobra já o faz,
-		// mas garante que vá para o arquivo de log.
-		log.Printf("ERRO FATAL: Falha ao executar rootCmd: %v", err)
-		// Cobra já imprime o erro no Stderr, então não precisamos fazer isso aqui.
-		// fmt.Fprintln(os.Stderr, "Erro ao executar comando:", err)
+		// Se Execute falhar, o log já deve ter sido configurado (ou tentado)
+		// e o erro de Execute pode ser logado no arquivo (se o log de arquivo estiver ok)
+		// ou no stderr (se o log de arquivo falhou).
+		log.Printf("CRITICAL: rootCmd.Execute failed: %v", err) // Vai para o arquivo de log se configurado
+		fmt.Fprintln(os.Stderr, "Error executing command:", err) // Também para stderr para visibilidade imediata
 		if logFile != nil {
 			logFile.Close()
 		}
-		os.Exit(1) // Sai com código de erro.
+		os.Exit(1)
 	}
 
-	// Se Execute() for bem-sucedido e a aplicação terminar normalmente.
+	// Se Execute for bem-sucedido e a aplicação terminar normalmente
 	if logFile != nil {
-		log.Println("INFO: Aplicação finalizada com sucesso. Fechando arquivo de log.")
+		log.Println("INFO: Application finished successfully. Closing log file.")
 		logFile.Close()
 	}
 }
-
-[end of cmd/vigenda/main.go]
