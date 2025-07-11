@@ -487,6 +487,25 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Processar inputs do formulário se estiver em modo de formulário e focado
 	if m.currentView == CreatingView || m.currentView == EditingView {
+		// --- Temporary Log for Debugging ---
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			// Log apenas para teclas de runas (caracteres), não para Tab, Enter, Esc, etc.
+			if keyMsg.Type == tea.KeyRunes && len(keyMsg.Runes) > 0 {
+				// log.Printf("LessonsModel: KeyRune '%s' received. FocusedIndex: %d, CurrentView: %v", string(keyMsg.Runes), m.focusedIndex, m.currentView)
+				// if m.focusedIndex >= 0 && m.focusedIndex < len(m.formFocusOrder) {
+				// 	log.Printf("LessonsModel: Input at focusedIndex %d reports Focused(): %t", m.focusedIndex, m.formFocusOrder[m.focusedIndex].Focused())
+				// 	// Also log for the specific component instance
+				// 	switch m.focusedIndex {
+				// 	case 0: // log.Printf("LessonsModel: m.classIDInput.Focused(): %t", m.classIDInput.Focused())
+				// 	case 1: // log.Printf("LessonsModel: m.titleInput.Focused(): %t", m.titleInput.Focused())
+				// 	case 2: // log.Printf("LessonsModel: m.planContentInput.Focused(): %t", m.planContentInput.Focused())
+				// 	case 3: // log.Printf("LessonsModel: m.scheduledAtInput.Focused(): %t", m.scheduledAtInput.Focused())
+				// 	}
+				// }
+			}
+		}
+		// --- End Temporary Log ---
+
 		var formCmd tea.Cmd
 		// Atualizar o input focado.
 		// A msg é passada para o input que está atualmente focado.
