@@ -13,16 +13,16 @@ Olá, Agente! Este documento fornece diretrizes e informações para ajudá-lo a
     -   Banco de Dados: **SQLite** (usando o driver `mattn/go-sqlite3`).
     -   Testes: Pacote `testing` nativo do Go, `stretchr/testify` (assert, require, mock).
 -   **Estrutura do Repositório Principal (Pacotes Go):**
-    -   `README.md`: Visão geral, instalação básica, como contribuir. **LEIA PRIMEIRO.**
+    -   `README.md`: Visão geral, interação principal (TUI), comandos CLI, instalação básica, como contribuir. **LEIA PRIMEIRO.**
     -   `TECHNICAL_SPECIFICATION.MD`: Detalhes da arquitetura em camadas, fluxo de dados (com diagramas Mermaid), descrição detalhada de módulos internos, padrões de design. Consulte para entender a organização.
     -   `DATABASE_SCHEMA.md`: Documentação detalhada do esquema do banco de dados SQLite, incluindo tabelas, colunas e relacionamentos. **Consulte ao trabalhar com repositórios ou modelos.**
-    -   `INSTALLATION.MD`: Instruções detalhadas para configurar o ambiente de desenvolvimento (Go, GCC, ferramentas) e seção expandida de solução de problemas.
-    -   `TESTING.MD`: Como executar testes unitários, de integração, benchmarks e linters. Inclui comandos específicos.
-    -   `EXAMPLES.md`: Exemplos práticos de uso da CLI Vigenda para diversos cenários.
+    -   `INSTALLATION.MD` (note a capitalização): Instruções detalhadas para configurar o ambiente de desenvolvimento (Go, GCC, ferramentas) e seção expandida de solução de problemas.
+    -   `TESTING.MD` (note a capitalização): Como executar testes unitários, de integração, benchmarks e linters. Inclui comandos específicos.
+    -   `EXAMPLES.md`: Exemplos práticos de uso da CLI Vigenda para diversos cenários. (Verificar se os exemplos ainda são válidos após foco na TUI).
     -   `CONTRIBUTING.MD`: Diretrizes para contribuição (humanos e IA), padrões de codificação Go (incluindo Godoc), formato de commit (Conventional Commits), processo de PR. **SIGA RIGOROSAMENTE.**
     -   `CODE_OF_CONDUCT.md`: Código de Conduta para Contribuidores.
     -   `CHANGELOG.MD`: Registro de mudanças.
-    -   `AGENTS.md`: Este arquivo.
+    -   `AGENTS.md` (este arquivo): Diretrizes específicas para agentes de IA.
     -   `go.mod`, `go.sum`: Gerenciamento de dependências Go.
     -   `build.sh`: Script para construir binários para múltiplas plataformas.
     -   `cmd/vigenda/main.go`: Ponto de entrada da aplicação CLI.
@@ -374,11 +374,10 @@ Este projeto é atualmente mantido para um propósito específico. No entanto, s
 
 Para um guia completo sobre como usar o Vigenda, incluindo detalhes sobre todos os comandos, configuração e exemplos práticos, consulte nossa documentação do usuário:
 
-*   **[Manual do Usuário](./docs/user_manual/README.md)**: Um guia detalhado sobre todas as funcionalidades.
-*   **[Guia de Introdução](./docs/getting_started/README.md)**: Para uma instalação rápida e os primeiros passos.
-*   **[FAQ (Perguntas Frequentes)](./docs/faq/README.md)**: Respostas para as dúvidas mais comuns.
-*   **[Tutoriais](./docs/tutorials/README.md)**: Exemplos práticos passo a passo.
-*   **[Guia do Desenvolvedor](./docs/developer/README.md)**: Informações sobre a arquitetura do projeto, como configurar o ambiente de desenvolvimento e diretrizes para contribuição (para desenvolvedores).
+    -   `docs/user_manual/README.md`: Um guia detalhado sobre todas as funcionalidades, tanto da TUI quanto dos comandos CLI.
+    -   `docs/tutorials/`: Contém tutoriais práticos para cenários específicos.
+    -   `docs/developer/README.md`: Informações sobre a arquitetura do projeto, como configurar o ambiente de desenvolvimento e diretrizes para contribuição (para desenvolvedores).
+    -   `docs/diagrams/README.md`: Contém diagramas de caso de uso do sistema.
 
 ## Licença
 
@@ -386,7 +385,7 @@ Este projeto não possui uma licença de código aberto definida no momento. Tod
 
 ## Reporte de Bugs
 
-Para informações sobre como reportar bugs, como eles são analisados e gerenciados, por favor consulte o arquivo [BUG_REPORTING.md](BUG_REPORTING.md).
+Para reportar bugs, por favor, crie uma "Issue" no rastreador de issues do projeto (se disponível publicamente). Descreva o bug com o máximo de detalhes possível, incluindo passos para reproduzi-lo, o comportamento esperado e o comportamento atual.
 
 Lembre-se, seu objetivo é produzir código de alta qualidade e documentação que seja fácil de manter e entender. Siga estas diretrizes e use os documentos fornecidos para guiá-lo. Atualize esta documentação e as outras conforme o projeto evolui. Boa codificação!
 

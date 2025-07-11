@@ -14,15 +14,18 @@ Agradecemos seu interesse em contribuir para o nosso projeto! Este guia detalha 
     Crie um fork pessoal do repositório principal na sua conta do GitHub (ou plataforma similar).
 
 2.  **Clone o Fork Localmente:**
+    (Substitua `[SEU_USUARIO]` e `[NOME_DO_REPOSITORIO]` pelos valores corretos se o projeto estiver no GitHub ou plataforma similar)
     ```bash
-    git clone https://github.com/SEU_USUARIO/NOME_DO_REPOSITORIO.git
-    cd NOME_DO_REPOSITORIO
+    git clone https://github.com/[SEU_USUARIO]/[NOME_DO_REPOSITORIO].git
+    cd [NOME_DO_REPOSITORIO]
     ```
+    Se o projeto não estiver em um sistema de controle de versão público, clone ou copie os arquivos do local fornecido.
 
-3.  **Configure o Repositório Remoto (Upstream):**
-    Adicione o repositório original como um remote chamado `upstream`.
+3.  **Configure o Repositório Remoto (Upstream) (Se Aplicável):**
+    Se você fez um fork de um repositório público, adicione o repositório original como um remote chamado `upstream`.
+    (Substitua `[URL_REPOSITORIO_ORIGINAL]` pela URL correta)
     ```bash
-    git remote add upstream https://github.com/ORGANIZACAO_OU_USUARIO_ORIGINAL/NOME_DO_REPOSITORIO.git
+    git remote add upstream [URL_REPOSITORIO_ORIGINAL]
     ```
     Mantenha seu fork atualizado com o repositório principal:
     ```bash

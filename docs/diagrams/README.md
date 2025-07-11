@@ -92,8 +92,16 @@ rectangle "Sistema Vigenda" {
 
 **Como Visualizar os Diagramas `.puml`:**
 
-Copie o conteúdo de qualquer arquivo `.puml` e cole-o em um renderizador PlantUML online, como:
-*   [PlantUML Online Server](http://www.plantuml.com/plantuml)
-*   Ou utilize uma extensão PlantUML no seu editor de código (ex: VS Code).
+Os arquivos `.puml` contêm o código-fonte dos diagramas em linguagem PlantUML. Para visualizá-los:
+
+1.  **Copie o conteúdo** de um arquivo `.puml`.
+2.  **Cole em um renderizador PlantUML online:**
+    *   [Servidor Online PlantUML Oficial](http://www.plantuml.com/plantuml)
+    *   [Mermaid Live Editor](https://mermaid.live/) (para o diagrama de visão geral que usa sintaxe Mermaid dentro do PlantUML)
+3.  **Ou utilize uma extensão PlantUML no seu editor de código:**
+    *   **VS Code:** Procure por extensões como "PlantUML" de jebbs ou "Markdown Preview Enhanced" (que suporta PlantUML).
+    *   Outros editores podem ter plugins similares.
+
+**Nota:** Seria ideal que as imagens renderizadas (ex: `.png` ou `.svg`) destes diagramas fossem incluídas diretamente neste diretório ou embutidas nos documentos relevantes (como `TECHNICAL_SPECIFICATION.MD`) para facilitar a consulta sem a necessidade de um renderizador externo.
 
 Estes diagramas fornecem uma visão estruturada das funcionalidades do sistema Vigenda sob a perspectiva do usuário.

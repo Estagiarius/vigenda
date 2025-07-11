@@ -36,7 +36,7 @@ Este Código de Conduta se aplica dentro de todos os espaços da comunidade (inc
 
 ## Contato, Denúncias e Aplicação
 
-Casos de comportamento abusivo, de assédio ou de outra forma inaceitável podem ser reportados aos mantenedores da comunidade responsáveis pela aplicação em [INSIRA AQUI O ENDEREÇO DE E-MAIL OU OUTRO MÉTODO DE CONTATO PRIVADO]. Todas as queixas serão revisadas e investigadas prontamente e de forma justa.
+Casos de comportamento abusivo, de assédio ou de outra forma inaceitável podem ser reportados aos mantenedores da comunidade responsáveis pela aplicação em `contact@example.com` (substitua pelo endereço de e-mail real do projeto ou outro método de contato privado). Todas as queixas serão revisadas e investigadas prontamente e de forma justa.
 
 Todos os mantenedores da comunidade são obrigados a respeitar a privacidade e a segurança do relator de qualquer incidente. Mais detalhes sobre políticas específicas de aplicação podem ser postados separadamente.
 

@@ -3,9 +3,12 @@
 Este tutorial detalha como gerenciar o ciclo de vida das avaliações no Vigenda, desde a criação de múltiplas avaliações para uma turma, atribuindo pesos, lançando notas de forma interativa, até o cálculo da média da turma para verificar o impacto.
 
 **Pré-requisitos:**
-*   Vigenda instalado e funcionando.
-*   Uma turma criada. Se você não tem uma, siga o [Tutorial 01](./01_criando_primeira_turma_e_importando_alunos.md). Vamos assumir que existe uma turma com `ID = 1` e que ela já tem alunos importados.
-*   Conhecimento básico dos comandos `vigenda avaliacao criar`, `vigenda avaliacao lancar-notas`, e `vigenda avaliacao media-turma`.
+*   Vigenda instalado e funcionando. Consulte [**INSTALLATION.MD**](../../INSTALLATION.MD).
+*   Uma **disciplina** e uma **turma** já devem ter sido criadas através da **Interface de Texto do Usuário (TUI)** do Vigenda.
+    *   Para iniciar a TUI: execute `vigenda` (ou `go run ./cmd/vigenda/main.go`).
+    *   No menu da TUI, crie uma disciplina (ex: "História") e, dentro dela, uma turma (ex: "História 9A"). Anote o ID da turma (vamos assumir `ID = 1` para este tutorial).
+*   Alunos devem ter sido importados para a turma `ID = 1` (ex: usando o comando `vigenda turma importar-alunos 1 alunos.csv`).
+*   Conhecimento básico dos comandos CLI `vigenda avaliacao criar`, `vigenda avaliacao lancar-notas`, e `vigenda avaliacao media-turma`. Consulte o [Manual do Usuário](../../docs/user_manual/README.md) para detalhes.
 
 ## Cenário
 
@@ -65,10 +68,11 @@ Digite a nota para cada aluno e pressione Enter. Siga as instruções do prompt 
 Após lançar as notas da P1, você pode querer ver como estão as médias (ainda parciais, pois faltam T1 e Participação).
 
 ```bash
-./vigenda avaliacao media-turma --classid 1 --term "1º Bimestre"
+./vigenda avaliacao media-turma 1
 ```
+*(Nota: A implementação CLI atual do comando `media-turma` não suporta a flag `--term`. A média será calculada com base em todas as avaliações com notas lançadas para a turma ID 1).*
 
-A saída mostrará a média de cada aluno considerando apenas a P1, pois é a única com notas lançadas no período.
+A saída mostrará a média de cada aluno considerando apenas a P1 (se apenas ela tiver notas no momento).
 Exemplo de saída:
 ```
 Médias para Turma ID 1, Período: 1º Bimestre
@@ -104,10 +108,11 @@ Repita o processo do Passo 2 para as outras avaliações, usando seus respectivo
 Com todas as notas do "1º Bimestre" lançadas, calcule novamente a média da turma.
 
 ```bash
-./vigenda avaliacao media-turma --classid 1 --term "1º Bimestre"
+./vigenda avaliacao media-turma 1
 ```
+*(Lembre-se: a flag `--term` não é usada pelo comando CLI atual. A média incluirá todas as avaliações com notas para a turma ID 1).*
 
-Agora, a saída deverá refletir a média ponderada de todas as três avaliações (P1, T1, Participacao):
+Agora, a saída deverá refletir a média ponderada de todas as três avaliações (P1, T1, Participacao) que tiveram notas lançadas:
 ```
 Médias para Turma ID 1, Período: 1º Bimestre
 -------------------------------------------
