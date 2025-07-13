@@ -92,6 +92,10 @@ type studentsForFinalGradesLoadedMsg struct {
 	err      error
 }
 
+type finalGradesEnteredMsg struct {
+	err error
+}
+
 
 // --- Cmds ---
 func (m *Model) deleteAssessmentCmd(assessmentID int64) tea.Cmd {
@@ -169,6 +173,34 @@ func (m *Model) loadStudentsForFinalGradesCmd(classID int64) tea.Cmd {
 			return studentsForFinalGradesLoadedMsg{err: err}
 		}
 		return studentsForFinalGradesLoadedMsg{students: students, err: nil}
+	}
+}
+
+func (m *Model) submitFinalGradesCmd() tea.Cmd {
+	if m.currentClassID == nil {
+		return func() tea.Msg { return finalGradesEnteredMsg{err: fmt.Errorf("ID da turma não definido")} }
+	}
+
+	grades := make(map[int64]float64)
+	for studentID, ti := range m.gradesInput {
+		gradeStr := ti.Value()
+		if gradeStr == "" {
+			continue
+		}
+		grade, err := strconv.ParseFloat(gradeStr, 64)
+		if err != nil {
+			return func() tea.Msg { return finalGradesEnteredMsg{err: fmt.Errorf("nota inválida para aluno ID %d: '%s'", studentID, gradeStr)} }
+		}
+		grades[studentID] = grade
+	}
+
+	if len(grades) == 0 {
+		return func() tea.Msg { return finalGradesEnteredMsg{err: fmt.Errorf("nenhuma nota foi inserida")} }
+	}
+
+	return func() tea.Msg {
+		err := m.assessmentService.EnterFinalGrades(context.Background(), *m.currentClassID, grades)
+		return finalGradesEnteredMsg{err: err}
 	}
 }
 
@@ -329,8 +361,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			} else {
-				// Handle grade input for final grades
-				// This will be similar to updateGradeInputs
+				cmds = append(cmds, m.updateGradeInputs(msg))
 			}
 		}
 
@@ -404,6 +435,18 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.message = fmt.Sprintf("Avaliação ID %d deletada com sucesso.", msg.assessmentID)
 			// Refresh the list
 			cmds = append(cmds, m.loadAssessmentsCmd())
+		}
+
+	case finalGradesEnteredMsg:
+		m.isLoading = false
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.message = "Notas finais salvas com sucesso!"
+			m.state = ListView
+			m.list.Select(-1)
+			m.studentsForGrading = nil
+			m.gradesInput = make(map[int64]textinput.Model)
 		}
 
 	case studentsForFinalGradesLoadedMsg:
@@ -819,7 +862,11 @@ func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
 				}
 			case key.Matches(keyMsg, key.NewBinding(key.WithKeys("ctrl+s"))):
 				m.isLoading = true
-				cmds = append(cmds, m.submitGradesCmd())
+				if m.state == EnterGradesView {
+					cmds = append(cmds, m.submitGradesCmd())
+				} else if m.state == FinalGradesView {
+					cmds = append(cmds, m.submitFinalGradesCmd())
+				}
 			}
 		}
 	}
