@@ -337,6 +337,31 @@ func (s *stubAssessmentService) ListAllAssessments(ctx context.Context) ([]model
 	}, nil
 }
 
+func (s *stubAssessmentService) DeleteAssessment(ctx context.Context, assessmentID int64) error {
+	fmt.Printf("[StubAssessmentService] DeleteAssessment called for AssessmentID %d\n", assessmentID)
+	// In a real stub, you might want to check if it exists in a slice or map.
+	// For compilation, just returning nil is sufficient.
+	return nil
+}
+
+func (s *stubAssessmentService) GetStudentsForGrading(ctx context.Context, assessmentID int64) ([]models.Student, *models.Assessment, error) {
+	fmt.Printf("[StubAssessmentService] GetStudentsForGrading called for AssessmentID %d\n", assessmentID)
+	// This stub needs to return some data for the TUI to display.
+	assessment := &models.Assessment{
+		ID:      assessmentID,
+		ClassID: 1,
+		Name:    "Prova Stub para Lançamento",
+		Term:    1,
+		Weight:  4.0,
+	}
+	students := []models.Student{
+		{ID: 101, ClassID: 1, FullName: "Alice", Status: "ativo"},
+		{ID: 102, ClassID: 1, FullName: "Bob", Status: "ativo"},
+		{ID: 103, ClassID: 1, FullName: "Charlie", Status: "ativo"},
+	}
+	return students, assessment, nil
+}
+
 // StubQuestionService
 type stubQuestionService struct {
 	questionRepo repository.QuestionRepository
