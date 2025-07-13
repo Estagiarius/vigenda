@@ -454,13 +454,6 @@ func (m *Model) View() string {
 		} else { // Displaying students for grade entry
 			b.WriteString(fmt.Sprintf("Lançando notas para Avaliação ID %d: %s\n\n", *m.currentAssessmentID, m.message))
 
-			// Using the existing table component for a structured layout
-			gradeTableCols := []table.Column{
-				{Title: "Aluno", Width: 30},
-				{Title: "Nota", Width: 15},
-			}
-			gradeTableRows := []table.Row{}
-			// This part is tricky as table.Row doesn't directly support textinput.Model.
 			// The view logic will need to be more sophisticated, rendering inputs separately or
 			// building a string representation that includes the input's view.
 			// For now, let's build a simpler string-based view.
