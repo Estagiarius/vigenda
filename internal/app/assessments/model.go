@@ -28,17 +28,17 @@ const (
 	ListView ViewState = iota // Main action list
 	CreateAssessmentView
 	EnterGradesView // This will be complex: needs to list students, then input grades
-	ClassAverageView
+	FinalGradesView
 	ListAssessmentsView // For showing assessments in a table
 )
 
 // Model represents the assessments management model.
 type Model struct {
 	assessmentService service.AssessmentService
-	// classService service.ClassService // May need for student listing
-	state ViewState
+	classService      service.ClassService // May need for student listing
+	state             ViewState
 
-	list       list.Model  // For actions or selecting assessments/classes
+	list list.Model // For actions or selecting assessments/classes
 	table      table.Model // For displaying assessments or students
 	textInputs []textinput.Model
 	focusIndex int
@@ -87,6 +87,11 @@ type assessmentDeletedMsg struct {
 	err          error
 }
 
+type studentsForFinalGradesLoadedMsg struct {
+	students []models.Student
+	err      error
+}
+
 
 // --- Cmds ---
 func (m *Model) deleteAssessmentCmd(assessmentID int64) tea.Cmd {
@@ -105,12 +110,12 @@ func (m *Model) loadAssessmentsCmd() tea.Cmd {
 }
 
 
-func New(assessmentService service.AssessmentService /*, classService service.ClassService */) *Model {
+func New(assessmentService service.AssessmentService, classService service.ClassService) *Model {
 	actionItems := []list.Item{
 		actionItem{title: "Listar Avaliações", description: "Visualizar todas as avaliações (pode pedir turma)."},
 		actionItem{title: "Criar Nova Avaliação", description: "Adicionar uma nova avaliação para uma turma."},
 		actionItem{title: "Lançar Notas", description: "Lançar/editar notas de alunos para uma avaliação."},
-		actionItem{title: "Calcular Média da Turma", description: "Calcular a média geral de uma turma em avaliações."},
+		actionItem{title: "Lançar/Calcular Notas Finais", description: "Lançar manualmente ou calcular a média final de uma turma."},
 	}
 	l := list.New(actionItems, list.NewDefaultDelegate(), 0, 0)
 	l.Title = "Gerenciar Avaliações e Notas"
@@ -147,13 +152,23 @@ func New(assessmentService service.AssessmentService /*, classService service.Cl
 
 	return &Model{ // Ensure this returns a pointer
 		assessmentService: assessmentService,
-		// classService: classService,
-		state:      ListView,
-		list:       l,
-		table:      tbl,
-		textInputs: inputs,
-		isLoading:  false,
-		gradesInput: make(map[int64]textinput.Model),
+		classService:      classService,
+		state:             ListView,
+		list:              l,
+		table:             tbl,
+		textInputs:        inputs,
+		isLoading:         false,
+		gradesInput:       make(map[int64]textinput.Model),
+	}
+}
+
+func (m *Model) loadStudentsForFinalGradesCmd(classID int64) tea.Cmd {
+	return func() tea.Msg {
+		students, err := m.classService.GetStudentsByClassID(context.Background(), classID)
+		if err != nil {
+			return studentsForFinalGradesLoadedMsg{err: err}
+		}
+		return studentsForFinalGradesLoadedMsg{students: students, err: nil}
 	}
 }
 
@@ -228,8 +243,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.state = EnterGradesView
 						m.setupEnterAssessmentIDForm("Lançar Notas para Avaliação ID:")
 					case "Calcular Média da Turma":
-						m.state = ClassAverageView
-						m.setupEnterClassIDForm("Calcular Média para Turma ID:")
+						m.state = FinalGradesView
+						m.setupEnterClassIDForm("Lançar/Calcular Notas Finais para Turma ID:")
 					}
 				}
 			}
@@ -291,26 +306,31 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmds = append(cmds, m.updateGradeInputs(msg))
 			}
 
-		case ClassAverageView: // Asking for Class ID
-			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
-				if m.focusIndex == 1 { // Submit button for ID input
-					m.isLoading = true
-					classIDStr := m.textInputs[0].Value()
-					_, err := strconv.ParseInt(classIDStr, 10, 64)
-					if err != nil {
-						m.err = fmt.Errorf("ID da Turma inválido: %w", err)
-						m.isLoading = false
-					} else {
-						m.err = fmt.Errorf("Cálculo de média da turma TUI não totalmente implementado.")
-						m.isLoading = false
+		case FinalGradesView:
+			if len(m.studentsForGrading) == 0 { // Asking for Class ID
+				if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
+					if m.focusIndex == 1 { // Submit button for ID input
+						m.isLoading = true
+						classIDStr := m.textInputs[0].Value()
+						classID, err := strconv.ParseInt(classIDStr, 10, 64)
+						if err != nil {
+							m.err = fmt.Errorf("ID da Turma inválido: %w", err)
+							m.isLoading = false
+						} else {
+							m.currentClassID = &classID
+							cmds = append(cmds, m.loadStudentsForFinalGradesCmd(classID))
+						}
+					} else { // Focus on input
+						m.textInputs[0], cmd = m.textInputs[0].Update(msg)
+						cmds = append(cmds, cmd)
 					}
-				} else { // Focus on input
+				} else { // Other keys for input
 					m.textInputs[0], cmd = m.textInputs[0].Update(msg)
 					cmds = append(cmds, cmd)
 				}
-			} else { // Other keys for input
-				m.textInputs[0], cmd = m.textInputs[0].Update(msg)
-				cmds = append(cmds, cmd)
+			} else {
+				// Handle grade input for final grades
+				// This will be similar to updateGradeInputs
 			}
 		}
 
@@ -384,6 +404,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.message = fmt.Sprintf("Avaliação ID %d deletada com sucesso.", msg.assessmentID)
 			// Refresh the list
 			cmds = append(cmds, m.loadAssessmentsCmd())
+		}
+
+	case studentsForFinalGradesLoadedMsg:
+		m.isLoading = false
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.studentsForGrading = msg.students
+			m.message = "Insira as notas finais."
+			m.gradesInput = make(map[int64]textinput.Model)
+			for _, s := range msg.students {
+				ti := textinput.New()
+				ti.Placeholder = "Nota Final"
+				ti.CharLimit = 5
+				ti.Width = 10
+				m.gradesInput[s.ID] = ti
+			}
 		}
 
 	case error:
@@ -472,14 +509,28 @@ func (m *Model) View() string {
 			b.WriteString("Use ↑/↓ para navegar, Enter/Tab para editar, Esc para sair da edição.\n")
 		}
 
-	case ClassAverageView: // Asking for Class ID
-		b.WriteString("Calcular Média da Turma\n\n")
-		b.WriteString(m.textInputs[0].View() + "\n") // Class ID input
-		submitButton := "[ Calcular Média ]"
-		if m.focusIndex == 1 { // Assuming one input + submit
-			submitButton = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render(submitButton)
+	case FinalGradesView:
+		if len(m.studentsForGrading) == 0 { // Still asking for Class ID
+			b.WriteString("Lançar/Calcular Notas Finais da Turma\n\n")
+			b.WriteString(m.textInputs[0].View() + "\n") // Class ID input
+			submitButton := "[ Carregar Alunos ]"
+			if m.focusIndex == 1 { // Assuming one input + submit
+				submitButton = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render(submitButton)
+			}
+			b.WriteString("\n" + submitButton + "\n\n")
+		} else { // Displaying students for final grade entry
+			b.WriteString(fmt.Sprintf("Lançando notas finais para Turma ID %d\n\n", *m.currentClassID))
+			b.WriteString(lipgloss.NewStyle().Bold(true).Render("Aluno                         Nota Final\n"))
+			b.WriteString(strings.Repeat("-", 45) + "\n")
+			for _, s := range m.studentsForGrading {
+				gradeInputView := ""
+				if ti, ok := m.gradesInput[s.ID]; ok {
+					gradeInputView = ti.View()
+				}
+				b.WriteString(fmt.Sprintf("%-30s %s\n", s.FullName, gradeInputView))
+			}
+			b.WriteString("\n[ Salvar Notas (Ctrl+S) ] [ Calcular Média (Ctrl+C) ] [ Cancelar (Esc) ]\n")
 		}
-		b.WriteString("\n" + submitButton + "\n\n")
 
 	default:
 		b.WriteString("Visualização de Avaliações Desconhecida")
