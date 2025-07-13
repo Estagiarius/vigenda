@@ -149,6 +149,8 @@ type AssessmentRepository interface {
 	ListAllAssessments(ctx context.Context) ([]models.Assessment, error)
 	// DeleteAssessment remove uma avaliação e suas notas associadas (via ON DELETE CASCADE no DB).
 	DeleteAssessment(ctx context.Context, assessmentID int64) error
+	// FindAssessmentByNameAndClass busca uma avaliação específica pelo nome e ID da turma.
+	FindAssessmentByNameAndClass(ctx context.Context, name string, classID int64) (*models.Assessment, error)
 	// GetAssessmentWithGrades (Comentado) poderia ser um exemplo de consulta mais complexa,
 	// retornando uma avaliação junto com todas as suas notas associadas.
 	// GetAssessmentWithGrades(ctx context.Context, assessmentID int64) (*models.AssessmentWithGrades, error)

@@ -223,3 +223,42 @@ func (s *assessmentServiceImpl) GetStudentsForGrading(ctx context.Context, asses
 
 	return students, assessment, nil
 }
+
+const FinalGradeAssessmentName = "Nota Final"
+
+// getOrCreateFinalAssessment finds or creates a special assessment for final grades.
+func (s *assessmentServiceImpl) getOrCreateFinalAssessment(ctx context.Context, classID int64) (int64, error) {
+	// 1. Try to find the existing final assessment
+	assessment, err := s.assessmentRepo.FindAssessmentByNameAndClass(ctx, FinalGradeAssessmentName, classID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to find final assessment: %w", err)
+	}
+
+	// 2. If it exists, return its ID
+	if assessment != nil {
+		return assessment.ID, nil
+	}
+
+	// 3. If not, create it
+	// Using term 0 and weight 0 to signify it's a special, non-weighted assessment
+	newAssessment, err := s.CreateAssessment(ctx, FinalGradeAssessmentName, classID, 0, 0)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create final assessment: %w", err)
+	}
+	return newAssessment.ID, nil
+}
+
+func (s *assessmentServiceImpl) EnterFinalGrades(ctx context.Context, classID int64, finalGrades map[int64]float64) error {
+	if classID == 0 {
+		return fmt.Errorf("class ID cannot be zero")
+	}
+
+	// 1. Get the special assessment ID for final grades
+	finalAssessmentID, err := s.getOrCreateFinalAssessment(ctx, classID)
+	if err != nil {
+		return err
+	}
+
+	// 2. Use the existing EnterGrades logic with the special assessment ID
+	return s.EnterGrades(ctx, finalAssessmentID, finalGrades)
+}
