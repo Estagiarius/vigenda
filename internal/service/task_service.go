@@ -67,13 +67,6 @@ func (s *taskServiceImpl) handleErrorAndCreateBugTask(ctx context.Context, origi
 	}
 
 	systemUserID := int64(0) // UserID 0 para tarefas de sistema/bugs.
-	bugTask := models.Task{
-		UserID:      systemUserID,
-		ClassID:     nil, // Bugs geralmente não são específicos de uma turma.
-		Title:       bugTitle,
-		Description: bugDescription,
-		IsCompleted: false,
-	}
 
 	// Tenta criar a tarefa de bug.
 	// Usa createTaskInternal para evitar recursão de tratamento de erro.

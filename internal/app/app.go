@@ -274,8 +274,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
 			// O dashboard pode ter sua própria lógica de foco interno.
 			// Se o dashboard indicar que não está mais focado (ex: após pressionar Esc de um modal interno), volta ao menu.
-			type focuser interface{ IsFocused() bool }
-			if f, ok := m.dashboardModel.Model.(focuser); !ok || !f.IsFocused() {
+			if !m.dashboardModel.IsFocused() {
 				m.currentView = DashboardView
 				log.Println("AppModel: Voltando para o Menu Principal a partir do Painel de Controle.")
 			}
