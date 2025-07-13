@@ -253,18 +253,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Retorna true se a view deve voltar ao menu principal.
 	processSubmodelUpdate := func(currentSubModel tea.Model, kmsg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		newSubModel, newSubCmd := currentSubModel.Update(kmsg)
-		// Tenta type assertion para verificar se o sub-modelo tem um método IsFocused.
-		// Este é um padrão que os sub-modelos podem implementar.
-		type focuser interface{ IsFocused() bool }
-		if f, ok := newSubModel.(focuser); ok {
-			if key.Matches(kmsg, key.NewBinding(key.WithKeys("esc"))) && !f.IsFocused() {
-				return newSubModel, newSubCmd, true // Sinaliza para voltar ao menu.
-			}
-		} else if key.Matches(kmsg, key.NewBinding(key.WithKeys("esc"))) {
-			// Se o sub-modelo não implementa IsFocused, 'esc' sempre volta.
+		if key.Matches(kmsg, key.NewBinding(key.WithKeys("esc"))) {
 			return newSubModel, newSubCmd, true
 		}
-		return newSubModel, newSubCmd, false // Não volta.
+		return newSubModel, newSubCmd, false
 	}
 
 	switch m.currentView {

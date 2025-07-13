@@ -28,6 +28,11 @@ type MockTaskRepository struct {
 	CreatedBugTasks []models.Task
 }
 
+func (m *MockTaskRepository) GetUpcomingActiveTasks(ctx context.Context, days int) ([]models.Task, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *MockTaskRepository) CreateTask(ctx context.Context, task *models.Task) (int64, error) {
 	if task.UserID == 0 && strings.HasPrefix(task.Title, "[BUG]") {
 		m.CreatedBugTasks = append(m.CreatedBugTasks, *task)

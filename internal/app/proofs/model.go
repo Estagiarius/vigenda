@@ -159,8 +159,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// No need to explicitly return focus cmd here as resetForm handles it.
 				return m, nil // Return m directly
 			}
-			// If in FormView, Esc is handled by parent model to go to main menu
-			return m, nil // Return m directly
+			// If in FormView, Esc should be handled by the parent model.
+			// By not handling it here (i.e., not returning m, nil), the message
+			// will be passed up to the parent model's Update function.
 		}
 
 		switch m.state {
@@ -349,9 +350,3 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
-// Changed to pointer receiver for consistency
-func (m *Model) IsFocused() bool {
-	// The form is always the primary interaction if this model is active,
-	// until a proof is generated. When proof is shown, it's more of a display state.
-	return m.state == FormView
-}

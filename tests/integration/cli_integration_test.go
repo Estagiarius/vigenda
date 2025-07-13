@@ -232,21 +232,11 @@ func TestDashboardOutput(t *testing.T) {
 
 	if err != nil {
 		// If the error is not context.DeadlineExceeded, then it's an unexpected error.
-		if err.Error() != "signal: killed" && ctxErr, ok := err.(*exec.ExitError); !ok || ctxErr.String() != "signal: killed" { // error from CommandContext can be *exec.ExitError with "signal: killed"
-			// Check if the underlying error from CommandContext is context.DeadlineExceeded
-			// exec.CommandContext returns an error that might wrap context.DeadlineExceeded.
-			// A common way it manifests is as an *exec.ExitError with m.ProcessState.String() == "signal: killed"
-			// when the context is canceled due to deadline.
-			// For simplicity, we check if the error message contains "killed" as a proxy for timeout
-			// or if the error itself is context.DeadlineExceeded.
-			// This is a bit indirect. A more robust way would be to check the context from runCLI if it were returned.
-			// Given the current runCLI, checking for "signal: killed" (which is what timeout often causes) is a pragmatic approach.
-			if !strings.Contains(err.Error(), "signal: killed") && err != context.DeadlineExceeded {
-				t.Fatalf("CLI execution failed with unexpected error: %v\nStderr: %s", err, stderr)
-			} else {
-				t.Logf("CLI execution timed out as expected for interactive TUI (err: %v). Assuming TUI started.", err)
-			}
+		if exitErr, ok := err.(*exec.ExitError); !ok || exitErr.String() != "signal: killed" {
+			// This is not the timeout error we expect.
+			t.Fatalf("CLI execution failed with unexpected error: %v\nStderr: %s", err, stderr)
 		} else {
+			// This is the expected timeout error.
 			t.Logf("CLI execution timed out as expected for interactive TUI (err: %v). Assuming TUI started.", err)
 		}
 	} else {
