@@ -159,8 +159,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// No need to explicitly return focus cmd here as resetForm handles it.
 				return m, nil // Return m directly
 			}
-			// If in FormView, Esc is handled by parent model to go to main menu
-			return m, nil // Return m directly
+			// If in FormView, Esc should be handled by the parent model.
+			// By not handling it here (i.e., not returning m, nil), the message
+			// will be passed up to the parent model's Update function.
 		}
 
 		switch m.state {
