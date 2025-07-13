@@ -350,9 +350,3 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
-// Changed to pointer receiver for consistency
-func (m *Model) IsFocused() bool {
-	// The form is always the primary interaction if this model is active,
-	// until a proof is generated. When proof is shown, it's more of a display state.
-	return m.state == FormView
-}
