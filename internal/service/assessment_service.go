@@ -105,75 +105,78 @@ func (s *assessmentServiceImpl) EnterGrades(ctx context.Context, assessmentID in
 	return nil
 }
 
-func (s *assessmentServiceImpl) CalculateClassAverage(ctx context.Context, classID int64) (float64, error) {
+func (s *assessmentServiceImpl) CalculateClassAverage(ctx context.Context, classID int64, terms []int) (map[int64]float64, error) {
 	if classID == 0 {
-		return 0, fmt.Errorf("class ID cannot be zero")
+		return nil, fmt.Errorf("class ID cannot be zero")
 	}
 
-	grades, assessments, students, err := s.assessmentRepo.GetGradesByClassID(ctx, classID)
+	grades, allAssessments, students, err := s.assessmentRepo.GetGradesByClassID(ctx, classID)
 	if err != nil {
-		return 0, fmt.Errorf("service.CalculateClassAverage: fetching data: %w", err)
+		return nil, fmt.Errorf("service.CalculateClassAverage: fetching data: %w", err)
 	}
 
 	if len(students) == 0 {
-		return 0, fmt.Errorf("no students found in class %d to calculate average", classID)
-	}
-	if len(assessments) == 0 {
-		return 0, fmt.Errorf("no assessments found for class %d to calculate average", classID)
+		return nil, fmt.Errorf("no students found in class %d to calculate average", classID)
 	}
 
-	// studentAverages map: studentID -> {totalWeightedGrade, totalWeight}
-	studentAverages := make(map[int64]struct {
-		totalWeightedGrade float64
-		totalWeight        float64
-	})
+	// Create a set for quick lookup of terms to include
+	includeTerms := make(map[int]bool)
+	filterByTerm := len(terms) > 0
+	if filterByTerm {
+		for _, t := range terms {
+			includeTerms[t] = true
+		}
+	}
+
+	// Filter assessments based on terms
+	var assessments []models.Assessment
+	for _, a := range allAssessments {
+		if !filterByTerm || includeTerms[a.Term] {
+			assessments = append(assessments, a)
+		}
+	}
+
+	if len(assessments) == 0 {
+		return nil, fmt.Errorf("no assessments found for class %d matching the specified terms", classID)
+	}
 
 	assessmentMap := make(map[int64]models.Assessment)
 	for _, a := range assessments {
 		assessmentMap[a.ID] = a
 	}
 
+	studentTotals := make(map[int64]struct {
+		totalWeightedGrade float64
+		totalWeight        float64
+	})
+
 	for _, g := range grades {
-		assessment, okA := assessmentMap[g.AssessmentID]
-		if !okA {
-			// This shouldn't happen if data integrity is maintained
-			fmt.Printf("Warning: Grade found for unknown assessment ID %d\n", g.AssessmentID)
+		assessment, ok := assessmentMap[g.AssessmentID]
+		if !ok {
+			// This grade is for an assessment filtered out by term, so skip it
 			continue
 		}
-		// Consider only active students for average calculation
-		studentInfo, studentExists := findStudent(students, g.StudentID)
-		if !studentExists || studentInfo.Status != "ativo" {
-			continue // Skip grades for inactive/non-existent students
-		}
 
-
-		sa := studentAverages[g.StudentID]
-		sa.totalWeightedGrade += g.Grade * assessment.Weight
-		sa.totalWeight += assessment.Weight
-		studentAverages[g.StudentID] = sa
+		st := studentTotals[g.StudentID]
+		st.totalWeightedGrade += g.Grade * assessment.Weight
+		st.totalWeight += assessment.Weight
+		studentTotals[g.StudentID] = st
 	}
 
-	var overallClassTotal float64
-	var activeStudentsCount int
-
+	studentAverages := make(map[int64]float64)
 	for _, student := range students {
 		if student.Status != "ativo" {
-			continue
+			continue // Only calculate for active students
 		}
-		activeStudentsCount++
-		sa, ok := studentAverages[student.ID]
-		if ok && sa.totalWeight > 0 {
-			overallClassTotal += sa.totalWeightedGrade / sa.totalWeight
+		totals, ok := studentTotals[student.ID]
+		if ok && totals.totalWeight > 0 {
+			studentAverages[student.ID] = totals.totalWeightedGrade / totals.totalWeight
+		} else {
+			studentAverages[student.ID] = 0 // Student has no grades for the selected terms
 		}
-		// If a student has no grades or no weighted assessments, their average is 0 for this calculation.
 	}
 
-	if activeStudentsCount == 0 {
-		// Or handle as "no active students to average"
-		return 0, fmt.Errorf("no active students in class %d to calculate average", classID)
-	}
-
-	return overallClassTotal / float64(activeStudentsCount), nil
+	return studentAverages, nil
 }
 
 // Helper function to find a student in a slice (if needed, not strictly necessary with map lookups)

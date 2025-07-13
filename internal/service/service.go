@@ -76,9 +76,9 @@ type AssessmentService interface {
 	// EnterGrades registra ou atualiza as notas de múltiplos alunos para uma avaliação específica.
 	// studentGrades é um mapa onde a chave é o StudentID e o valor é a nota.
 	EnterGrades(ctx context.Context, assessmentID int64, studentGrades map[int64]float64) error
-	// CalculateClassAverage calcula a média ponderada das notas de uma turma.
-	// O cálculo considera todas as avaliações e seus pesos para a turma especificada.
-	CalculateClassAverage(ctx context.Context, classID int64) (float64, error)
+	// CalculateClassAverage calcula a média ponderada das notas para cada aluno de uma turma.
+	// O cálculo pode ser filtrado por períodos (terms). Se terms for nulo ou vazio, todos os períodos são considerados.
+	CalculateClassAverage(ctx context.Context, classID int64, terms []int) (map[int64]float64, error)
 	// ListAllAssessments retorna uma lista de todas as avaliações.
 	// Em um sistema multiusuário, isso seria filtrado pelo usuário ou turma.
 	ListAllAssessments(ctx context.Context) ([]models.Assessment, error)

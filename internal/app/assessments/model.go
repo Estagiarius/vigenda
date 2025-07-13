@@ -106,8 +106,35 @@ type finalGradesEnteredMsg struct {
 	err error
 }
 
+type classAverageCalculatedMsg struct {
+	averages map[int64]float64
+	err      error
+}
+
 
 // --- Cmds ---
+func (m *Model) calculateAverageCmd(classID int64, termsStr string) tea.Cmd {
+	return func() tea.Msg {
+		var terms []int
+		if termsStr != "" {
+			parts := strings.Split(termsStr, ",")
+			for _, p := range parts {
+				term, err := strconv.Atoi(strings.TrimSpace(p))
+				if err != nil {
+					return classAverageCalculatedMsg{err: fmt.Errorf("período inválido: %s", p)}
+				}
+				terms = append(terms, term)
+			}
+		}
+
+		averages, err := m.assessmentService.CalculateClassAverage(context.Background(), classID, terms)
+		if err != nil {
+			return classAverageCalculatedMsg{err: err}
+		}
+		return classAverageCalculatedMsg{averages: averages}
+	}
+}
+
 func (m *Model) deleteAssessmentCmd(assessmentID int64) tea.Cmd {
 	return func() tea.Msg {
 		err := m.assessmentService.DeleteAssessment(context.Background(), assessmentID)
@@ -462,6 +489,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list.Select(-1)
 			m.studentsForGrading = nil
 			m.gradesInput = make(map[int64]textinput.Model)
+		}
+
+	case classAverageCalculatedMsg:
+		m.isLoading = false
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.message = "Médias calculadas com sucesso!"
+			for studentID, avg := range msg.averages {
+				if ti, ok := m.gradesInput[studentID]; ok {
+					ti.SetValue(fmt.Sprintf("%.2f", avg))
+					ti.Blur() // Disable editing after calculation
+					m.gradesInput[studentID] = ti
+				}
+			}
 		}
 
 	case studentsForFinalGradesLoadedMsg:
@@ -888,9 +930,9 @@ func (m *Model) updatePopup(msg tea.Msg) tea.Cmd {
 			return nil
 		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"))):
 			m.isPopupVisible = false
-			// Placeholder for actual calculation command
-			m.message = "Cálculo da média acionado com os parâmetros: " + m.popup.inputs[0].Value()
-			return nil
+			m.isLoading = true
+			termsStr := m.popup.inputs[0].Value()
+			return m.calculateAverageCmd(*m.currentClassID, termsStr)
 		}
 	}
 
