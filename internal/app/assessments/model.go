@@ -49,7 +49,11 @@ type Model struct {
 	currentAssessmentID *int64 // For context when entering grades or calculating average
 	studentsForGrading []models.Student // For EnterGradesView
 	gradesInput        map[int64]textinput.Model // studentID -> textinput for grade
-	gradeFocusIndex int  // New: To track focus on grade inputs
+	gradeFocusIndex int // New: To track focus on grade inputs
+
+	// Popup state
+	isPopupVisible bool
+	popup          popupModel
 
 	isLoading bool
 	err       error
@@ -57,6 +61,12 @@ type Model struct {
 
 	width  int
 	height int
+}
+
+// popupModel holds the state for the calculation settings popup.
+type popupModel struct {
+	inputs     []textinput.Model
+	focusIndex int
 }
 
 // --- Messages ---
@@ -365,6 +375,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 
+	if m.isPopupVisible {
+		cmd = m.updatePopup(msg)
+		return m, cmd
+	}
+
 	// Handle async results
 	case assessmentsLoadedMsg:
 		m.isLoading = false
@@ -501,6 +516,7 @@ func (m *Model) View() string {
 		b.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render(fmt.Sprintf("%s\n\n", m.message)))
 	}
 
+	var mainContent string
 	switch m.state {
 	case ListView:
 		b.WriteString(m.list.View())
@@ -579,7 +595,25 @@ func (m *Model) View() string {
 		b.WriteString("Visualização de Avaliações Desconhecida")
 	}
 
-	return baseStyle.Render(b.String())
+	mainContent = b.String()
+
+	if m.isPopupVisible {
+		popupContent := lipgloss.NewStyle().
+			BorderStyle(lipgloss.ThickBorder()).
+			BorderForeground(lipgloss.Color("69")).
+			Padding(1).
+			Render(m.popup.inputs[0].View() + "\n\n[ Calcular ] [ Cancelar (Esc) ]")
+
+		return lipgloss.Place(
+			m.width, m.height,
+			lipgloss.Center, lipgloss.Center,
+			popupContent,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("240")),
+		)
+	}
+
+	return baseStyle.Render(mainContent)
 }
 
 // --- Form Setup and Submission Logic ---
@@ -833,11 +867,52 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
+func (m *Model) setupPopup() {
+	m.popup.focusIndex = 0
+	m.popup.inputs = make([]textinput.Model, 1) // Just one input for now: terms
+	ti := textinput.New()
+	ti.Placeholder = "Períodos a incluir (ex: 1,2,3)"
+	ti.Focus()
+	ti.CharLimit = 20
+	ti.Width = 30
+	m.popup.inputs[0] = ti
+}
+
+func (m *Model) updatePopup(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+
+	if keyMsg, ok := msg.(tea.KeyMsg); ok {
+		switch {
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("esc"))):
+			m.isPopupVisible = false
+			return nil
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"))):
+			m.isPopupVisible = false
+			// Placeholder for actual calculation command
+			m.message = "Cálculo da média acionado com os parâmetros: " + m.popup.inputs[0].Value()
+			return nil
+		}
+	}
+
+	// Handle text input
+	var cmd tea.Cmd
+	m.popup.inputs[0], cmd = m.popup.inputs[0].Update(msg)
+	cmds = append(cmds, cmd)
+
+	return tea.Batch(cmds...)
+}
+
 func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
 	keyMsg, ok := msg.(tea.KeyMsg)
 	if !ok {
+		return nil
+	}
+
+	if key.Matches(keyMsg, key.NewBinding(key.WithKeys("ctrl+m"))) {
+		m.isPopupVisible = true
+		m.setupPopup()
 		return nil
 	}
 
