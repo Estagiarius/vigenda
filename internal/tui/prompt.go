@@ -32,7 +32,6 @@ var (
 	focusedStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))            // Estilo para elementos focados (ex: cursor, botão).
 	blurredStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))            // Estilo para elementos não focados.
 	noStyle        = lipgloss.NewStyle()                                              // Estilo vazio.
-	helpStyle      = blurredStyle.Copy()                                              // Estilo para texto de ajuda.
 	errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))              // Estilo para mensagens de erro (vermelho).
 	cursorModeHelp = helpStyle.Render("modo cursor está habilitado")                  // Mensagem de ajuda para modo cursor (não usado ativamente na View).
 	focusedButton  = focusedStyle.Copy().Render("[ Submeter ]")                       // Aparência do botão de submissão quando focado.
