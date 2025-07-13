@@ -79,6 +79,14 @@ func (m *MockTaskService) DeleteTask(ctx context.Context, taskID int64) error {
 
 var _ service.TaskService = (*MockTaskService)(nil)
 
+func (m *MockTaskService) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
+	args := m.Called(ctx, userID, fromDate, limit)
+	if tasks, ok := args.Get(0).([]models.Task); ok {
+		return tasks, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func TestTasksModel_Init(t *testing.T) {
 	mockService := new(MockTaskService)
 	model := New(mockService)

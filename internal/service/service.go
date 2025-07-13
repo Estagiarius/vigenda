@@ -69,20 +69,9 @@ type ClassService interface {
 	DeleteStudent(ctx context.Context, studentID int64) error
 }
 
-// AssessmentService define a interface para a lógica de negócios relacionada a avaliações e notas.
-type AssessmentService interface {
-	// CreateAssessment cria uma nova avaliação para uma turma.
-	CreateAssessment(ctx context.Context, name string, classID int64, term int, weight float64) (models.Assessment, error)
-	// EnterGrades registra ou atualiza as notas de múltiplos alunos para uma avaliação específica.
-	// studentGrades é um mapa onde a chave é o StudentID e o valor é a nota.
-	EnterGrades(ctx context.Context, assessmentID int64, studentGrades map[int64]float64) error
-	// CalculateClassAverage calcula a média ponderada das notas de uma turma.
-	// O cálculo considera todas as avaliações e seus pesos para a turma especificada.
-	CalculateClassAverage(ctx context.Context, classID int64) (float64, error)
-	// ListAllAssessments retorna uma lista de todas as avaliações.
-	// Em um sistema multiusuário, isso seria filtrado pelo usuário ou turma.
-	ListAllAssessments(ctx context.Context) ([]models.Assessment, error)
-}
+// A interface AssessmentService foi movida para internal/service/assessment_service.go
+// para evitar declarações duplicadas e manter a organização do código.
+// O conteúdo foi consolidado lá.
 
 // QuestionService define a interface para a lógica de negócios relacionada ao banco de questões.
 // Atualmente, inclui a importação de questões e a geração de provas (que foi movida para ProofService).

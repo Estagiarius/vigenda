@@ -134,20 +134,6 @@ type LessonRepository interface {
 	DeleteLesson(ctx context.Context, lessonID int64) error
 }
 
-// AssessmentRepository define a interface para operações de acesso a dados relacionadas a 'assessments' (avaliações) e 'grades' (notas).
-type AssessmentRepository interface {
-	// CreateAssessment adiciona uma nova avaliação ao banco de dados e retorna seu ID.
-	CreateAssessment(ctx context.Context, assessment *models.Assessment) (int64, error)
-	// GetAssessmentByID recupera uma avaliação específica por seu ID.
-	GetAssessmentByID(ctx context.Context, assessmentID int64) (*models.Assessment, error)
-	// EnterGrade registra ou atualiza a nota de um aluno para uma avaliação.
-	EnterGrade(ctx context.Context, grade *models.Grade) error
-	// GetGradesByClassID recupera todas as notas, avaliações e alunos de uma turma específica.
-	// Usado para calcular a média da turma, pois necessita de todas essas informações.
-	GetGradesByClassID(ctx context.Context, classID int64) ([]models.Grade, []models.Assessment, []models.Student, error)
-	// ListAllAssessments recupera todas as avaliações (pode precisar de filtragem por usuário ou turma).
-	ListAllAssessments(ctx context.Context) ([]models.Assessment, error)
-	// GetAssessmentWithGrades (Comentado) poderia ser um exemplo de consulta mais complexa,
-	// retornando uma avaliação junto com todas as suas notas associadas.
-	// GetAssessmentWithGrades(ctx context.Context, assessmentID int64) (*models.AssessmentWithGrades, error)
-}
+// A interface AssessmentRepository foi movida para internal/repository/assessment_repository.go
+// para evitar declarações duplicadas e manter a organização do código.
+// O conteúdo foi consolidado lá.

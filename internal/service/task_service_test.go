@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings" // Added import
 	"testing"
+	"time"
 	"vigenda/internal/models"
 	// "vigenda/internal/repository" // repository package is not directly used by this test file, types are defined locally or through models.
 
@@ -16,20 +17,21 @@ import (
 
 // MockTaskRepository for testing TaskService
 type MockTaskRepository struct {
-	CreateTaskFunc        func(ctx context.Context, task *models.Task) (int64, error)
-	GetTaskByIDFunc       func(ctx context.Context, id int64) (*models.Task, error)
-	GetTasksByClassIDFunc func(ctx context.Context, classID int64) ([]models.Task, error)
-	GetAllTasksFunc       func(ctx context.Context) ([]models.Task, error)
-	MarkTaskCompletedFunc func(ctx context.Context, taskID int64) error
-	UpdateTaskFunc        func(ctx context.Context, task *models.Task) error // Added
-	DeleteTaskFunc        func(ctx context.Context, taskID int64) error    // Added
-
-	// Store created bug tasks for verification
-	CreatedBugTasks []models.Task
+	CreateTaskFunc           func(ctx context.Context, task *models.Task) (int64, error)
+	GetTaskByIDFunc          func(ctx context.Context, id int64) (*models.Task, error)
+	GetTasksByClassIDFunc    func(ctx context.Context, classID int64) ([]models.Task, error)
+	GetAllTasksFunc          func(ctx context.Context) ([]models.Task, error)
+	MarkTaskCompletedFunc    func(ctx context.Context, taskID int64) error
+	UpdateTaskFunc           func(ctx context.Context, task *models.Task) error
+	DeleteTaskFunc           func(ctx context.Context, taskID int64) error
+	GetUpcomingActiveTasksFunc func(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error)
+	CreatedBugTasks          []models.Task
 }
 
-func (m *MockTaskRepository) GetUpcomingActiveTasks(ctx context.Context, days int) ([]models.Task, error) {
-	//TODO implement me
+func (m *MockTaskRepository) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
+	if m.GetUpcomingActiveTasksFunc != nil {
+		return m.GetUpcomingActiveTasksFunc(ctx, userID, fromDate, limit)
+	}
 	panic("implement me")
 }
 

@@ -4,16 +4,36 @@ import (
 	"context"
 	"fmt"
 	"vigenda/internal/models"
-	"vigenda/internal/repository" // Added import
+	"vigenda/internal/repository"
 )
+
+// GradingSheet é uma struct que agrupa todas as informações necessárias para a tela de lançamento de notas.
+type GradingSheet struct {
+	Assessment models.Assessment
+	Students   []models.Student
+	Grades     map[int64]models.Grade // Mapeia StudentID para a nota existente.
+}
+
+// AssessmentService define a interface para a lógica de negócios relacionada a avaliações e notas.
+// Esta é uma versão atualizada da interface para incluir o método GetGradingSheet.
+type AssessmentService interface {
+	CreateAssessment(ctx context.Context, name string, classID int64, term int, weight float64) (models.Assessment, error)
+	EnterGrades(ctx context.Context, assessmentID int64, studentGrades map[int64]float64) error
+	CalculateClassAverage(ctx context.Context, classID int64) (float64, error)
+	ListAllAssessments(ctx context.Context) ([]models.Assessment, error)
+	GetGradingSheet(ctx context.Context, assessmentID int64) (*GradingSheet, error)
+	GetAssessmentByID(ctx context.Context, assessmentID int64) (*models.Assessment, error)
+	DeleteAssessment(ctx context.Context, assessmentID int64) error
+	UpdateAssessment(ctx context.Context, assessmentID int64, name string, classID int64, term int, weight float64) (models.Assessment, error)
+}
+
 
 type assessmentServiceImpl struct {
 	assessmentRepo repository.AssessmentRepository
-	classRepo      repository.ClassRepository // Added classRepo for fetching students
+	classRepo      repository.ClassRepository
 }
 
-// NewAssessmentService creates a new instance of AssessmentService.
-// It now accepts AssessmentRepository and ClassRepository as dependencies.
+// NewAssessmentService cria uma nova instância de AssessmentService.
 func NewAssessmentService(
 	assessmentRepo repository.AssessmentRepository,
 	classRepo repository.ClassRepository,
@@ -24,12 +44,54 @@ func NewAssessmentService(
 	}
 }
 
+func (s *assessmentServiceImpl) GetAssessmentByID(ctx context.Context, assessmentID int64) (*models.Assessment, error) {
+	if assessmentID <= 0 {
+		return nil, fmt.Errorf("assessment ID must be positive")
+	}
+	return s.assessmentRepo.GetAssessmentByID(ctx, assessmentID)
+}
+
+func (s *assessmentServiceImpl) DeleteAssessment(ctx context.Context, assessmentID int64) error {
+	if assessmentID <= 0 {
+		return fmt.Errorf("assessment ID must be positive")
+	}
+	// Optional: check ownership before deleting
+	return s.assessmentRepo.DeleteAssessment(ctx, assessmentID)
+}
+
+func (s *assessmentServiceImpl) UpdateAssessment(ctx context.Context, assessmentID int64, name string, classID int64, term int, weight float64) (models.Assessment, error) {
+	if assessmentID <= 0 {
+		return models.Assessment{}, fmt.Errorf("assessment ID must be positive")
+	}
+	if name == "" {
+		return models.Assessment{}, fmt.Errorf("assessment name cannot be empty")
+	}
+	// ... other validations ...
+
+	assessmentToUpdate, err := s.assessmentRepo.GetAssessmentByID(ctx, assessmentID)
+	if err != nil {
+		return models.Assessment{}, fmt.Errorf("failed to get assessment to update: %w", err)
+	}
+
+	assessmentToUpdate.Name = name
+	assessmentToUpdate.ClassID = classID
+	assessmentToUpdate.Term = term
+	assessmentToUpdate.Weight = weight
+
+	err = s.assessmentRepo.UpdateAssessment(ctx, assessmentToUpdate)
+	if err != nil {
+		return models.Assessment{}, fmt.Errorf("failed to update assessment: %w", err)
+	}
+	return *assessmentToUpdate, nil
+}
+
+
 func (s *assessmentServiceImpl) CreateAssessment(ctx context.Context, name string, classID int64, term int, weight float64) (models.Assessment, error) {
 	if name == "" {
 		return models.Assessment{}, fmt.Errorf("assessment name cannot be empty")
 	}
-	if classID == 0 {
-		return models.Assessment{}, fmt.Errorf("class ID cannot be zero")
+	if classID <= 0 {
+		return models.Assessment{}, fmt.Errorf("class ID must be positive")
 	}
 	if term <= 0 {
 		return models.Assessment{}, fmt.Errorf("term must be positive")
@@ -37,13 +99,8 @@ func (s *assessmentServiceImpl) CreateAssessment(ctx context.Context, name strin
 	if weight <= 0 {
 		return models.Assessment{}, fmt.Errorf("weight must be positive")
 	}
-	// TODO: Validate classID exists using s.classRepo.GetClassByID(ctx, classID)
-
-	// Assuming UserID 1 for now
-	// userID := int64(1) // UserID is not part of models.Assessment
 
 	assessment := models.Assessment{
-		// UserID:  userID, // Removed
 		ClassID: classID,
 		Name:    name,
 		Term:    term,
@@ -59,14 +116,13 @@ func (s *assessmentServiceImpl) CreateAssessment(ctx context.Context, name strin
 }
 
 func (s *assessmentServiceImpl) EnterGrades(ctx context.Context, assessmentID int64, studentGrades map[int64]float64) error {
-	if assessmentID == 0 {
+	if assessmentID <= 0 {
 		return fmt.Errorf("assessment ID cannot be zero")
 	}
 	if len(studentGrades) == 0 {
 		return fmt.Errorf("no grades provided")
 	}
 
-	// Optional: Validate assessmentID exists
 	assessment, err := s.assessmentRepo.GetAssessmentByID(ctx, assessmentID)
 	if err != nil {
 		return fmt.Errorf("service.EnterGrades: validating assessment: %w", err)
@@ -75,27 +131,13 @@ func (s *assessmentServiceImpl) EnterGrades(ctx context.Context, assessmentID in
 		return fmt.Errorf("assessment with ID %d not found", assessmentID)
 	}
 
-	// Optional: Validate studentIDs exist within the assessment's class
-	// This would involve fetching students for assessment.ClassID and checking existence.
-	// For now, we assume student IDs are valid and belong to the correct class.
-
-	// Assuming UserID 1 for now
-	// userID := int64(1) // UserID is not part of models.Grade
-
 	for studentID, gradeVal := range studentGrades {
-		if studentID == 0 {
-			return fmt.Errorf("student ID cannot be zero in grades map")
+		if studentID <= 0 {
+			return fmt.Errorf("student ID must be positive")
 		}
-		// Basic grade validation (e.g., 0-10, or whatever scale)
-		if gradeVal < 0 || gradeVal > 100 { // Assuming a 0-100 scale for placeholder
-			// return fmt.Errorf("invalid grade value %.2f for student %d. Must be between 0 and 100", gradeVal, studentID)
-			// For now, let's allow any float. Specific validation can be added.
-		}
-
 		grade := models.Grade{
 			AssessmentID: assessmentID,
 			StudentID:    studentID,
-			// UserID:       userID, // Removed: User who entered the grade is not stored in Grade model
 			Grade:        gradeVal,
 		}
 		if err := s.assessmentRepo.EnterGrade(ctx, &grade); err != nil {
@@ -105,8 +147,44 @@ func (s *assessmentServiceImpl) EnterGrades(ctx context.Context, assessmentID in
 	return nil
 }
 
+func (s *assessmentServiceImpl) GetGradingSheet(ctx context.Context, assessmentID int64) (*GradingSheet, error) {
+	if assessmentID <= 0 {
+		return nil, fmt.Errorf("assessment ID must be positive")
+	}
+
+	// 1. Get the assessment details
+	assessment, err := s.assessmentRepo.GetAssessmentByID(ctx, assessmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get assessment details: %w", err)
+	}
+
+	// 2. Get all students for the assessment's class
+	students, err := s.classRepo.GetStudentsByClassID(ctx, assessment.ClassID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get students for class %d: %w", assessment.ClassID, err)
+	}
+
+	// 3. Get all existing grades for this assessment
+	existingGrades, err := s.assessmentRepo.GetGradesByAssessmentID(ctx, assessmentID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get existing grades for assessment %d: %w", assessmentID, err)
+	}
+
+	// 4. Build the map of grades for easy lookup
+	gradesMap := make(map[int64]models.Grade)
+	for _, grade := range existingGrades {
+		gradesMap[grade.StudentID] = grade
+	}
+
+	return &GradingSheet{
+		Assessment: *assessment,
+		Students:   students,
+		Grades:     gradesMap,
+	}, nil
+}
+
 func (s *assessmentServiceImpl) CalculateClassAverage(ctx context.Context, classID int64) (float64, error) {
-	if classID == 0 {
+	if classID <= 0 {
 		return 0, fmt.Errorf("class ID cannot be zero")
 	}
 
@@ -116,13 +194,12 @@ func (s *assessmentServiceImpl) CalculateClassAverage(ctx context.Context, class
 	}
 
 	if len(students) == 0 {
-		return 0, fmt.Errorf("no students found in class %d to calculate average", classID)
+		return 0, nil // No students, average is 0
 	}
 	if len(assessments) == 0 {
-		return 0, fmt.Errorf("no assessments found for class %d to calculate average", classID)
+		return 0, nil // No assessments, average is 0
 	}
 
-	// studentAverages map: studentID -> {totalWeightedGrade, totalWeight}
 	studentAverages := make(map[int64]struct {
 		totalWeightedGrade float64
 		totalWeight        float64
@@ -136,16 +213,12 @@ func (s *assessmentServiceImpl) CalculateClassAverage(ctx context.Context, class
 	for _, g := range grades {
 		assessment, okA := assessmentMap[g.AssessmentID]
 		if !okA {
-			// This shouldn't happen if data integrity is maintained
-			fmt.Printf("Warning: Grade found for unknown assessment ID %d\n", g.AssessmentID)
 			continue
 		}
-		// Consider only active students for average calculation
 		studentInfo, studentExists := findStudent(students, g.StudentID)
 		if !studentExists || studentInfo.Status != "ativo" {
-			continue // Skip grades for inactive/non-existent students
+			continue
 		}
-
 
 		sa := studentAverages[g.StudentID]
 		sa.totalWeightedGrade += g.Grade * assessment.Weight
@@ -165,25 +238,22 @@ func (s *assessmentServiceImpl) CalculateClassAverage(ctx context.Context, class
 		if ok && sa.totalWeight > 0 {
 			overallClassTotal += sa.totalWeightedGrade / sa.totalWeight
 		}
-		// If a student has no grades or no weighted assessments, their average is 0 for this calculation.
 	}
 
 	if activeStudentsCount == 0 {
-		// Or handle as "no active students to average"
-		return 0, fmt.Errorf("no active students in class %d to calculate average", classID)
+		return 0, nil
 	}
 
 	return overallClassTotal / float64(activeStudentsCount), nil
 }
 
-// Helper function to find a student in a slice (if needed, not strictly necessary with map lookups)
 func findStudent(students []models.Student, studentID int64) (models.Student, bool) {
-    for _, s := range students {
-        if s.ID == studentID {
-            return s, true
-        }
-    }
-    return models.Student{}, false
+	for _, s := range students {
+		if s.ID == studentID {
+			return s, true
+		}
+	}
+	return models.Student{}, false
 }
 
 func (s *assessmentServiceImpl) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {

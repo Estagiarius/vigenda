@@ -282,60 +282,9 @@ func (s *stubClassService) GetStudentsByClassID(ctx context.Context, classID int
 	return s.classRepo.GetStudentsByClassID(ctx, classID)
 }
 
-// StubAssessmentService
-type stubAssessmentService struct {
-	assessmentRepo repository.AssessmentRepository
-}
-
-// NewStubAssessmentService creates a new stub instance of AssessmentService.
-func NewStubAssessmentService(assessmentRepo repository.AssessmentRepository) AssessmentService {
-	return &stubAssessmentService{assessmentRepo: assessmentRepo}
-}
-
-func (s *stubAssessmentService) CreateAssessment(ctx context.Context, name string, classID int64, term int, weight float64) (models.Assessment, error) {
-	fmt.Printf("[StubAssessmentService] CreateAssessment: %s for ClassID %d\n", name, classID)
-	assessment := models.Assessment{
-		ClassID: classID,
-		Name:    name,
-		Term:    term,
-		Weight:  weight,
-	}
-	id, err := s.assessmentRepo.CreateAssessment(ctx, &assessment)
-	if err != nil {
-		return models.Assessment{}, err
-	}
-	assessment.ID = id
-	return assessment, nil
-}
-
-func (s *stubAssessmentService) EnterGrades(ctx context.Context, assessmentID int64, studentGrades map[int64]float64) error {
-	fmt.Printf("[StubAssessmentService] EnterGrades for AssessmentID %d: %+v\n", assessmentID, studentGrades)
-	for studentID, gradeVal := range studentGrades {
-		grade := models.Grade{
-			AssessmentID: assessmentID,
-			StudentID:    studentID,
-			Grade:        gradeVal,
-		}
-		if err := s.assessmentRepo.EnterGrade(ctx, &grade); err != nil {
-			return fmt.Errorf("error entering grade for student %d: %w", studentID, err)
-		}
-	}
-	return nil
-}
-
-func (s *stubAssessmentService) CalculateClassAverage(ctx context.Context, classID int64) (float64, error) {
-	fmt.Printf("[StubAssessmentService] CalculateClassAverage for ClassID %d\n", classID)
-	return 7.5, nil
-}
-
-func (s *stubAssessmentService) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {
-	fmt.Printf("[StubAssessmentService] ListAllAssessments called\n")
-	now := time.Now()
-	return []models.Assessment{
-		{ID: 1, ClassID: 1, Name: "Prova 1 Stub", Term: 1, Weight: 2, AssessmentDate: &now},
-		{ID: 2, ClassID: 1, Name: "Trabalho 1 Stub", Term: 1, Weight: 1.5, AssessmentDate: &now},
-	}, nil
-}
+// A implementação do stub para AssessmentService foi removida deste arquivo
+// para evitar conflitos e centralizar a lógica no pacote principal do serviço.
+// Os testes agora usarão mocks gerados por gomock.
 
 // StubQuestionService
 type stubQuestionService struct {
