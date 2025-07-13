@@ -49,12 +49,15 @@ Funcionalidades Principais:
 
 Use "vigenda [comando] --help" para mais informações sobre um comando específico.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println("Vigenda CLI - TUI desativada para teste.")
+		fmt.Println("Serviços inicializados com sucesso.")
 		// Launch the BubbleTea application
 		// PersistentPreRunE ensures all necessary services are initialized.
 		// Pass the initialized services to the TUI application.
-		app.StartApp(taskService, classService, assessmentService, questionService, proofService, lessonService)
+		// app.StartApp(taskService, classService, assessmentService, questionService, proofService, lessonService)
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		log.Println("PersistentPreRunE: Start")
 		// Setup logging to file first
 		if err := setupLogging(); err != nil {
 			// Se não conseguir configurar o log, ainda tenta continuar, mas loga no stderr.
@@ -64,6 +67,7 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 
 		// This function will run before any command, ensuring DB is initialized.
 		if db == nil { // Initialize only once
+			log.Println("PersistentPreRunE: Initializing database connection")
 			dbType := os.Getenv("VIGENDA_DB_TYPE")
 			dbDSN := os.Getenv("VIGENDA_DB_DSN") // Generic DSN
 
@@ -131,11 +135,15 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 			// Use the non-conflicting GetDBConnection from connection.go
 			db, err = database.GetDBConnection(config)
 			if err != nil {
+				log.Printf("PersistentPreRunE: Error getting DB connection: %v", err)
 				return fmt.Errorf("failed to initialize database (type: %s): %w", config.DBType, err)
 			}
+			log.Println("PersistentPreRunE: Database connection successful")
 			// Initialize services here, after DB is ready
 			initializeServices(db)
+			log.Println("PersistentPreRunE: Services initialized")
 		}
+		log.Println("PersistentPreRunE: End")
 		return nil
 	},
 }

@@ -31,6 +31,7 @@ var (
 	promptStyle    = lipgloss.NewStyle().Padding(0, 1)                                // Estilo para o texto do prompt.
 	focusedStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))            // Estilo para elementos focados (ex: cursor, botão).
 	blurredStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))            // Estilo para elementos não focados.
+	helpStyle      = blurredStyle.Copy()                                              // Reutiliza o estilo 'blurred' para a ajuda.
 	noStyle        = lipgloss.NewStyle()                                              // Estilo vazio.
 	errorStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("9"))              // Estilo para mensagens de erro (vermelho).
 	cursorModeHelp = helpStyle.Render("modo cursor está habilitado")                  // Mensagem de ajuda para modo cursor (não usado ativamente na View).

@@ -218,6 +218,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// Dispara o comando Init do sub-modelo correspondente.
 					switch m.currentView {
 					case ConcreteDashboardView:
+						// Ao invés de mudar a view, iniciamos o dashboard no primeiro carregamento
+						if m.dashboardModel == nil {
+							m.dashboardModel = dashboard.New(m.taskService, m.classService, m.assessmentService, m.lessonService)
+						}
 						cmds = append(cmds, m.dashboardModel.Init())
 					case TaskManagementView:
 						cmds = append(cmds, m.tasksModel.Init())
@@ -235,9 +239,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.quitting = true
 				cmds = append(cmds, tea.Quit)
 			}
-			return m, tea.Batch(cmds...)
+			// Se a view for alterada para ConcreteDashboardView, o Update do dashboard será chamado no próximo ciclo.
+			// Não retornamos aqui ainda, para permitir que o Update do dashboard seja processado.
 		}
-		// Se não estiver no DashboardView, a tecla será passada para o sub-modelo ativo abaixo.
 
 	case error: // Captura erros globais (ex: de Inits de sub-modelos).
 		m.err = msg
@@ -253,46 +257,60 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	// Retorna true se a view deve voltar ao menu principal.
 	processSubmodelUpdate := func(currentSubModel tea.Model, kmsg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		newSubModel, newSubCmd := currentSubModel.Update(kmsg)
+		// A lógica de 'esc' agora é mais explícita por view
+		// para evitar que 'esc' sempre volte ao menu.
+		// A responsabilidade de voltar é do sub-modelo ou do AppModel.
+		// Exemplo: se o sub-modelo não estiver focado em um input, 'esc' volta.
+		// Esta função pode ser simplificada se a lógica de 'esc' for movida para dentro de cada sub-modelo.
 		if key.Matches(kmsg, key.NewBinding(key.WithKeys("esc"))) {
-			return newSubModel, newSubCmd, true
+			// Tenta converter para um tipo que tenha IsFocused()
+			type focuser interface {
+				IsFocused() bool
+			}
+			if f, ok := newSubModel.(focuser); ok && !f.IsFocused() {
+				return newSubModel, newSubCmd, true // Sinaliza para voltar ao menu
+			}
 		}
 		return newSubModel, newSubCmd, false
 	}
 
 	switch m.currentView {
 	case ConcreteDashboardView:
+		// O Dashboard é especial, ele é a "base" quando não é o menu.
+		// O menu (DashboardView) é uma sobreposição.
+		// Esta lógica precisa ser repensada.
+		// Se a view é ConcreteDashboardView, o dashboard deve ser atualizado.
 		updatedSubModel, submodelCmd = m.dashboardModel.Update(msg)
 		m.dashboardModel = updatedSubModel.(*dashboard.Model)
-		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
-			// O dashboard pode ter sua própria lógica de foco interno.
-			// Se o dashboard indicar que não está mais focado (ex: após pressionar Esc de um modal interno), volta ao menu.
-			if !m.dashboardModel.IsFocused() {
-				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir do Painel de Controle.")
-			}
+		// 'esc' no dashboard não deve fazer nada, pois é a tela base.
+		// 'm' para abrir o menu
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("m"))) {
+			m.currentView = DashboardView // Mostra o menu
+			log.Println("AppModel: Mostrando o menu principal sobre o dashboard.")
 		}
+
 	case TaskManagementView:
 		if km, ok := msg.(tea.KeyMsg); ok {
 			var shouldReturn bool
 			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.tasksModel, km)
 			m.tasksModel = updatedSubModel.(*tasks.Model)
 			if shouldReturn {
-				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Tarefas.")
+				m.currentView = ConcreteDashboardView // Volta para o dashboard
+				log.Println("AppModel: Voltando para o Dashboard a partir de Gerenciar Tarefas.")
 			}
 		} else {
 			updatedSubModel, submodelCmd = m.tasksModel.Update(msg)
 			m.tasksModel = updatedSubModel.(*tasks.Model)
 		}
-	// ... (Lógica similar para outros casos, usando processSubmodelUpdate para teclas) ...
+	// ... (Lógica similar para outros casos, voltando para ConcreteDashboardView) ...
 	case ClassManagementView:
 		if km, ok := msg.(tea.KeyMsg); ok {
 			var shouldReturn bool
 			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.classesModel, km)
 			m.classesModel = updatedSubModel.(*classes.Model)
 			if shouldReturn {
-				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Turmas.")
+				m.currentView = ConcreteDashboardView // Volta para o dashboard
+				log.Println("AppModel: Voltando para o Dashboard a partir de Gerenciar Turmas.")
 			}
 		} else {
 			updatedSubModel, submodelCmd = m.classesModel.Update(msg)
@@ -304,8 +322,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.assessmentsModel, km)
 			m.assessmentsModel = updatedSubModel.(*assessments.Model)
 			if shouldReturn {
-				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Avaliações.")
+				m.currentView = ConcreteDashboardView // Volta para o dashboard
+				log.Println("AppModel: Voltando para o Dashboard a partir de Gerenciar Avaliações.")
 			}
 		} else {
 			updatedSubModel, submodelCmd = m.assessmentsModel.Update(msg)
@@ -317,8 +335,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.questionsModel, km)
 			m.questionsModel = updatedSubModel.(*questions.Model)
 			if shouldReturn {
-				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir do Banco de Questões.")
+				m.currentView = ConcreteDashboardView // Volta para o dashboard
+				log.Println("AppModel: Voltando para o Dashboard a partir do Banco de Questões.")
 			}
 		} else {
 			updatedSubModel, submodelCmd = m.questionsModel.Update(msg)
@@ -330,8 +348,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.proofsModel, km)
 			m.proofsModel = updatedSubModel.(*proofs.Model)
 			if shouldReturn {
-				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerar Provas.")
+				m.currentView = ConcreteDashboardView // Volta para o dashboard
+				log.Println("AppModel: Voltando para o Dashboard a partir de Gerar Provas.")
 			}
 		} else {
 			updatedSubModel, submodelCmd = m.proofsModel.Update(msg)
@@ -359,32 +377,55 @@ func (m *Model) View() string {
 	var viewContent string
 	var help string // Texto de ajuda, pode ser contextual.
 
+	// Renderiza a view principal baseada no estado
 	switch m.currentView {
-	case DashboardView: // Se a view atual é o menu principal.
-		viewContent = m.list.View()
-		help = m.list.Help.View(m.list) // Usa a ajuda embutida do componente de lista.
 	case ConcreteDashboardView:
-		viewContent = m.dashboardModel.View()
-		help = "\nPressione 'esc' para voltar ao menu principal."
+		if m.dashboardModel != nil {
+			viewContent = m.dashboardModel.View()
+		} else {
+			viewContent = "Carregando Dashboard..." // ou um spinner
+		}
+		help = "\nPressione 'm' para abrir o menu, 'q' para sair."
 	case TaskManagementView:
 		viewContent = m.tasksModel.View()
-		help = "\nPressione 'esc' para voltar ao menu principal."
+		help = "\nPressione 'esc' para voltar ao dashboard."
 	case ClassManagementView:
 		viewContent = m.classesModel.View()
-		help = "\nPressione 'esc' para voltar ao menu principal."
+		help = "\nPressione 'esc' para voltar ao dashboard."
 	case AssessmentManagementView:
 		viewContent = m.assessmentsModel.View()
-		help = "\nPressione 'esc' para voltar ao menu principal."
+		help = "\nPressione 'esc' para voltar ao dashboard."
 	case QuestionBankView:
 		viewContent = m.questionsModel.View()
-		help = "\nPressione 'esc' para voltar ao menu principal."
+		help = "\nPressione 'esc' para voltar ao dashboard."
 	case ProofGenerationView:
 		viewContent = m.proofsModel.View()
-		help = "\nPressione 'esc' para voltar ao menu principal."
-	default: // Caso uma view desconhecida seja definida.
-		viewContent = fmt.Sprintf("Visão desconhecida: %s (%d)", m.currentView.String(), m.currentView)
-		help = "\nPressione 'esc' ou 'q' para tentar voltar ao menu principal."
+		help = "\nPressione 'esc' para voltar ao dashboard."
+	default:
+		// Por padrão, mostramos o dashboard se ele estiver pronto, ou o menu se for a seleção inicial.
+		if m.dashboardModel != nil && !m.dashboardModel.IsLoading() {
+			viewContent = m.dashboardModel.View()
+			help = "\nPressione 'm' para abrir o menu, 'q' para sair."
+		} else {
+			viewContent = m.list.View()
+			help = m.list.Help.View(m.list)
+		}
 	}
+
+	// Se a view for o menu (DashboardView), ele é renderizado sobre a view atual.
+	if m.currentView == DashboardView {
+		// Place a lista do menu no centro da tela
+		viewContent = lipgloss.Place(
+			m.width, m.height,
+			lipgloss.Center, lipgloss.Center,
+			lipgloss.JoinVertical(
+				lipgloss.Center,
+				m.list.View(),
+				m.list.Help.View(m.list),
+			),
+		)
+	}
+
 
 	// Junta o conteúdo da view principal com o texto de ajuda.
 	finalRender := lipgloss.JoinVertical(lipgloss.Left,

@@ -56,6 +56,11 @@ func (m *MockTaskService) MarkTaskAsCompleted(ctx context.Context, taskID int64)
 	return args.Error(0)
 }
 
+func (m *MockTaskService) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
+	args := m.Called(ctx, userID, fromDate, limit)
+	return args.Get(0).([]models.Task), args.Error(1)
+}
+
 func (m *MockTaskService) GetTaskByID(ctx context.Context, taskID int64) (*models.Task, error) {
 	args := m.Called(ctx, taskID)
 	if args.Get(0) == nil {

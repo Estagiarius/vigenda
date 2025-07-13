@@ -32,18 +32,13 @@ const (
 	// Distingue-se de DashboardView (menu principal) para permitir uma navegação clara.
 	ConcreteDashboardView
 
-	// StudentView é um exemplo de uma sub-visualização, possivelmente para listar ou editar alunos.
-	// O seu uso e contexto exato podem depender de como o ClassManagementView é implementado.
-	// NOTA: Este valor (99) está fora da sequência iota e foi usado em tui.go;
-	// considerar reavaliar sua necessidade ou integrá-lo melhor ao enum.
-	StudentView View = 99 // Usado em tui.go, verificar se é necessário aqui ou se é específico daquele contexto.
 	// TODO: Adicionar outras visualizações conforme são desenvolvidas, mantendo o iota ou usando valores explícitos.
 )
 
 // String retorna a representação textual amigável de uma View.
 // Usado para exibir títulos de menu ou identificar a visualização atual.
 // É crucial que a ordem e o número de strings neste array correspondam
-// exatamente às constantes View definidas acima (exceto para valores explícitos como StudentView).
+// exatamente às constantes View definidas acima.
 func (v View) String() string {
 	switch v {
 	case DashboardView:
@@ -60,8 +55,6 @@ func (v View) String() string {
 		return "Gerar Provas"
 	case ConcreteDashboardView:
 		return "Painel de Controle"
-	case StudentView: // Caso para o valor explícito
-		return "Visualizar Alunos" // Ou um nome mais apropriado
 	default:
 		return "Visualização Desconhecida"
 	}

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 	"vigenda/internal/models"
-	"vigenda/internal/repository" // Assuming stubs might need repository interfaces
+	"vigenda/internal/repository/stubs"
 )
 
 // --- Stub Service Implementations ---
@@ -22,8 +22,8 @@ type stubTaskService struct {
 }
 
 // NewStubTaskService creates a new stub instance of TaskService.
-func NewStubTaskService(taskRepo repository.TaskRepository) TaskService { // Changed param type
-	return &stubTaskService{taskRepo: taskRepo}
+func NewStubTaskService() TaskService {
+	return &stubTaskService{taskRepo: stubs.NewMockTaskRepository()}
 }
 
 func (s *stubTaskService) CreateTask(ctx context.Context, title, description string, classID *int64, dueDate *time.Time) (models.Task, error) {
@@ -116,8 +116,8 @@ type stubClassService struct {
 }
 
 // NewStubClassService creates a new stub instance of ClassService.
-func NewStubClassService(classRepo repository.ClassRepository) ClassService {
-	return &stubClassService{classRepo: classRepo}
+func NewStubClassService() ClassService {
+	return &stubClassService{classRepo: stubs.NewMockClassRepository()}
 }
 
 func (s *stubClassService) CreateClass(ctx context.Context, name string, subjectID int64) (models.Class, error) {
@@ -288,8 +288,8 @@ type stubAssessmentService struct {
 }
 
 // NewStubAssessmentService creates a new stub instance of AssessmentService.
-func NewStubAssessmentService(assessmentRepo repository.AssessmentRepository) AssessmentService {
-	return &stubAssessmentService{assessmentRepo: assessmentRepo}
+func NewStubAssessmentService() AssessmentService {
+	return &stubAssessmentService{assessmentRepo: stubs.NewMockAssessmentRepository()}
 }
 
 func (s *stubAssessmentService) CreateAssessment(ctx context.Context, name string, classID int64, term int, weight float64) (models.Assessment, error) {
@@ -343,8 +343,11 @@ type stubQuestionService struct {
 	subjectRepo  repository.SubjectRepository
 }
 
-func NewStubQuestionService(qRepo repository.QuestionRepository, sRepo repository.SubjectRepository) QuestionService {
-	return &stubQuestionService{questionRepo: qRepo, subjectRepo: sRepo}
+func NewStubQuestionService() QuestionService {
+	return &stubQuestionService{
+		questionRepo: stubs.NewMockQuestionRepository(),
+		subjectRepo:  stubs.NewMockSubjectRepository(),
+	}
 }
 
 func (s *stubQuestionService) AddQuestionsFromJSON(ctx context.Context, jsonData []byte) (int, error) {
@@ -362,8 +365,8 @@ type stubProofService struct {
 	questionRepo repository.QuestionRepository
 }
 
-func NewStubProofService(qRepo repository.QuestionRepository) ProofService {
-	return &stubProofService{questionRepo: qRepo}
+func NewStubProofService() ProofService {
+	return &stubProofService{questionRepo: stubs.NewMockQuestionRepository()}
 }
 
 func (s *stubProofService) GenerateProof(ctx context.Context, criteria ProofCriteria) ([]models.Question, error) {
@@ -373,4 +376,36 @@ func (s *stubProofService) GenerateProof(ctx context.Context, criteria ProofCrit
 		Topic:     criteria.Topic,
 	}
 	return s.questionRepo.GetQuestionsByCriteria(ctx, qCriteria)
+}
+
+// StubLessonService
+type stubLessonService struct {
+	lessonRepo repository.LessonRepository
+}
+
+func NewStubLessonService() LessonService {
+	return &stubLessonService{lessonRepo: stubs.NewMockLessonRepository()}
+}
+
+func (s *stubLessonService) CreateLesson(ctx context.Context, title string, content string, classID int64, scheduledAt time.Time) (models.Lesson, error) {
+	lesson := models.Lesson{
+		Title:       title,
+		PlanContent: content,
+		ClassID:     classID,
+		ScheduledAt: scheduledAt,
+	}
+	id, err := s.lessonRepo.CreateLesson(ctx, &lesson)
+	if err != nil {
+		return models.Lesson{}, err
+	}
+	lesson.ID = id
+	return lesson, nil
+}
+
+func (s *stubLessonService) GetLessonsByClass(ctx context.Context, classID int64) ([]models.Lesson, error) {
+	return s.lessonRepo.GetLessonsByClass(ctx, classID)
+}
+
+func (s *stubLessonService) GetLessonsForDate(ctx context.Context, userID int64, date time.Time) ([]models.Lesson, error) {
+	return s.lessonRepo.GetLessonsByDate(ctx, userID, date)
 }

@@ -271,6 +271,10 @@ func (m *Model) IsFocused() bool {
 	return false
 }
 
+func (m *Model) IsLoading() bool {
+	return m.isLoading
+}
+
 // --- Mensagens para carregamento de dados (exemplos) ---
 // Estas seriam definidas mais concretamente quando a lógica de fetch for implementada.
 
