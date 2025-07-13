@@ -193,3 +193,33 @@ func (s *assessmentServiceImpl) ListAllAssessments(ctx context.Context) ([]model
 	}
 	return assessments, nil
 }
+
+func (s *assessmentServiceImpl) DeleteAssessment(ctx context.Context, assessmentID int64) error {
+	if assessmentID == 0 {
+		return fmt.Errorf("assessment ID cannot be zero")
+	}
+	return s.assessmentRepo.DeleteAssessment(ctx, assessmentID)
+}
+
+func (s *assessmentServiceImpl) GetStudentsForGrading(ctx context.Context, assessmentID int64) ([]models.Student, *models.Assessment, error) {
+	if assessmentID == 0 {
+		return nil, nil, fmt.Errorf("assessment ID cannot be zero")
+	}
+
+	// 1. Get the assessment details
+	assessment, err := s.assessmentRepo.GetAssessmentByID(ctx, assessmentID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("service.GetStudentsForGrading: failed to get assessment: %w", err)
+	}
+	if assessment == nil {
+		return nil, nil, fmt.Errorf("assessment with ID %d not found", assessmentID)
+	}
+
+	// 2. Get students from the assessment's class
+	students, err := s.classRepo.GetStudentsByClassID(ctx, assessment.ClassID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("service.GetStudentsForGrading: failed to get students for class ID %d: %w", assessment.ClassID, err)
+	}
+
+	return students, assessment, nil
+}

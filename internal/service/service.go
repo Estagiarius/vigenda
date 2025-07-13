@@ -82,6 +82,10 @@ type AssessmentService interface {
 	// ListAllAssessments retorna uma lista de todas as avaliações.
 	// Em um sistema multiusuário, isso seria filtrado pelo usuário ou turma.
 	ListAllAssessments(ctx context.Context) ([]models.Assessment, error)
+	// DeleteAssessment remove uma avaliação e suas notas associadas.
+	DeleteAssessment(ctx context.Context, assessmentID int64) error
+	// GetStudentsForGrading busca os alunos de uma turma associada a uma avaliação.
+	GetStudentsForGrading(ctx context.Context, assessmentID int64) ([]models.Student, *models.Assessment, error)
 }
 
 // QuestionService define a interface para a lógica de negócios relacionada ao banco de questões.

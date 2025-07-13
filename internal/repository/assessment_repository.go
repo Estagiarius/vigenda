@@ -194,3 +194,19 @@ func (r *assessmentRepository) ListAllAssessments(ctx context.Context) ([]models
 
 	return assessments, nil
 }
+
+func (r *assessmentRepository) DeleteAssessment(ctx context.Context, assessmentID int64) error {
+	query := `DELETE FROM assessments WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, assessmentID)
+	if err != nil {
+		return fmt.Errorf("assessmentRepository.DeleteAssessment: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("assessmentRepository.DeleteAssessment: could not get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("assessmentRepository.DeleteAssessment: no assessment found with ID %d", assessmentID)
+	}
+	return nil
+}

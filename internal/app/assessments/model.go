@@ -49,6 +49,7 @@ type Model struct {
 	currentAssessmentID *int64 // For context when entering grades or calculating average
 	studentsForGrading []models.Student // For EnterGradesView
 	gradesInput        map[int64]textinput.Model // studentID -> textinput for grade
+	gradeFocusIndex int  // New: To track focus on grade inputs
 
 	isLoading bool
 	err       error
@@ -81,15 +82,24 @@ type classAverageCalculatedMsg struct {
 	err     error
 }
 
+type assessmentDeletedMsg struct {
+	assessmentID int64
+	err          error
+}
+
 
 // --- Cmds ---
-func (m *Model) loadAssessmentsCmd(classID int64) tea.Cmd {
+func (m *Model) deleteAssessmentCmd(assessmentID int64) tea.Cmd {
 	return func() tea.Msg {
-		// Assuming a service method like ListAssessmentsByClass exists
-		// If not, this needs adjustment. For now, this is a placeholder.
-		// assessments, err := m.assessmentService.ListAssessmentsByClass(context.Background(), classID)
-		// For a generic list, maybe ListAllAssessments if that's more appropriate first
-		assessments, err := m.assessmentService.ListAllAssessments(context.Background()) // Placeholder
+		err := m.assessmentService.DeleteAssessment(context.Background(), assessmentID)
+		return assessmentDeletedMsg{assessmentID: assessmentID, err: err}
+	}
+}
+
+func (m *Model) loadAssessmentsCmd() tea.Cmd {
+	m.isLoading = true
+	return func() tea.Msg {
+		assessments, err := m.assessmentService.ListAllAssessments(context.Background())
 		return assessmentsLoadedMsg{assessments: assessments, err: err}
 	}
 }
@@ -209,9 +219,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.resetForms()
 					switch selected.title {
 					case "Listar Avaliações":
-						m.isLoading = true
-						m.state = ListAssessmentsView // Dedicated view for table
-						cmds = append(cmds, m.loadAssessmentsCmd(0)) // 0 for all, or adapt service
+						m.state = ListAssessmentsView
+						cmds = append(cmds, m.loadAssessmentsCmd())
 					case "Criar Nova Avaliação":
 						m.state = CreateAssessmentView
 						m.setupCreateAssessmentForm()
@@ -226,11 +235,22 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 		case ListAssessmentsView: // Navigating the table of assessments
-			// m.table, cmd = m.table.Update(msg)
-			var updatedTable table.Model
-			updatedTable, cmd = m.table.Update(msg)
-			m.table = updatedTable
-			cmds = append(cmds, cmd)
+			if key.Matches(msg, key.NewBinding(key.WithKeys("d"))) {
+				selectedRow := m.table.SelectedRow()
+				if len(selectedRow) > 0 {
+					assessmentID, _ := strconv.ParseInt(selectedRow[0], 10, 64)
+					m.isLoading = true
+					m.message = fmt.Sprintf("Deletando avaliação ID %d...", assessmentID)
+					cmds = append(cmds, m.deleteAssessmentCmd(assessmentID))
+				}
+			} else if key.Matches(msg, key.NewBinding(key.WithKeys("e"))) {
+				// Placeholder for edit functionality
+			} else {
+				var updatedTable table.Model
+				updatedTable, cmd = m.table.Update(msg)
+				m.table = updatedTable
+				cmds = append(cmds, cmd)
+			}
 
 		case CreateAssessmentView:
 			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
@@ -246,6 +266,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case EnterGradesView:
 			if len(m.studentsForGrading) == 0 { // Still asking for Assessment ID
+				m.err = nil // Clear previous errors on new keypress
 				if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
 					if m.focusIndex == 1 { // Submit button for ID input
 						m.isLoading = true
@@ -267,12 +288,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cmds = append(cmds, cmd)
 				}
 			} else { // Displaying students and grade inputs
-				if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
-					m.isLoading = true
-					cmds = append(cmds, m.submitGradesCmd())
-				} else {
-					// Simplified: This would need focus management for m.gradesInput
-				}
+				cmds = append(cmds, m.updateGradeInputs(msg))
 			}
 
 		case ClassAverageView: // Asking for Class ID
@@ -360,6 +376,16 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.gradesInput = make(map[int64]textinput.Model)
 		}
 
+	case assessmentDeletedMsg:
+		m.isLoading = false
+		if msg.err != nil {
+			m.err = fmt.Errorf("Erro ao deletar avaliação ID %d: %w", msg.assessmentID, msg.err)
+		} else {
+			m.message = fmt.Sprintf("Avaliação ID %d deletada com sucesso.", msg.assessmentID)
+			// Refresh the list
+			cmds = append(cmds, m.loadAssessmentsCmd())
+		}
+
 	case error:
 		m.err = msg
 		m.isLoading = false
@@ -426,19 +452,31 @@ func (m *Model) View() string {
 			}
 			b.WriteString("\n" + submitButton + "\n\n")
 		} else { // Displaying students for grade entry
-			b.WriteString(fmt.Sprintf("Lançando notas para Avaliação ID %d\n", *m.currentAssessmentID))
-			// This needs a proper table or formatted list for students and their grade inputs
-			b.WriteString("Aluno ID | Nome do Aluno        | Nota\n")
-			b.WriteString(strings.Repeat("-", 40) + "\n")
+			b.WriteString(fmt.Sprintf("Lançando notas para Avaliação ID %d: %s\n\n", *m.currentAssessmentID, m.message))
+
+			// Using the existing table component for a structured layout
+			gradeTableCols := []table.Column{
+				{Title: "Aluno", Width: 30},
+				{Title: "Nota", Width: 15},
+			}
+			gradeTableRows := []table.Row{}
+			// This part is tricky as table.Row doesn't directly support textinput.Model.
+			// The view logic will need to be more sophisticated, rendering inputs separately or
+			// building a string representation that includes the input's view.
+			// For now, let's build a simpler string-based view.
+			b.WriteString(lipgloss.NewStyle().Bold(true).Render("Aluno                         Nota\n"))
+			b.WriteString(strings.Repeat("-", 45) + "\n")
 			for _, s := range m.studentsForGrading {
 				gradeInputView := ""
-				if gi, ok := m.gradesInput[s.ID]; ok {
-					gradeInputView = gi.View()
+				if ti, ok := m.gradesInput[s.ID]; ok {
+					gradeInputView = ti.View()
 				}
-				b.WriteString(fmt.Sprintf("%-8d | %-20s | %s\n", s.ID, s.FullName, gradeInputView))
+				// Simple layout, can be improved with lipgloss.JoinHorizontal, etc.
+				b.WriteString(fmt.Sprintf("%-30s %s\n", s.FullName, gradeInputView))
 			}
-			b.WriteString("\n[ Submeter Todas as Notas (Enter) ] [ Cancelar (Esc) ]\n")
-			b.WriteString("Navegação entre campos de nota e submissão final ainda é simplificada.\n")
+
+			b.WriteString("\n[ Salvar Notas (Ctrl+S) ] [ Cancelar (Esc) ]\n")
+			b.WriteString("Use ↑/↓ para navegar, Enter/Tab para editar, Esc para sair da edição.\n")
 		}
 
 	case ClassAverageView: // Asking for Class ID
@@ -578,24 +616,31 @@ func (m *Model) updateFormInputs(msg tea.Msg) tea.Cmd {
 }
 
 func (m *Model) submitCreateAssessmentFormCmd() tea.Cmd {
-	name := m.textInputs[0].Value()
-	classIDStr := m.textInputs[1].Value()
-	termStr := m.textInputs[2].Value()
-	weightStr := m.textInputs[3].Value()
-
-	if name == "" || classIDStr == "" || termStr == "" || weightStr == "" {
-		m.err = fmt.Errorf("Todos os campos são obrigatórios.")
-		m.isLoading = false
-		return nil
-	}
-	classID, err := strconv.ParseInt(classIDStr, 10, 64)
-	if err != nil { m.err = fmt.Errorf("ID da Turma inválido"); m.isLoading = false; return nil }
-	term, err := strconv.Atoi(termStr)
-	if err != nil { m.err = fmt.Errorf("Período inválido"); m.isLoading = false; return nil }
-	weight, err := strconv.ParseFloat(weightStr, 64)
-	if err != nil { m.err = fmt.Errorf("Peso inválido"); m.isLoading = false; return nil }
-
 	return func() tea.Msg {
+		name := m.textInputs[0].Value()
+		classIDStr := m.textInputs[1].Value()
+		termStr := m.textInputs[2].Value()
+		weightStr := m.textInputs[3].Value()
+
+		if name == "" || classIDStr == "" || termStr == "" || weightStr == "" {
+			return assessmentCreatedMsg{err: fmt.Errorf("todos os campos são obrigatórios")}
+		}
+
+		classID, err := strconv.ParseInt(classIDStr, 10, 64)
+		if err != nil {
+			return assessmentCreatedMsg{err: fmt.Errorf("ID da turma inválido: '%s'", classIDStr)}
+		}
+
+		term, err := strconv.Atoi(termStr)
+		if err != nil {
+			return assessmentCreatedMsg{err: fmt.Errorf("período inválido: '%s'", termStr)}
+		}
+
+		weight, err := strconv.ParseFloat(weightStr, 64)
+		if err != nil {
+			return assessmentCreatedMsg{err: fmt.Errorf("peso inválido: '%s'", weightStr)}
+		}
+
 		asm, err := m.assessmentService.CreateAssessment(context.Background(), name, classID, term, weight)
 		return assessmentCreatedMsg{assessment: asm, err: err}
 	}
@@ -603,14 +648,15 @@ func (m *Model) submitCreateAssessmentFormCmd() tea.Cmd {
 
 func (m *Model) loadStudentsForGradingCmd(assessmentID int64) tea.Cmd {
 	return func() tea.Msg {
-		// This requires assessmentService to have a method like GetStudentsForAssessmentGrading
-		// Which in turn might need to fetch the assessment, then its class, then students of that class.
-		// For now, this is a placeholder for that complex logic.
-		// students, assessmentName, err := m.assessmentService.GetStudentsAndAssessmentNameForGrading(context.Background(), assessmentID)
-		// return studentsForGradingLoadedMsg{students: students, assessmentName: assessmentName, err: err}
-
-		// Simulating a failure as the service method is complex and likely not there yet.
-		return studentsForGradingLoadedMsg{err: fmt.Errorf("serviço para carregar alunos para avaliação não implementado")}
+		students, assessment, err := m.assessmentService.GetStudentsForGrading(context.Background(), assessmentID)
+		if err != nil {
+			return studentsForGradingLoadedMsg{err: err}
+		}
+		return studentsForGradingLoadedMsg{
+			students:       students,
+			assessmentName: assessment.Name,
+			err:            nil,
+		}
 	}
 }
 
@@ -700,11 +746,71 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
-// Changed to pointer receiver for consistency, though it doesn't modify state.
-func (m *Model) IsFocused() bool {
-	// Focused if in any form input state
-	return m.state == CreateAssessmentView ||
-	       (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || // inputting assessment ID
-	       (m.state == EnterGradesView && len(m.studentsForGrading) > 0) || // inputting grades (complex focus)
-	       m.state == ClassAverageView // inputting class ID
+func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
+	var cmds []tea.Cmd
+
+	keyMsg, ok := msg.(tea.KeyMsg)
+	if !ok {
+		return nil
+	}
+
+	// When not in text input mode, navigate between students
+	if m.gradeFocusIndex < len(m.studentsForGrading) {
+		focusedStudent := m.studentsForGrading[m.gradeFocusIndex]
+		if ti, exists := m.gradesInput[focusedStudent.ID]; !exists || !ti.Focused() {
+			switch {
+			case key.Matches(keyMsg, key.NewBinding(key.WithKeys("up"))):
+				if m.gradeFocusIndex > 0 {
+					m.gradeFocusIndex--
+				}
+			case key.Matches(keyMsg, key.NewBinding(key.WithKeys("down"))):
+				if m.gradeFocusIndex < len(m.studentsForGrading)-1 {
+					m.gradeFocusIndex++
+				}
+			case key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"), key.WithKeys("tab"))):
+				// Focus the text input for the current student
+				if ti, exists := m.gradesInput[focusedStudent.ID]; exists {
+					cmds = append(cmds, ti.Focus())
+					m.gradesInput[focusedStudent.ID] = ti
+				}
+			case key.Matches(keyMsg, key.NewBinding(key.WithKeys("ctrl+s"))):
+				m.isLoading = true
+				cmds = append(cmds, m.submitGradesCmd())
+			}
+		}
+	}
+
+	// Update the focused text input
+	for i, student := range m.studentsForGrading {
+		if ti, exists := m.gradesInput[student.ID]; exists && ti.Focused() {
+			// Handle Enter and Esc within the text input
+			if key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"))) {
+				ti.Blur()
+				// Move to next student
+				if i < len(m.studentsForGrading)-1 {
+					m.gradeFocusIndex = i + 1
+				}
+			} else if key.Matches(keyMsg, key.NewBinding(key.WithKeys("esc"))) {
+				ti.Blur()
+			} else {
+				var cmd tea.Cmd
+				m.gradesInput[student.ID], cmd = ti.Update(msg)
+				cmds = append(cmds, cmd)
+			}
+		}
+	}
+
+	// Refocus based on gradeFocusIndex
+	for i, student := range m.studentsForGrading {
+		ti := m.gradesInput[student.ID]
+		if i == m.gradeFocusIndex && !ti.Focused() {
+			// Visual cue for focus, without cursor
+			ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+		} else {
+			ti.PromptStyle = lipgloss.NewStyle()
+		}
+		m.gradesInput[student.ID] = ti
+	}
+
+	return tea.Batch(cmds...)
 }
