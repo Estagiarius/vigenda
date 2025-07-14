@@ -86,11 +86,6 @@ type studentsForGradingLoadedMsg struct {
 type gradesEnteredMsg struct {
 	err error
 }
-type classAverageCalculatedMsg struct {
-	average float64
-	className string // Or ClassID
-	err     error
-}
 
 type assessmentDeletedMsg struct {
 	assessmentID int64
