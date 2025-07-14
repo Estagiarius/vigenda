@@ -323,9 +323,14 @@ func (s *stubAssessmentService) EnterGrades(ctx context.Context, assessmentID in
 	return nil
 }
 
-func (s *stubAssessmentService) CalculateClassAverage(ctx context.Context, classID int64) (float64, error) {
-	fmt.Printf("[StubAssessmentService] CalculateClassAverage for ClassID %d\n", classID)
-	return 7.5, nil
+func (s *stubAssessmentService) CalculateClassAverage(ctx context.Context, classID int64, terms []int) (map[int64]float64, error) {
+	fmt.Printf("[StubAssessmentService] CalculateClassAverage for ClassID %d with terms %v\n", classID, terms)
+	// Return a map of student IDs to their calculated average grades.
+	return map[int64]float64{
+		101: 8.5,
+		102: 9.0,
+		103: 7.2,
+	}, nil
 }
 
 func (s *stubAssessmentService) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {
@@ -335,6 +340,38 @@ func (s *stubAssessmentService) ListAllAssessments(ctx context.Context) ([]model
 		{ID: 1, ClassID: 1, Name: "Prova 1 Stub", Term: 1, Weight: 2, AssessmentDate: &now},
 		{ID: 2, ClassID: 1, Name: "Trabalho 1 Stub", Term: 1, Weight: 1.5, AssessmentDate: &now},
 	}, nil
+}
+
+func (s *stubAssessmentService) DeleteAssessment(ctx context.Context, assessmentID int64) error {
+	fmt.Printf("[StubAssessmentService] DeleteAssessment called for AssessmentID %d\n", assessmentID)
+	// In a real stub, you might want to check if it exists in a slice or map.
+	// For compilation, just returning nil is sufficient.
+	return nil
+}
+
+func (s *stubAssessmentService) GetStudentsForGrading(ctx context.Context, assessmentID int64) ([]models.Student, *models.Assessment, error) {
+	fmt.Printf("[StubAssessmentService] GetStudentsForGrading called for AssessmentID %d\n", assessmentID)
+	// This stub needs to return some data for the TUI to display.
+	assessment := &models.Assessment{
+		ID:      assessmentID,
+		ClassID: 1,
+		Name:    "Prova Stub para Lançamento",
+		Term:    1,
+		Weight:  4.0,
+	}
+	students := []models.Student{
+		{ID: 101, ClassID: 1, FullName: "Alice", Status: "ativo"},
+		{ID: 102, ClassID: 1, FullName: "Bob", Status: "ativo"},
+		{ID: 103, ClassID: 1, FullName: "Charlie", Status: "ativo"},
+	}
+	return students, assessment, nil
+}
+
+func (s *stubAssessmentService) EnterFinalGrades(ctx context.Context, classID int64, finalGrades map[int64]float64) error {
+	fmt.Printf("[StubAssessmentService] EnterFinalGrades for ClassID %d: %+v\n", classID, finalGrades)
+	// In a real stub, you would find the "Nota Final" assessment and use EnterGrades.
+	// For compilation, returning nil is sufficient.
+	return nil
 }
 
 // StubQuestionService

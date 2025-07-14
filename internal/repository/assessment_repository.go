@@ -98,6 +98,28 @@ func (r *assessmentRepository) EnterGrade(ctx context.Context, grade *models.Gra
 	return nil
 }
 
+func (r *assessmentRepository) FindAssessmentByNameAndClass(ctx context.Context, name string, classID int64) (*models.Assessment, error) {
+	query := `SELECT id, class_id, name, term, weight, assessment_date
+              FROM assessments WHERE name = ? AND class_id = ?`
+	row := r.db.QueryRowContext(ctx, query, name, classID)
+	assessment := &models.Assessment{}
+	err := row.Scan(
+		&assessment.ID,
+		&assessment.ClassID,
+		&assessment.Name,
+		&assessment.Term,
+		&assessment.Weight,
+		&assessment.AssessmentDate,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Not found is not an error here
+		}
+		return nil, fmt.Errorf("assessmentRepository.FindAssessmentByNameAndClass: %w", err)
+	}
+	return assessment, nil
+}
+
 func (r *assessmentRepository) GetGradesByClassID(ctx context.Context, classID int64) ([]models.Grade, []models.Assessment, []models.Student, error) {
 	assessmentsQuery := `SELECT id, class_id, name, term, weight, assessment_date FROM assessments WHERE class_id = ?`
 	assessmentRows, err := r.db.QueryContext(ctx, assessmentsQuery, classID)
@@ -193,4 +215,20 @@ func (r *assessmentRepository) ListAllAssessments(ctx context.Context) ([]models
 	}
 
 	return assessments, nil
+}
+
+func (r *assessmentRepository) DeleteAssessment(ctx context.Context, assessmentID int64) error {
+	query := `DELETE FROM assessments WHERE id = ?`
+	result, err := r.db.ExecContext(ctx, query, assessmentID)
+	if err != nil {
+		return fmt.Errorf("assessmentRepository.DeleteAssessment: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("assessmentRepository.DeleteAssessment: could not get rows affected: %w", err)
+	}
+	if rowsAffected == 0 {
+		return fmt.Errorf("assessmentRepository.DeleteAssessment: no assessment found with ID %d", assessmentID)
+	}
+	return nil
 }
