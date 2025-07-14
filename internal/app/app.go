@@ -109,7 +109,7 @@ func New(
 	// Inicializa todos os sub-modelos, injetando suas respectivas dependências de serviço.
 	tm := tasks.New(ts)
 	cm := classes.New(cs)
-	am := assessments.New(as)
+	am := assessments.New(as, cs) // Passa ClassService aqui
 	qm := questions.New(qs)
 	pm := proofs.New(ps)
 	dshModel := dashboard.New(ts, cs, as, ls)
