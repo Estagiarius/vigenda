@@ -367,6 +367,13 @@ func (s *stubAssessmentService) GetStudentsForGrading(ctx context.Context, asses
 	return students, assessment, nil
 }
 
+func (s *stubAssessmentService) EnterFinalGrades(ctx context.Context, classID int64, finalGrades map[int64]float64) error {
+	fmt.Printf("[StubAssessmentService] EnterFinalGrades for ClassID %d: %+v\n", classID, finalGrades)
+	// In a real stub, you would find the "Nota Final" assessment and use EnterGrades.
+	// For compilation, returning nil is sufficient.
+	return nil
+}
+
 // StubQuestionService
 type stubQuestionService struct {
 	questionRepo repository.QuestionRepository
