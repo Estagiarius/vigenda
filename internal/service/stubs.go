@@ -323,9 +323,14 @@ func (s *stubAssessmentService) EnterGrades(ctx context.Context, assessmentID in
 	return nil
 }
 
-func (s *stubAssessmentService) CalculateClassAverage(ctx context.Context, classID int64) (float64, error) {
-	fmt.Printf("[StubAssessmentService] CalculateClassAverage for ClassID %d\n", classID)
-	return 7.5, nil
+func (s *stubAssessmentService) CalculateClassAverage(ctx context.Context, classID int64, terms []int) (map[int64]float64, error) {
+	fmt.Printf("[StubAssessmentService] CalculateClassAverage for ClassID %d with terms %v\n", classID, terms)
+	// Return a map of student IDs to their calculated average grades.
+	return map[int64]float64{
+		101: 8.5,
+		102: 9.0,
+		103: 7.2,
+	}, nil
 }
 
 func (s *stubAssessmentService) ListAllAssessments(ctx context.Context) ([]models.Assessment, error) {
