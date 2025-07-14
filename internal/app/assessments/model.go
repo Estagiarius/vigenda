@@ -630,7 +630,7 @@ func (m *Model) View() string {
 				}
 				b.WriteString(fmt.Sprintf("%-30s %s\n", s.FullName, gradeInputView))
 			}
-			b.WriteString("\n[ Salvar Notas (Ctrl+S) ] [ Calcular Média (Ctrl+C) ] [ Cancelar (Esc) ]\n")
+			b.WriteString("\n[ Salvar (Ctrl+S) ] [ Calcular Média (Ctrl+M) ] [ Cancelar (Esc) ]\n")
 		}
 
 	default:
