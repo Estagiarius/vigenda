@@ -711,12 +711,25 @@ O ID da turma é o identificador numérico único da turma.`,
 			return
 		}
 
-		average, err := assessmentService.CalculateClassAverage(context.Background(), classID)
+		// Passing nil for terms to calculate the overall average
+		studentAverages, err := assessmentService.CalculateClassAverage(context.Background(), classID, nil)
 		if err != nil {
 			fmt.Println("Error calculating class average:", err)
 			return
 		}
-		fmt.Printf("Average grade for Class ID %d: %.2f\n", classID, average)
+
+		if len(studentAverages) == 0 {
+			fmt.Println("No students with grades found to calculate an average.")
+			return
+		}
+
+		var totalAverage float64
+		for _, avg := range studentAverages {
+			totalAverage += avg
+		}
+		overallAverage := totalAverage / float64(len(studentAverages))
+
+		fmt.Printf("Overall average grade for Class ID %d: %.2f\n", classID, overallAverage)
 	},
 }
 
