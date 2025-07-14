@@ -718,7 +718,7 @@ func (m *Model) updateFocus() tea.Cmd {
 	numInputs := 0
 	if m.state == CreateAssessmentView {
 		numInputs = 4
-	} else if (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || m.state == ClassAverageView {
+	} else if (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || m.state == FinalGradesView {
 		numInputs = 1 // Single ID input
 	} else if m.state == EnterGradesView && len(m.studentsForGrading) > 0 {
 		// Complex: focus between grade inputs and a submit button
@@ -738,7 +738,7 @@ func (m *Model) updateInputFocusStyle() tea.Cmd {
 	// Determine active inputs based on state
 	if m.state == CreateAssessmentView {
 		numInputs = 4
-	} else if (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || m.state == ClassAverageView {
+	} else if (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || m.state == FinalGradesView {
 		numInputs = 1
 	} // Other states might not use these textInputs directly or have their own focus logic
 
@@ -761,8 +761,12 @@ func (m *Model) updateFormInputs(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 	// Update focused text input
 	activeInputs := 0
-	if m.state == CreateAssessmentView { activeInputs = 4 }
-	if (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || m.state == ClassAverageView { activeInputs = 1}
+	if m.state == CreateAssessmentView {
+		activeInputs = 4
+	}
+	if (m.state == EnterGradesView && len(m.studentsForGrading) == 0) || m.state == FinalGradesView {
+		activeInputs = 1
+	}
 
 
 	if m.focusIndex < activeInputs {
