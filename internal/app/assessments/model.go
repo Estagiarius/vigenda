@@ -646,7 +646,11 @@ func (m *Model) View() string {
 					lineStyle = lineStyle.Background(lipgloss.Color("237")) // Highlight the focused line
 				}
 
-				line := fmt.Sprintf("%-30s %s", studentName, gradeInputView)
+				studentNameStyle := lipgloss.NewStyle().Width(m.width - 20) // Allocate most width to name
+				line := lipgloss.JoinHorizontal(lipgloss.Left,
+					studentNameStyle.Render(studentName),
+					gradeInputView,
+				)
 				b.WriteString(lineStyle.Render(line) + "\n")
 			}
 			b.WriteString("\n" + helpStyle.Render("↑/↓: Navegar | Enter: Editar | Ctrl+S: Salvar | Esc: Voltar"))
@@ -925,9 +929,13 @@ func (m *Model) SetSize(width, height int) {
 	}
 
 	// Adjust gradesInput (these are typically smaller)
+	gradeInputWidth := 10
+	if m.width < 50 { // Shrink grade input on very small screens
+		gradeInputWidth = 5
+	}
 	for studentID := range m.gradesInput {
 		ti := m.gradesInput[studentID]
-		ti.Width = 10 // Keep grade inputs small and fixed width
+		ti.Width = gradeInputWidth
 		m.gradesInput[studentID] = ti
 	}
 }
