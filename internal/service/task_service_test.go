@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings" // Added import
 	"testing"
+	"time"
 	"vigenda/internal/models"
 	// "vigenda/internal/repository" // repository package is not directly used by this test file, types are defined locally or through models.
 
@@ -28,7 +29,7 @@ type MockTaskRepository struct {
 	CreatedBugTasks []models.Task
 }
 
-func (m *MockTaskRepository) GetUpcomingActiveTasks(ctx context.Context, days int) ([]models.Task, error) {
+func (m *MockTaskRepository) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -140,7 +141,7 @@ func TestTaskService_CreateTask(t *testing.T) {
 			t.Errorf("Expected a bug task to be created, but none found")
 		} else {
 			bugTask := mockRepo.CreatedBugTasks[0]
-			expectedBugTitle := "[BUG][AUTO][PRIORITY_PENDING] Task Creation Failure"
+			expectedBugTitle := "[BUG][AUTO][PRIORITY_PENDING] Falha na Criação de Tarefa"
 			if bugTask.Title != expectedBugTitle {
 				t.Errorf("Expected bug task title '%s', got '%s'", expectedBugTitle, bugTask.Title)
 			}
@@ -219,7 +220,7 @@ func TestTaskService_ListActiveTasksByClass(t *testing.T) {
 		}
 		if len(mockRepo.CreatedBugTasks) == 0 {
 			t.Errorf("Expected a bug task to be created")
-		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Task Listing By Class Failure") {
+		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Falha na Listagem de Tarefas por Turma") {
 			t.Errorf("Incorrect bug task title: %s", mockRepo.CreatedBugTasks[0].Title)
 		}
 	})
@@ -274,7 +275,7 @@ func TestTaskService_ListAllTasks(t *testing.T) {
 		}
 		if len(mockRepo.CreatedBugTasks) == 0 {
 			t.Errorf("Expected a bug task to be created")
-		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Global Task Listing Failure") { // Adjusted title
+		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Falha na Listagem Global de Tarefas") { // Adjusted title
 			t.Errorf("Incorrect bug task title: %s", mockRepo.CreatedBugTasks[0].Title)
 		}
 	})
@@ -344,7 +345,7 @@ func TestTaskService_ListAllActiveTasks(t *testing.T) {
 		}
 		if len(mockRepo.CreatedBugTasks) == 0 {
 			t.Errorf("Expected a bug task to be created")
-		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Global Active Task Listing Failure") { // Corrected expected bug title
+		} else if !strings.Contains(mockRepo.CreatedBugTasks[0].Title, "[BUG][AUTO][PRIORITY_PENDING] Falha na Listagem Global de Tarefas Ativas") { // Corrected expected bug title
 			t.Errorf("Incorrect bug task title: %s", mockRepo.CreatedBugTasks[0].Title)
 		}
 	})
