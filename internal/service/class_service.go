@@ -271,7 +271,8 @@ func (s *classServiceImpl) ImportStudentsFromCSV(ctx context.Context, classID in
 	// }
 
 	reader := csv.NewReader(strings.NewReader(string(csvData)))
-	if _, err := reader.Read(); err != nil { // Skip header
+	// Skip header
+	if _, err := reader.Read(); err != nil {
 		if err == io.EOF {
 			return 0, fmt.Errorf("CSV is empty or header-only")
 		}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/table"
+	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -28,6 +29,7 @@ const (
 	AddingStudentView
 	EditingStudentView
 	DeletingStudentConfirmView
+	EditingClassStudentsView
 )
 
 type FocusTarget int
@@ -60,6 +62,7 @@ type Model struct {
 	classService service.ClassService
 	state        ViewState
 	table        table.Model
+	textarea     textarea.Model
 	formInputs   struct {
 		inputs     []textinput.Model
 		focusIndex int
@@ -78,6 +81,11 @@ type Model struct {
 
 func New(cs service.ClassService) *Model {
 	log.Println("ClassesModel: New")
+
+	ta := textarea.New()
+	ta.Placeholder = "Cole o conteúdo do CSV aqui..."
+	ta.Focus()
+
 	classTable := table.New(
 		table.WithColumns([]table.Column{
 			{Title: columnTitleID, Width: 5},
@@ -114,6 +122,7 @@ func New(cs service.ClassService) *Model {
 		classService:  cs,
 		state:         ListView,
 		table:         classTable,
+		textarea:      ta,
 		studentsTable: studentsTable,
 		formInputs:    struct{ inputs []textinput.Model; focusIndex int }{inputs: []textinput.Model{}, focusIndex: 0},
 		isLoading:     true,
@@ -151,6 +160,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd = m.handleStudentUpdated(msg)
 	case studentDeletedMsg:
 		cmd = m.handleStudentDeleted(msg)
+	case studentsImportedMsg:
+		cmd = m.handleStudentsImported(msg)
 	case errMsg:
 		m.err = msg.err
 		m.isLoading = false
@@ -158,7 +169,11 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds = append(cmds, cmd)
 
 	// Update focused form input if any form is active
-	if (m.state == CreatingView || m.state == EditingClassView || m.state == AddingStudentView || m.state == EditingStudentView) &&
+	if m.state == EditingClassStudentsView {
+		var taCmd tea.Cmd
+		m.textarea, taCmd = m.textarea.Update(msg)
+		cmds = append(cmds, taCmd)
+	} else if (m.state == CreatingView || m.state == EditingClassView || m.state == AddingStudentView || m.state == EditingStudentView) &&
 		len(m.formInputs.inputs) > 0 && m.formInputs.focusIndex >= 0 && m.formInputs.focusIndex < len(m.formInputs.inputs) {
 		// Only update if the message is a KeyMsg and it wasn't an action key already handled by form logic
 		if keyMsg, ok := msg.(tea.KeyMsg); ok {
@@ -187,6 +202,24 @@ func (m *Model) handleKeyPress(msg tea.KeyMsg) tea.Cmd {
 		return m.handleStudentFormKeys(msg)
 	case DeletingStudentConfirmView:
 		return m.handleDeleteStudentConfirmKeys(msg)
+	case EditingClassStudentsView:
+		return m.handleStudentFormKeys(msg)
+	}
+	return nil
+}
+
+func (m *Model) handleStudentsImported(msg studentsImportedMsg) tea.Cmd {
+	m.isLoading = false
+	if msg.err != nil {
+		m.err = fmt.Errorf("importar alunos: %w", msg.err)
+		return nil
+	}
+	m.state = DetailsView
+	m.err = nil
+	m.resetFormInputs()
+	if m.selectedClass != nil {
+		m.isLoading = true
+		return m.fetchClassStudentsCmd(m.selectedClass.ID)
 	}
 	return nil
 }
@@ -242,7 +275,7 @@ func (m *Model) View() string {
 				}
 				b.WriteString(tableRender)
 			}
-			help := "Esc: Voltar | a: Add Aluno"
+			help := "Esc: Voltar | a: Add Aluno | i: Importar Alunos"
 			if len(m.classStudents) > 0 { // Only show table focus keys if there are students
 				if m.detailsViewFocusTarget == FocusTargetNone {
 					help += " | Tab: Focar Tabela Alunos"
@@ -268,6 +301,14 @@ func (m *Model) View() string {
 			b.WriteString("Esta ação não pode ser desfeita.\n\n")
 			b.WriteString(lipgloss.NewStyle().Faint(true).Render("Pressione 's' para confirmar, 'n' ou 'Esc' para cancelar."))
 		}
+	case EditingClassStudentsView:
+		title := "Importar Alunos"
+		if m.selectedClass != nil {
+			title = fmt.Sprintf("Importar Alunos para: %s", m.selectedClass.Name)
+		}
+		b.WriteString(lipgloss.NewStyle().Bold(true).MarginBottom(1).Render(title))
+		b.WriteString(m.textarea.View())
+		b.WriteString("\n" + lipgloss.NewStyle().Faint(true).Render("Cole o conteúdo do CSV aqui. | Ctrl+S: Salvar | Esc: Cancelar"))
 	}
 	return b.String()
 }
@@ -293,7 +334,7 @@ func (m *Model) SetSize(width, height int) {
 }
 
 func (m *Model) IsFocused() bool {
-	return m.state == CreatingView || m.state == EditingClassView || m.state == AddingStudentView || m.state == EditingStudentView
+	return m.state == CreatingView || m.state == EditingClassView || m.state == AddingStudentView || m.state == EditingStudentView || m.state == EditingClassStudentsView
 }
 
 // Key Handlers
@@ -402,6 +443,13 @@ func (m *Model) handleDetailsViewKeys(msg tea.KeyMsg) tea.Cmd {
 			m.prepareStudentForm(nil)
 			return textinput.Blink
 		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("i"))):
+		if m.selectedClass != nil {
+			m.state = EditingClassStudentsView
+			m.err = nil
+			// TODO: Prepare a form for CSV import
+			return textinput.Blink
+		}
 	case key.Matches(msg, key.NewBinding(key.WithKeys("tab"))):
 		if m.detailsViewFocusTarget == FocusTargetNone && len(m.classStudents) > 0 {
 			m.detailsViewFocusTarget = FocusTargetStudentsTable
@@ -451,6 +499,16 @@ func (m *Model) handleStudentFormKeys(msg tea.KeyMsg) tea.Cmd {
 		if m.selectedClass != nil {
 			m.isLoading = true
 			return m.fetchClassStudentsCmd(m.selectedClass.ID)
+		}
+	case key.Matches(msg, key.NewBinding(key.WithKeys("ctrl+s"))):
+		if m.state == EditingClassStudentsView {
+			csvData := m.textarea.Value()
+			if csvData == "" {
+				m.err = fmt.Errorf("nenhum dado CSV fornecido")
+				return nil
+			}
+			m.isLoading = true
+			return m.importStudentsCmd(m.selectedClass.ID, csvData)
 		}
 	case key.Matches(msg, key.NewBinding(key.WithKeys("enter"))):
 		if m.formInputs.focusIndex == len(m.formInputs.inputs)-1 { // Last field
@@ -722,6 +780,7 @@ type fetchedClassStudentsMsg struct { students []models.Student; err error }
 type studentAddedMsg struct { addedStudent models.Student; err error }
 type studentUpdatedMsg struct { updatedStudent models.Student; err error }
 type studentDeletedMsg struct { err error }
+type studentsImportedMsg struct { count int; err error }
 type errMsg struct{ err error }
 
 func (e errMsg) Error() string { return e.err.Error() }
@@ -797,5 +856,14 @@ func (m *Model) deleteStudentCmd(id int64) tea.Cmd {
 		defer cancel()
 		err := m.classService.DeleteStudent(ctx, id)
 		return studentDeletedMsg{err: err}
+	}
+}
+
+func (m *Model) importStudentsCmd(classID int64, csvData string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), dbOperationTimeout)
+		defer cancel()
+		count, err := m.classService.ImportStudentsFromCSV(ctx, classID, []byte(csvData))
+		return studentsImportedMsg{count: count, err: err}
 	}
 }

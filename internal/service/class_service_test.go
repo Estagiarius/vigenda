@@ -253,12 +253,37 @@ func TestClassServiceImpl_GetStudentsByClassID(t *testing.T) {
 	}
 }
 
-// Placeholder for ImportStudentsFromCSV and UpdateStudentStatus if more detailed tests are needed.
-// For now, the presence of tests for core CRUD operations is the main goal.
-func TestImportStudentsFromCSV(t *testing.T) {
-	// TODO: Implement test
-	// This test would be more complex, involving CSV parsing logic and multiple AddStudent calls.
-	// It might be better suited for integration testing or require more elaborate mocking.
+func TestClassServiceImpl_ImportStudentsFromCSV(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockClassRepo := stubs.NewMockClassRepository(ctrl)
+	classService := NewClassService(mockClassRepo, nil)
+
+	ctx := context.Background()
+	classID := int64(1)
+	csvData := `enrollment_id,full_name,status
+S001,Student One,ativo
+S002,Student Two,inativo
+,Student Three,
+S004,Student Four,transferido
+`
+
+	// Expect AddStudent to be called for each valid row
+	mockClassRepo.EXPECT().AddStudent(ctx, gomock.Any()).DoAndReturn(
+		func(ctx context.Context, s *models.Student) (int64, error) {
+			return 1, nil
+		}).Times(4)
+	mockClassRepo.EXPECT().GetStudentByID(ctx, gomock.Any()).Return(&models.Student{}, nil).AnyTimes()
+
+	importedCount, err := classService.ImportStudentsFromCSV(ctx, classID, []byte(csvData))
+	if err != nil {
+		t.Fatalf("ImportStudentsFromCSV failed: %v", err)
+	}
+
+	if importedCount != 4 {
+		t.Errorf("ImportStudentsFromCSV returned count %d, want %d", importedCount, 4)
+	}
 }
 
 func TestUpdateStudentStatus(t *testing.T) {
