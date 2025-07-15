@@ -375,20 +375,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case FinalGradesView:
 			if len(m.studentsForGrading) == 0 { // Asking for Class ID
 				if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
-					if m.focusIndex == 1 { // Submit button for ID input
-						m.isLoading = true
-						classIDStr := m.textInputs[0].Value()
-						classID, err := strconv.ParseInt(classIDStr, 10, 64)
-						if err != nil {
-							m.err = fmt.Errorf("ID da Turma inválido: %w", err)
-							m.isLoading = false
-						} else {
-							m.currentClassID = &classID
-							cmds = append(cmds, m.loadStudentsForFinalGradesCmd(classID))
-						}
-					} else { // Focus on input
-						m.textInputs[0], cmd = m.textInputs[0].Update(msg)
-						cmds = append(cmds, cmd)
+					m.isLoading = true
+					classIDStr := m.textInputs[0].Value()
+					classID, err := strconv.ParseInt(classIDStr, 10, 64)
+					if err != nil {
+						m.err = fmt.Errorf("ID da Turma inválido: %w", err)
+						m.isLoading = false
+					} else {
+						m.currentClassID = &classID
+						cmds = append(cmds, m.loadStudentsForFinalGradesCmd(classID))
 					}
 				} else { // Other keys for input
 					m.textInputs[0], cmd = m.textInputs[0].Update(msg)
