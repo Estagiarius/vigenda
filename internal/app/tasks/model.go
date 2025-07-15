@@ -777,9 +777,9 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
-// IsFocused returns true if the model is currently in a state that should trap Esc.
-func (m *Model) IsFocused() bool {
-	return m.currentView != TableView
+// CanGoBack returns true if the model is in a state where 'esc' should return to the main menu.
+func (m *Model) CanGoBack() bool {
+	return m.currentView == TableView
 }
 
 // IsLoading returns true if the model is currently loading data.

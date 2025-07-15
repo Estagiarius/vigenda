@@ -333,8 +333,8 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
-func (m *Model) IsFocused() bool {
-	return m.state == CreatingView || m.state == EditingClassView || m.state == AddingStudentView || m.state == EditingStudentView || m.state == EditingClassStudentsView
+func (m *Model) CanGoBack() bool {
+	return m.state == ListView
 }
 
 // Key Handlers

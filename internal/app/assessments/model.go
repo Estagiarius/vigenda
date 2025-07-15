@@ -972,6 +972,10 @@ func (m *Model) updatePopup(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m *Model) IsAtRoot() bool {
+	return m.state == ListView
+}
+
 func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
