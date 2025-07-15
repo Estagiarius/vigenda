@@ -624,7 +624,6 @@ func (m *Model) View() string {
 					if ti.Focused() {
 						gradeInputView = ti.View()
 					} else {
-						// Render as simple text if not focused
 						val := ti.Value()
 						if val == "" {
 							val = ti.Placeholder
