@@ -21,6 +21,8 @@ var baseStyle = lipgloss.NewStyle().
 	BorderStyle(lipgloss.NormalBorder()).
 	BorderForeground(lipgloss.Color("240"))
 
+var helpStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
 // ViewState defines the current state of the assessments view
 type ViewState int
 
@@ -306,9 +308,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					case "Lançar Notas":
 						m.state = EnterGradesView
 						m.setupEnterAssessmentIDForm("Lançar Notas para Avaliação ID:")
-					case "Calcular Média da Turma":
+					case "Lançar/Calcular Notas Finais":
 						m.state = FinalGradesView
-						m.setupEnterClassIDForm("Lançar/Calcular Notas Finais para Turma ID:")
+						m.setupEnterClassIDForm("ID da Turma para Lançar/Calcular Notas Finais:")
 					}
 				}
 			}
@@ -373,20 +375,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case FinalGradesView:
 			if len(m.studentsForGrading) == 0 { // Asking for Class ID
 				if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
-					if m.focusIndex == 1 { // Submit button for ID input
-						m.isLoading = true
-						classIDStr := m.textInputs[0].Value()
-						classID, err := strconv.ParseInt(classIDStr, 10, 64)
-						if err != nil {
-							m.err = fmt.Errorf("ID da Turma inválido: %w", err)
-							m.isLoading = false
-						} else {
-							m.currentClassID = &classID
-							cmds = append(cmds, m.loadStudentsForFinalGradesCmd(classID))
-						}
-					} else { // Focus on input
-						m.textInputs[0], cmd = m.textInputs[0].Update(msg)
-						cmds = append(cmds, cmd)
+					m.isLoading = true
+					classIDStr := m.textInputs[0].Value()
+					classID, err := strconv.ParseInt(classIDStr, 10, 64)
+					if err != nil {
+						m.err = fmt.Errorf("ID da Turma inválido: %w", err)
+						m.isLoading = false
+					} else {
+						m.currentClassID = &classID
+						cmds = append(cmds, m.loadStudentsForFinalGradesCmd(classID))
 					}
 				} else { // Other keys for input
 					m.textInputs[0], cmd = m.textInputs[0].Update(msg)
@@ -606,26 +603,57 @@ func (m *Model) View() string {
 		}
 
 	case FinalGradesView:
-		if len(m.studentsForGrading) == 0 { // Still asking for Class ID
+		if len(m.studentsForGrading) == 0 {
 			b.WriteString("Lançar/Calcular Notas Finais da Turma\n\n")
-			b.WriteString(m.textInputs[0].View() + "\n") // Class ID input
+			b.WriteString(m.textInputs[0].View() + "\n")
 			submitButton := "[ Carregar Alunos ]"
-			if m.focusIndex == 1 { // Assuming one input + submit
+			if m.focusIndex == 1 {
 				submitButton = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render(submitButton)
 			}
 			b.WriteString("\n" + submitButton + "\n\n")
-		} else { // Displaying students for final grade entry
+			b.WriteString("(Use Enter para submeter, Esc para voltar)")
+		} else {
 			b.WriteString(fmt.Sprintf("Lançando notas finais para Turma ID %d\n\n", *m.currentClassID))
-			b.WriteString(lipgloss.NewStyle().Bold(true).Render("Aluno                         Nota Final\n"))
-			b.WriteString(strings.Repeat("-", 45) + "\n")
-			for _, s := range m.studentsForGrading {
+			header := lipgloss.NewStyle().Bold(true).Render("Aluno                         Nota Final")
+			b.WriteString(header + "\n")
+			b.WriteString(strings.Repeat("─", 45) + "\n")
+
+			for i, s := range m.studentsForGrading {
 				gradeInputView := ""
 				if ti, ok := m.gradesInput[s.ID]; ok {
-					gradeInputView = ti.View()
+					if ti.Focused() {
+						gradeInputView = ti.View()
+					} else {
+						// Render as simple text if not focused
+						val := ti.Value()
+						if val == "" {
+							val = ti.Placeholder
+						}
+						style := lipgloss.NewStyle().Width(ti.Width).PaddingLeft(1)
+						if i == m.gradeFocusIndex {
+							style = style.Foreground(lipgloss.Color("205"))
+						}
+						gradeInputView = style.Render(val)
+					}
 				}
-				b.WriteString(fmt.Sprintf("%-30s %s\n", s.FullName, gradeInputView))
+				studentName := s.FullName
+				if len(studentName) > 28 {
+					studentName = studentName[:27] + "…"
+				}
+
+				lineStyle := lipgloss.NewStyle()
+				if i == m.gradeFocusIndex {
+					lineStyle = lineStyle.Background(lipgloss.Color("237")) // Highlight the focused line
+				}
+
+				studentNameStyle := lipgloss.NewStyle().Width(m.width - 20) // Allocate most width to name
+				line := lipgloss.JoinHorizontal(lipgloss.Left,
+					studentNameStyle.Render(studentName),
+					gradeInputView,
+				)
+				b.WriteString(lineStyle.Render(line) + "\n")
 			}
-			b.WriteString("\n[ Salvar (Ctrl+S) ] [ Calcular Média (Ctrl+M) ] [ Cancelar (Esc) ]\n")
+			b.WriteString("\n" + helpStyle.Render("↑/↓: Navegar | Enter: Editar | Ctrl+S: Salvar | Esc: Voltar"))
 		}
 
 	default:
@@ -901,9 +929,13 @@ func (m *Model) SetSize(width, height int) {
 	}
 
 	// Adjust gradesInput (these are typically smaller)
+	gradeInputWidth := 10
+	if m.width < 50 { // Shrink grade input on very small screens
+		gradeInputWidth = 5
+	}
 	for studentID := range m.gradesInput {
 		ti := m.gradesInput[studentID]
-		ti.Width = 10 // Keep grade inputs small and fixed width
+		ti.Width = gradeInputWidth
 		m.gradesInput[studentID] = ti
 	}
 }
@@ -943,6 +975,10 @@ func (m *Model) updatePopup(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m *Model) IsAtRoot() bool {
+	return m.state == ListView
+}
+
 func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
 	var cmds []tea.Cmd
 
@@ -951,72 +987,75 @@ func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
 		return nil
 	}
 
-	if key.Matches(keyMsg, key.NewBinding(key.WithKeys("ctrl+m"))) {
-		m.isPopupVisible = true
-		m.setupPopup()
-		return nil
+	// This is the main logic for handling grade inputs in both EnterGradesView and FinalGradesView
+	if m.gradeFocusIndex >= len(m.studentsForGrading) {
+		// Should not happen, but as a safeguard
+		m.gradeFocusIndex = 0
 	}
+	focusedStudent := m.studentsForGrading[m.gradeFocusIndex]
+	focusedInput, inputExists := m.gradesInput[focusedStudent.ID]
 
-	// When not in text input mode, navigate between students
-	if m.gradeFocusIndex < len(m.studentsForGrading) {
-		focusedStudent := m.studentsForGrading[m.gradeFocusIndex]
-		if ti, exists := m.gradesInput[focusedStudent.ID]; !exists || !ti.Focused() {
-			switch {
-			case key.Matches(keyMsg, key.NewBinding(key.WithKeys("up"))):
-				if m.gradeFocusIndex > 0 {
-					m.gradeFocusIndex--
-				}
-			case key.Matches(keyMsg, key.NewBinding(key.WithKeys("down"))):
-				if m.gradeFocusIndex < len(m.studentsForGrading)-1 {
-					m.gradeFocusIndex++
-				}
-			case key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"), key.WithKeys("tab"))):
-				// Focus the text input for the current student
-				if ti, exists := m.gradesInput[focusedStudent.ID]; exists {
-					cmds = append(cmds, ti.Focus())
-					m.gradesInput[focusedStudent.ID] = ti
-				}
-			case key.Matches(keyMsg, key.NewBinding(key.WithKeys("ctrl+s"))):
-				m.isLoading = true
-				if m.state == EnterGradesView {
-					cmds = append(cmds, m.submitGradesCmd())
-				} else if m.state == FinalGradesView {
-					cmds = append(cmds, m.submitFinalGradesCmd())
-				}
+	// Handle navigation and actions when an input is NOT focused for editing
+	if inputExists && !focusedInput.Focused() {
+		switch {
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("up"))):
+			if m.gradeFocusIndex > 0 {
+				m.gradeFocusIndex--
 			}
-		}
-	}
-
-	// Update the focused text input
-	for i, student := range m.studentsForGrading {
-		if ti, exists := m.gradesInput[student.ID]; exists && ti.Focused() {
-			// Handle Enter and Esc within the text input
-			if key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"))) {
-				ti.Blur()
-				// Move to next student
-				if i < len(m.studentsForGrading)-1 {
-					m.gradeFocusIndex = i + 1
-				}
-			} else if key.Matches(keyMsg, key.NewBinding(key.WithKeys("esc"))) {
-				ti.Blur()
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("down"))):
+			if m.gradeFocusIndex < len(m.studentsForGrading)-1 {
+				m.gradeFocusIndex++
+			}
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"))):
+			// Enter focuses the input for editing
+			focusedInput.Cursor.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+			cmds = append(cmds, focusedInput.Focus())
+			m.gradesInput[focusedStudent.ID] = focusedInput
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("ctrl+s"))):
+			m.isLoading = true
+			m.message = "Salvando notas..."
+			if m.state == FinalGradesView {
+				cmds = append(cmds, m.submitFinalGradesCmd())
 			} else {
-				var cmd tea.Cmd
-				m.gradesInput[student.ID], cmd = ti.Update(msg)
-				cmds = append(cmds, cmd)
+				cmds = append(cmds, m.submitGradesCmd())
+			}
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("ctrl+m"))):
+			if m.state == FinalGradesView {
+				m.isPopupVisible = true
+				m.setupPopup()
 			}
 		}
 	}
 
-	// Refocus based on gradeFocusIndex
-	for i, student := range m.studentsForGrading {
-		ti := m.gradesInput[student.ID]
-		if i == m.gradeFocusIndex && !ti.Focused() {
-			// Visual cue for focus, without cursor
-			ti.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-		} else {
-			ti.PromptStyle = lipgloss.NewStyle()
+	// Handle input updates when an input IS focused for editing
+	if inputExists && focusedInput.Focused() {
+		var cmd tea.Cmd
+		switch {
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("enter"))):
+			// Enter blurs the input and moves to the next student
+			focusedInput.Blur()
+			m.gradesInput[focusedStudent.ID] = focusedInput
+			if m.gradeFocusIndex < len(m.studentsForGrading)-1 {
+				m.gradeFocusIndex++
+			}
+		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("esc"))):
+			// Esc just blurs the current input
+			focusedInput.Blur()
+			m.gradesInput[focusedStudent.ID] = focusedInput
+		default:
+			// Any other key is passed to the text input
+			focusedInput, cmd = focusedInput.Update(msg)
+			m.gradesInput[focusedStudent.ID] = focusedInput
+			cmds = append(cmds, cmd)
 		}
-		m.gradesInput[student.ID] = ti
+	}
+
+	// Ensure all non-focused inputs are blurred
+	for id, ti := range m.gradesInput {
+		if id != focusedStudent.ID {
+			ti.Blur()
+			m.gradesInput[id] = ti
+		}
 	}
 
 	return tea.Batch(cmds...)

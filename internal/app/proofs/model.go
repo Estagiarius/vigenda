@@ -350,3 +350,7 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
+// CanGoBack returns true if the model is in a state where 'esc' should return to the main menu.
+func (m *Model) CanGoBack() bool {
+	return m.state == FormView
+}

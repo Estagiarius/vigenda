@@ -249,93 +249,62 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var submodelCmd tea.Cmd
 	var updatedSubModel tea.Model // Usar tea.Model para o tipo retornado por Update.
 
-	// Função helper para processar retorno de sub-modelo e tecla 'esc'.
-	// Retorna true se a view deve voltar ao menu principal.
-	processSubmodelUpdate := func(currentSubModel tea.Model, kmsg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
-		newSubModel, newSubCmd := currentSubModel.Update(kmsg)
-		if key.Matches(kmsg, key.NewBinding(key.WithKeys("esc"))) {
-			return newSubModel, newSubCmd, true
-		}
-		return newSubModel, newSubCmd, false
-	}
-
 	switch m.currentView {
 	case ConcreteDashboardView:
 		updatedSubModel, submodelCmd = m.dashboardModel.Update(msg)
 		m.dashboardModel = updatedSubModel.(*dashboard.Model)
+		// A lógica de 'esc' para o dashboard é um caso especial, pois ele pode ter foco interno.
 		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
-			// O dashboard pode ter sua própria lógica de foco interno.
-			// Se o dashboard indicar que não está mais focado (ex: após pressionar Esc de um modal interno), volta ao menu.
-			if !m.dashboardModel.IsFocused() {
+			if !m.dashboardModel.IsFocused() { // Se o dashboard não tem mais foco interno, volta ao menu.
 				m.currentView = DashboardView
 				log.Println("AppModel: Voltando para o Menu Principal a partir do Painel de Controle.")
 			}
 		}
 	case TaskManagementView:
-		if km, ok := msg.(tea.KeyMsg); ok {
-			var shouldReturn bool
-			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.tasksModel, km)
-			m.tasksModel = updatedSubModel.(*tasks.Model)
-			if shouldReturn {
+		updatedSubModel, submodelCmd = m.tasksModel.Update(msg)
+		m.tasksModel = updatedSubModel.(*tasks.Model)
+		// Se o sub-modelo de tarefas sinalizar que deve voltar (ex: após 'esc' no nível raiz),
+		// ele deve resetar seu próprio estado e o AppModel o trará de volta ao menu.
+		// Vamos assumir que o sub-modelo gerencia seu estado e nós apenas trocamos a view.
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if m.tasksModel.CanGoBack() { // Supondo que o modelo de tarefas tenha um método CanGoBack.
 				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Tarefas.")
 			}
-		} else {
-			updatedSubModel, submodelCmd = m.tasksModel.Update(msg)
-			m.tasksModel = updatedSubModel.(*tasks.Model)
 		}
-	// ... (Lógica similar para outros casos, usando processSubmodelUpdate para teclas) ...
 	case ClassManagementView:
-		if km, ok := msg.(tea.KeyMsg); ok {
-			var shouldReturn bool
-			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.classesModel, km)
-			m.classesModel = updatedSubModel.(*classes.Model)
-			if shouldReturn {
+		updatedSubModel, submodelCmd = m.classesModel.Update(msg)
+		m.classesModel = updatedSubModel.(*classes.Model)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if m.classesModel.CanGoBack() { // Supondo que o modelo de turmas tenha um método CanGoBack.
 				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Turmas.")
 			}
-		} else {
-			updatedSubModel, submodelCmd = m.classesModel.Update(msg)
-			m.classesModel = updatedSubModel.(*classes.Model)
 		}
 	case AssessmentManagementView:
-		if km, ok := msg.(tea.KeyMsg); ok {
-			var shouldReturn bool
-			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.assessmentsModel, km)
-			m.assessmentsModel = updatedSubModel.(*assessments.Model)
-			if shouldReturn {
+		updatedSubModel, submodelCmd = m.assessmentsModel.Update(msg)
+		m.assessmentsModel = updatedSubModel.(*assessments.Model)
+		// O modelo de avaliações tem sua própria navegação interna com 'esc'.
+		// Só voltamos ao menu se o 'esc' for pressionado na visualização principal (ListView) do sub-modelo.
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if m.assessmentsModel.IsAtRoot() { // Supondo que o modelo de avaliações tenha um método IsAtRoot.
 				m.currentView = DashboardView
 				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerenciar Avaliações.")
 			}
-		} else {
-			updatedSubModel, submodelCmd = m.assessmentsModel.Update(msg)
-			m.assessmentsModel = updatedSubModel.(*assessments.Model)
 		}
 	case QuestionBankView:
-		if km, ok := msg.(tea.KeyMsg); ok {
-			var shouldReturn bool
-			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.questionsModel, km)
-			m.questionsModel = updatedSubModel.(*questions.Model)
-			if shouldReturn {
+		updatedSubModel, submodelCmd = m.questionsModel.Update(msg)
+		m.questionsModel = updatedSubModel.(*questions.Model)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if m.questionsModel.CanGoBack() { // Supondo que o modelo de questões tenha um método CanGoBack.
 				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir do Banco de Questões.")
 			}
-		} else {
-			updatedSubModel, submodelCmd = m.questionsModel.Update(msg)
-			m.questionsModel = updatedSubModel.(*questions.Model)
 		}
 	case ProofGenerationView:
-		if km, ok := msg.(tea.KeyMsg); ok {
-			var shouldReturn bool
-			updatedSubModel, submodelCmd, shouldReturn = processSubmodelUpdate(m.proofsModel, km)
-			m.proofsModel = updatedSubModel.(*proofs.Model)
-			if shouldReturn {
+		updatedSubModel, submodelCmd = m.proofsModel.Update(msg)
+		m.proofsModel = updatedSubModel.(*proofs.Model)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if m.proofsModel.CanGoBack() { // Supondo que o modelo de provas tenha um método CanGoBack.
 				m.currentView = DashboardView
-				log.Println("AppModel: Voltando para o Menu Principal a partir de Gerar Provas.")
 			}
-		} else {
-			updatedSubModel, submodelCmd = m.proofsModel.Update(msg)
-			m.proofsModel = updatedSubModel.(*proofs.Model)
 		}
 	}
 	cmds = append(cmds, submodelCmd) // Adiciona comando do sub-modelo.

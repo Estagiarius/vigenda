@@ -289,8 +289,7 @@ func (m *Model) SetSize(width, height int) {
 	}
 }
 
-// Changed to pointer receiver for consistency
-func (m *Model) IsFocused() bool {
-	// Focused if in the form input state
-	return m.state == AddQuestionsFormView
+// CanGoBack returns true if the model is in a state where 'esc' should return to the main menu.
+func (m *Model) CanGoBack() bool {
+	return m.state == ActionListView
 }
