@@ -35,6 +35,14 @@ func (m *MockTaskService) ListAllTasks(ctx context.Context) ([]models.Task, erro
 	return nil, args.Error(1)
 }
 
+func (m *MockTaskService) GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error) {
+	args := m.Called(ctx, userID, fromDate, limit)
+	if tasks, ok := args.Get(0).([]models.Task); ok {
+		return tasks, args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *MockTaskService) ListAllActiveTasks(ctx context.Context) ([]models.Task, error) {
 	args := m.Called(ctx)
 	if tasks, ok := args.Get(0).([]models.Task); ok {
