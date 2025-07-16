@@ -506,11 +506,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.studentsForGrading = msg.students
 			m.message = "Insira as notas finais."
 			m.gradesInput = make(map[int64]textinput.Model)
-			for _, s := range msg.students {
+			for i, s := range msg.students {
 				ti := textinput.New()
 				ti.Placeholder = "Nota Final"
 				ti.CharLimit = 5
 				ti.Width = 10
+				if i == 0 {
+					ti.Focus()
+				}
 				m.gradesInput[s.ID] = ti
 			}
 		}
@@ -621,20 +624,7 @@ func (m *Model) View() string {
 			for i, s := range m.studentsForGrading {
 				gradeInputView := ""
 				if ti, ok := m.gradesInput[s.ID]; ok {
-					if ti.Focused() {
 						gradeInputView = ti.View()
-					} else {
-						// Render as simple text if not focused
-						val := ti.Value()
-						if val == "" {
-							val = ti.Placeholder
-						}
-						style := lipgloss.NewStyle().Width(ti.Width).PaddingLeft(1)
-						if i == m.gradeFocusIndex {
-							style = style.Foreground(lipgloss.Color("205"))
-						}
-						gradeInputView = style.Render(val)
-					}
 				}
 				studentName := s.FullName
 				if len(studentName) > 28 {
@@ -646,10 +636,12 @@ func (m *Model) View() string {
 					lineStyle = lineStyle.Background(lipgloss.Color("237")) // Highlight the focused line
 				}
 
-				studentNameStyle := lipgloss.NewStyle().Width(m.width - 20) // Allocate most width to name
+					studentNameStyle := lipgloss.NewStyle().Width(m.width - 25) // Allocate space for grade
+					gradeStyle := lipgloss.NewStyle().Width(15)
+
 				line := lipgloss.JoinHorizontal(lipgloss.Left,
 					studentNameStyle.Render(studentName),
-					gradeInputView,
+						gradeStyle.Render(gradeInputView),
 				)
 				b.WriteString(lineStyle.Render(line) + "\n")
 			}
@@ -995,8 +987,15 @@ func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
 	focusedStudent := m.studentsForGrading[m.gradeFocusIndex]
 	focusedInput, inputExists := m.gradesInput[focusedStudent.ID]
 
+	// Blur all inputs first
+	for i := range m.gradesInput {
+		input := m.gradesInput[i]
+		input.Blur()
+		m.gradesInput[i] = input
+	}
+
 	// Handle navigation and actions when an input is NOT focused for editing
-	if inputExists && !focusedInput.Focused() {
+	if inputExists {
 		switch {
 		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("up"))):
 			if m.gradeFocusIndex > 0 {
@@ -1025,6 +1024,12 @@ func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
 				m.setupPopup()
 			}
 		}
+	}
+
+	// Focus the current input
+	if newInput, ok := m.gradesInput[m.studentsForGrading[m.gradeFocusIndex].ID]; ok {
+		cmds = append(cmds, newInput.Focus())
+		m.gradesInput[m.studentsForGrading[m.gradeFocusIndex].ID] = newInput
 	}
 
 	// Handle input updates when an input IS focused for editing

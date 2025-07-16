@@ -31,11 +31,14 @@ func (s *assessmentServiceImpl) CreateAssessment(ctx context.Context, name strin
 	if classID == 0 {
 		return models.Assessment{}, fmt.Errorf("class ID cannot be zero")
 	}
-	if term <= 0 {
-		return models.Assessment{}, fmt.Errorf("term must be positive")
-	}
-	if weight <= 0 {
-		return models.Assessment{}, fmt.Errorf("weight must be positive")
+	// Bypassing validation for the special "Nota Final" assessment
+	if name != FinalGradeAssessmentName {
+		if term <= 0 {
+			return models.Assessment{}, fmt.Errorf("term must be positive")
+		}
+		if weight <= 0 {
+			return models.Assessment{}, fmt.Errorf("weight must be positive")
+		}
 	}
 	// TODO: Validate classID exists using s.classRepo.GetClassByID(ctx, classID)
 
