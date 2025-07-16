@@ -621,19 +621,7 @@ func (m *Model) View() string {
 			for i, s := range m.studentsForGrading {
 				gradeInputView := ""
 				if ti, ok := m.gradesInput[s.ID]; ok {
-					if ti.Focused() {
 						gradeInputView = ti.View()
-					} else {
-						val := ti.Value()
-						if val == "" {
-							val = ti.Placeholder
-						}
-						style := lipgloss.NewStyle().Width(ti.Width).PaddingLeft(1)
-						if i == m.gradeFocusIndex {
-							style = style.Foreground(lipgloss.Color("205"))
-						}
-						gradeInputView = style.Render(val)
-					}
 				}
 				studentName := s.FullName
 				if len(studentName) > 28 {
