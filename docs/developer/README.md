@@ -21,25 +21,29 @@ Bem-vindo à seção de desenvolvedores do Vigenda! Este documento fornece uma v
     *   [`internal/models`](#internalmodels)
     *   [`internal/repository`](#internalrepository)
     *   [`internal/service`](#internalservice)
-    *   [`internal/tui`](#internaltui)
+    *   [`internal/app`](#internalapp)
     *   [`cmd/vigenda`](#cmdvigenda)
 
 ## 1. Visão Geral da Arquitetura
 
-O Vigenda é uma aplicação CLI escrita em Go. Ele segue uma estrutura de projeto que tenta separar as preocupações para facilitar a manutenção e o desenvolvimento.
+O Vigenda é uma aplicação CLI escrita em Go. Ele segue uma estrutura de projeto que tenta separar as preocupações para facilitar a manutenção e o desenvolvimento. A interface do usuário é construída com o framework [Bubble Tea](https://github.com/charmbracelet/bubbletea), seguindo o padrão The Elm Architecture (TEA).
+
+Para um guia detalhado sobre como desenvolver e estender a interface do usuário, consulte o [**Guia de Desenvolvimento da TUI**](./TUI_DEVELOPMENT_GUIDE.md).
 
 ### Estrutura de Diretórios Principal
 
 A estrutura de diretórios mais relevante para desenvolvedores inclui:
 
-*   **`cmd/vigenda/`**: Contém o ponto de entrada principal da aplicação (`main.go`). É responsável por inicializar configurações, serviços, e o framework CLI (provavelmente Cobra ou similar) que parseia os comandos e argumentos.
+*   **`cmd/vigenda/`**: Contém o ponto de entrada principal da aplicação (`main.go`). É responsável por inicializar configurações, serviços, e lançar a aplicação TUI.
 *   **`internal/`**: Este diretório contém a maior parte da lógica de negócios e código da aplicação que não se destina a ser importado por outros projetos.
+    *   **`app/`**: Contém a implementação da TUI usando o framework Bubble Tea.
+        *   `app.go`: O modelo principal da aplicação que gerencia o estado global e as visualizações.
+        *   Subdiretórios (ex: `tasks/`, `classes/`, `assessments/`): Cada um contém um módulo TUI independente com seu próprio modelo, visão e lógica de atualização.
     *   **`config/`**: Gerenciamento de configurações da aplicação (ex: variáveis de ambiente para banco de dados).
     *   **`database/`**: Lógica de conexão com o banco de dados, migrações de esquema SQL.
     *   **`models/`**: Definições das estruturas de dados (structs Go) que representam as entidades do domínio (ex: Tarefa, Turma, Aluno, Avaliação, Questão).
     *   **`repository/`**: Camada de acesso a dados. Contém a lógica para interagir diretamente com o banco de dados (operações CRUD - Create, Read, Update, Delete) para os modelos.
     *   **`service/`**: Camada de serviço que contém a lógica de negócios da aplicação. Coordena as operações, utilizando os repositórios para buscar ou persistir dados e aplicando regras de negócio.
-    *   **`tui/`**: (Text User Interface) Componentes e lógica para a interface de usuário no terminal (ex: prompts interativos, tabelas de visualização, dashboard).
 *   **`pkg/`**: (Se existir) Código que é seguro para ser importado por projetos externos. (Atualmente, o `ls` não mostrou este diretório, então pode não ser usado).
 *   **`tests/`**: Testes de integração e, possivelmente, E2E (End-to-End).
     *   **`integration/`**: Testes que verificam a interação entre diferentes partes do sistema, incluindo o banco de dados.
@@ -50,14 +54,16 @@ A estrutura de diretórios mais relevante para desenvolvedores inclui:
 
 ### Fluxo de Interação (Exemplo Simplificado)
 
-1.  Usuário executa um comando (ex: `./vigenda tarefa add "Nova tarefa" ...`).
-2.  `cmd/vigenda/main.go` e o framework CLI (ex: Cobra) parseiam o comando e os argumentos.
-3.  O handler do comando no CLI chama o método apropriado no serviço correspondente (ex: `TaskService.CreateTask(...)`).
-4.  O `TaskService` valida os dados de entrada e aplica regras de negócio.
-5.  O `TaskService` chama o `TaskRepository` para persistir a nova tarefa no banco de dados.
-6.  O `TaskRepository` executa a query SQL (ou usa um ORM) para inserir os dados.
-7.  O resultado da operação retorna pela mesma cadeia (Repository -> Service -> CLI Handler).
-8.  O CLI Handler (ou um componente TUI chamado pelo handler) exibe a resposta para o usuário.
+1.  O usuário executa a aplicação (`./vigenda`).
+2.  `cmd/vigenda/main.go` inicializa os serviços e a aplicação TUI (Bubble Tea).
+3.  A TUI, gerenciada pelo `internal/app/app.go`, exibe o menu principal.
+4.  O usuário interage com a TUI (ex: seleciona "Adicionar Tarefa" e preenche um formulário).
+5.  A view da TUI (ex: `internal/app/tasks/model.go`) captura a entrada e envia uma mensagem (`tea.Msg`) para sua função `Update`.
+6.  A função `Update` do modelo da TUI chama o método de serviço apropriado (ex: `TaskService.CreateTask(...)`).
+7.  O `TaskService` valida os dados e chama o `TaskRepository` para persistir a nova tarefa no banco de dados.
+8.  O `TaskRepository` executa a query SQL para inserir os dados.
+9.  O resultado da operação (sucesso ou erro) retorna pela mesma cadeia (Repository -> Service -> TUI Model).
+10. A TUI atualiza seu estado (`Model`) e a `View` é re-renderizada para mostrar o resultado ao usuário (ex: uma mensagem de sucesso ou uma nova tarefa na lista).
 
 ## 2. Configuração do Ambiente de Desenvolvimento
 
@@ -182,25 +188,24 @@ Esta seção dá uma ideia do que esperar em cada diretório principal dentro de
     ```
 
 ### `internal/service`
-(ex: `task_service.go`, `assessment_service.go`, `*_test.go`)
+(ex: `task_service.go`, `class_service.go`, `assessment_service.go`, `lesson_service.go`, `proof_service.go`, `question_service.go`)
 *   Define interfaces para os serviços (ex: `TaskServiceInterface`).
 *   Implementações que orquestram a lógica de negócios, chamando métodos dos repositórios.
 *   Contém validações, transformações de dados, etc.
 *   Os arquivos `*_test.go` aqui devem focar em testes unitários para a lógica de negócios, usando mocks/stubs para a camada de repositório.
 
-### `internal/tui`
-(`prompt.go`, `table.go`, `statusbar.go`, `tui.go`)
-*   Componentes para construir a interface de linha de comando.
-*   `prompt.go`: Funções para solicitar entrada do usuário de forma interativa.
-*   `table.go`: Funções para exibir dados em formato de tabela no console.
-*   `statusbar.go`: (Potencialmente) para exibir informações de status.
-*   `tui.go`: Pode ser o ponto de entrada ou coordenador dos componentes TUI.
+### `internal/app`
+(ex: `app.go`, `tasks/model.go`, `classes/model.go`)
+*   Contém a implementação da TUI (Text User Interface) usando o framework **Bubble Tea**.
+*   `app.go` atua como o modelo principal, gerenciando o estado global e as visualizações (telas).
+*   Subdiretórios como `tasks`, `classes`, `assessments`, etc., contêm os componentes de UI para cada módulo específico, cada um com seu próprio `Model`, `View`, e `Update`.
+*   Para um guia aprofundado, consulte o [**Guia de Desenvolvimento da TUI**](./TUI_DEVELOPMENT_GUIDE.md).
 
 ### `cmd/vigenda`
 (`main.go`)
+*   Ponto de entrada da aplicação.
 *   Inicialização de tudo: configuração, conexão com DB, repositórios, serviços.
-*   Configuração da CLI usando uma biblioteca como Cobra: definição de comandos, subcomandos, flags.
-*   Cada comando da CLI terá uma função `Run` (ou similar) que chama o método de serviço apropriado.
+*   Inicia e executa a aplicação TUI (Bubble Tea).
 
 ---
 Este guia deve fornecer um bom ponto de partida para entender e contribuir com o Vigenda. Consulte sempre o `AGENTS.md` para quaisquer instruções específicas e explore o código para obter detalhes mais profundos.
