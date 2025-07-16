@@ -506,11 +506,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.studentsForGrading = msg.students
 			m.message = "Insira as notas finais."
 			m.gradesInput = make(map[int64]textinput.Model)
-			for _, s := range msg.students {
+			for i, s := range msg.students {
 				ti := textinput.New()
 				ti.Placeholder = "Nota Final"
 				ti.CharLimit = 5
 				ti.Width = 10
+				if i == 0 {
+					ti.Focus()
+				}
 				m.gradesInput[s.ID] = ti
 			}
 		}
