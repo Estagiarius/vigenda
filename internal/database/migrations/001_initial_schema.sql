@@ -52,7 +52,8 @@ CREATE TABLE IF NOT EXISTS grades (
     student_id INTEGER NOT NULL,
     grade REAL NOT NULL,
     FOREIGN KEY(assessment_id) REFERENCES assessments(id) ON DELETE CASCADE,
-    FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE
+    FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE,
+    UNIQUE(assessment_id, student_id)
 );
 CREATE TABLE IF NOT EXISTS tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
