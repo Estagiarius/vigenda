@@ -31,6 +31,7 @@ const (
 	CreateAssessmentView
 	EnterGradesView // This will be complex: needs to list students, then input grades
 	FinalGradesView
+	ViewFinalGradesView
 	ListAssessmentsView // For showing assessments in a table
 )
 
@@ -103,6 +104,12 @@ type finalGradesEnteredMsg struct {
 	err error
 }
 
+type finalGradesLoadedMsg struct {
+	students []models.Student
+	grades   map[int64]float64
+	err      error
+}
+
 type classAverageCalculatedMsg struct {
 	averages map[int64]float64
 	err      error
@@ -154,6 +161,7 @@ func New(assessmentService service.AssessmentService, classService service.Class
 		actionItem{title: "Criar Nova Avaliação", description: "Adicionar uma nova avaliação para uma turma."},
 		actionItem{title: "Lançar Notas", description: "Lançar/editar notas de alunos para uma avaliação."},
 		actionItem{title: "Lançar/Calcular Notas Finais", description: "Lançar manualmente ou calcular a média final de uma turma."},
+		actionItem{title: "Visualizar Notas Finais", description: "Visualizar as notas finais de uma turma."},
 	}
 	l := list.New(actionItems, list.NewDefaultDelegate(), 0, 0)
 	l.Title = "Gerenciar Avaliações e Notas"
@@ -238,6 +246,13 @@ func (m *Model) submitFinalGradesCmd() tea.Cmd {
 	}
 }
 
+func (m *Model) loadFinalGradesCmd(classID int64) tea.Cmd {
+	return func() tea.Msg {
+		students, grades, err := m.assessmentService.GetFinalGradesByClassID(context.Background(), classID)
+		return finalGradesLoadedMsg{students: students, grades: grades, err: err}
+	}
+}
+
 // Changed to pointer receiver
 func (m *Model) Init() tea.Cmd {
 	// It's good practice to ensure fields are in a known state at Init.
@@ -311,6 +326,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					case "Lançar/Calcular Notas Finais":
 						m.state = FinalGradesView
 						m.setupEnterClassIDForm("ID da Turma para Lançar/Calcular Notas Finais:")
+					case "Visualizar Notas Finais":
+						m.state = ViewFinalGradesView
+						m.setupEnterClassIDForm("ID da Turma para Visualizar as Notas Finais:")
 					}
 				}
 			}
@@ -392,6 +410,23 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				cmds = append(cmds, m.updateGradeInputs(msg))
 			}
+
+		case ViewFinalGradesView:
+			if key.Matches(msg, key.NewBinding(key.WithKeys("enter"))) {
+				m.isLoading = true
+				classIDStr := m.textInputs[0].Value()
+				classID, err := strconv.ParseInt(classIDStr, 10, 64)
+				if err != nil {
+					m.err = fmt.Errorf("ID da Turma inválido: %w", err)
+					m.isLoading = false
+				} else {
+					m.currentClassID = &classID
+					cmds = append(cmds, m.loadFinalGradesCmd(classID))
+				}
+			} else {
+				m.textInputs[0], cmd = m.textInputs[0].Update(msg)
+				cmds = append(cmds, cmd)
+			}
 		}
 
 	if m.isPopupVisible {
@@ -447,6 +482,29 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// This needs a proper focus management system for multiple inputs
 				}
 			}
+		}
+
+	case finalGradesLoadedMsg:
+		m.isLoading = false
+		if msg.err != nil {
+			m.err = msg.err
+		} else {
+			m.studentsForGrading = msg.students
+			rows := make([]table.Row, len(m.studentsForGrading))
+			for i, s := range m.studentsForGrading {
+				grade, ok := msg.grades[s.ID]
+				gradeStr := "N/A"
+				if ok {
+					gradeStr = fmt.Sprintf("%.1f", grade)
+				}
+				rows[i] = table.Row{s.FullName, gradeStr}
+			}
+			cols := []table.Column{
+				{Title: "Aluno", Width: 40},
+				{Title: "Nota Final", Width: 15},
+			}
+			m.table.SetColumns(cols)
+			m.table.SetRows(rows)
 		}
 
 	case gradesEnteredMsg:
@@ -646,6 +704,21 @@ func (m *Model) View() string {
 				b.WriteString(lineStyle.Render(line) + "\n")
 			}
 			b.WriteString("\n" + helpStyle.Render("↑/↓: Navegar | Enter: Editar | Ctrl+S: Salvar | Esc: Voltar"))
+		}
+
+	case ViewFinalGradesView:
+		if len(m.studentsForGrading) == 0 { // Still asking for Class ID
+			b.WriteString("Visualizar Notas Finais\n\n")
+			b.WriteString(m.textInputs[0].View() + "\n")
+			submitButton := "[ Carregar Notas ]"
+			if m.focusIndex == 1 {
+				submitButton = lipgloss.NewStyle().Foreground(lipgloss.Color("205")).Render(submitButton)
+			}
+			b.WriteString("\n" + submitButton + "\n\n")
+		} else {
+			b.WriteString(fmt.Sprintf("Notas Finais da Turma ID %d\n\n", *m.currentClassID))
+			b.WriteString(m.table.View())
+			b.WriteString("\n(Pressione 'esc' para voltar)")
 		}
 
 	default:
