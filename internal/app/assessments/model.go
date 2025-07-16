@@ -645,10 +645,12 @@ func (m *Model) View() string {
 					lineStyle = lineStyle.Background(lipgloss.Color("237")) // Highlight the focused line
 				}
 
-				studentNameStyle := lipgloss.NewStyle().Width(m.width - 20) // Allocate most width to name
+					studentNameStyle := lipgloss.NewStyle().Width(m.width - 25) // Allocate space for grade
+					gradeStyle := lipgloss.NewStyle().Width(15)
+
 				line := lipgloss.JoinHorizontal(lipgloss.Left,
 					studentNameStyle.Render(studentName),
-					gradeInputView,
+						gradeStyle.Render(gradeInputView),
 				)
 				b.WriteString(lineStyle.Render(line) + "\n")
 			}
