@@ -987,8 +987,15 @@ func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
 	focusedStudent := m.studentsForGrading[m.gradeFocusIndex]
 	focusedInput, inputExists := m.gradesInput[focusedStudent.ID]
 
+	// Blur all inputs first
+	for i := range m.gradesInput {
+		input := m.gradesInput[i]
+		input.Blur()
+		m.gradesInput[i] = input
+	}
+
 	// Handle navigation and actions when an input is NOT focused for editing
-	if inputExists && !focusedInput.Focused() {
+	if inputExists {
 		switch {
 		case key.Matches(keyMsg, key.NewBinding(key.WithKeys("up"))):
 			if m.gradeFocusIndex > 0 {
@@ -1017,6 +1024,12 @@ func (m *Model) updateGradeInputs(msg tea.Msg) tea.Cmd {
 				m.setupPopup()
 			}
 		}
+	}
+
+	// Focus the current input
+	if newInput, ok := m.gradesInput[m.studentsForGrading[m.gradeFocusIndex].ID]; ok {
+		cmds = append(cmds, newInput.Focus())
+		m.gradesInput[m.studentsForGrading[m.gradeFocusIndex].ID] = newInput
 	}
 
 	// Handle input updates when an input IS focused for editing
