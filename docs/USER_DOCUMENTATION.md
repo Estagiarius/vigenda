@@ -1,65 +1,72 @@
-
-# Documentação do Usuário
+# Documentação do Usuário do Vigenda
 
 ## Introdução
 
-Vigenda é uma aplicação web que visa melhorar a gestão de tarefas e compromissos. Este documento fornece informações detalhadas sobre como utilizar a aplicação.
+Bem-vindo ao Vigenda!
 
-## Funcionalidades
+O Vigenda é uma aplicação de linha de comando com uma **Interface de Texto do Usuário (TUI)**, projetada para ajudar professores e educadores a gerenciar suas atividades acadêmicas de forma eficiente. Com ele, você pode organizar turmas, planejar aulas, gerenciar tarefas, criar avaliações, manter um banco de questões e gerar provas personalizadas.
 
-### Gerenciamento de Tarefas
+Esta documentação serve como um guia completo para todas as funcionalidades que o Vigenda oferece.
 
-Você pode criar, visualizar e editar suas tarefas. Para acessar essa funcionalidade, siga os passos abaixo:
+## Como Iniciar
 
-1. Abra a aplicação no navegador.
-2. Navegue até a seção de tarefas.
-3. Utilize as opções disponíveis para gerenciar suas tarefas.
+Para começar a usar o Vigenda, abra seu terminal e execute o seguinte comando no diretório de instalação:
 
-### Gestão de Turmas e Alunos
+```bash
+./vigenda
+```
 
-Permite que professores organizem suas turmas e gerenciem informações dos alunos. Para utilizar:
+Isso iniciará a interface principal do Vigenda, onde você poderá navegar por todas as funcionalidades usando as **teclas de seta**, selecionar opções com **Enter** e voltar aos menus anteriores com **Esc**.
 
-1. Acesse a aplicação.
-2. Vá até a seção de gestão de turmas.
-3. Adicione, edite ou remova informações de turmas e alunos conforme necessário.
+## Funcionalidades Principais
 
-### Planejamento de Aulas
+O menu principal do Vigenda oferece acesso às seguintes seções:
 
-Facilita o planejamento e organização das aulas. Para planejar uma aula:
+### 1. Painel de Controle (Dashboard)
 
-1. Abra a aplicação.
-2. Navegue até a seção de planejamento.
-3. Insira detalhes da aula, como conteúdo, datas e recursos necessários.
+A tela inicial que fornece uma visão geral rápida das suas informações mais importantes, como tarefas pendentes e próximas avaliações.
 
-### Criação e Gestão de Avaliações
+### 2. Gestão de Tarefas
 
-Você pode criar e gerenciar avaliações para seus alunos. Passos para utilizar:
+Crie, visualize, edite e marque tarefas como concluídas. As tarefas podem ser gerais ou associadas a turmas específicas, ajudando a manter o controle das atividades dos alunos.
 
-1. Acesse a aplicação.
-2. Vá até a seção de avaliações.
-3. Crie novas avaliações, lance notas e visualize resultados.
+### 3. Gestão de Turmas e Disciplinas
 
-### Banco de Questões e Geração de Provas
+O coração da organização acadêmica.
+- **Crie Disciplinas:** Agrupe seu conteúdo por matéria (ex: "Matemática", "História").
+- **Crie Turmas:** Organize seus alunos em turmas dentro de cada disciplina (ex: "Turma 101 - Manhã").
+- **Adicione Alunos:** Gerencie a lista de alunos para cada turma.
 
-Oferece uma ferramenta para criar um banco de questões e gerar provas automaticamente. Para usar:
+### 4. Gestão de Avaliações e Notas
 
-1. Abra a aplicação.
-2. Acesse o banco de questões.
-3. Adicione novas questões e gere provas conforme necessário.
+Controle todo o ciclo de vida das avaliações:
+- **Crie Avaliações:** Defina avaliações com nome, período, peso e data.
+- **Lance Notas:** Insira as notas dos alunos para cada avaliação de forma interativa.
+- **Calcule Médias:** Visualize as médias ponderadas da turma automaticamente.
 
-### Ferramentas de Produtividade
+### 5. Banco de Questões
 
-Inclui funcionalidades como sessões de foco para melhorar a produtividade. Para acessar:
+Construa um repositório centralizado de questões para suas provas e atividades.
+- **Adicione Questões:** Crie questões de múltipla escolha ou dissertativas, classificando-as por disciplina, tópico e nível de dificuldade.
+- **Importe em Lote:** Use arquivos JSON para importar dezenas de questões de uma só vez (via linha de comando).
 
-1. Abra a aplicação.
-2. Navegue até a seção de produtividade.
-3. Utilize as ferramentas disponíveis para sessões de foco e outras atividades.
+### 6. Geração de Provas
 
-## Instalação e Execução
+Gere provas personalizadas em segundos a partir do seu banco de questões.
+- **Filtre Questões:** Selecione questões por disciplina, tópico e dificuldade.
+- **Gere Arquivos:** Crie arquivos de texto com a prova formatada, pronta para impressão.
 
-Para instalar e executar a aplicação, siga as instruções no arquivo `INSTALLATION.MD`.
+## Tutoriais e Exemplos
 
-## Suporte e Contato
+Para um guia passo a passo sobre como usar essas funcionalidades, consulte os seguintes documentos:
+- **[Exemplos de Uso da TUI](./user_manual/TUI_EXAMPLES.md):** Um guia rápido para realizar as tarefas mais comuns diretamente na interface.
+- **[Tutorial: Gerenciando Avaliações](./tutorials/02_gerenciando_avaliacoes_e_lancando_notas.md):** Um passo a passo detalhado sobre o fluxo de avaliações.
+- **[Tutorial: Dominando o Banco de Questões](./tutorials/03_dominando_banco_questoes_e_geracao_provas.md):** Um guia completo para criar e usar o banco de questões e gerar provas.
 
-Para dúvidas ou suporte, entre em contato com nossa equipe através do email [support@vigenda.com](mailto:support@vigenda.com).
+## Instalação
 
+Para instruções sobre como instalar o Vigenda em seu sistema, consulte o arquivo [**INSTALLATION.MD**](../INSTALLATION.MD).
+
+## Suporte
+
+Se encontrar problemas ou tiver dúvidas, consulte a seção de [**Relato de Bugs**](../BUG_REPORTING.MD).
