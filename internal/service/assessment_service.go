@@ -268,3 +268,41 @@ func (s *assessmentServiceImpl) EnterFinalGrades(ctx context.Context, classID in
 	// 2. Use the existing EnterGrades logic with the special assessment ID
 	return s.EnterGrades(ctx, finalAssessmentID, finalGrades)
 }
+
+func (s *assessmentServiceImpl) GetFinalGradesByClassID(ctx context.Context, classID int64) ([]models.Student, map[int64]float64, error) {
+	if classID == 0 {
+		return nil, nil, fmt.Errorf("class ID cannot be zero")
+	}
+
+	// 1. Find the "Nota Final" assessment
+	finalAssessment, err := s.assessmentRepo.FindAssessmentByNameAndClass(ctx, FinalGradeAssessmentName, classID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to find final assessment: %w", err)
+	}
+	if finalAssessment == nil {
+		// No final assessment exists, so no grades exist. Return empty map.
+		students, err := s.classRepo.GetStudentsByClassID(ctx, classID)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to get students for class: %w", err)
+		}
+		return students, make(map[int64]float64), nil
+	}
+
+	// 2. Get all grades for that assessment
+	grades, err := s.assessmentRepo.GetGradesByAssessmentID(ctx, finalAssessment.ID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get grades for final assessment: %w", err)
+	}
+	gradeMap := make(map[int64]float64)
+	for _, grade := range grades {
+		gradeMap[grade.StudentID] = grade.Grade
+	}
+
+	// 3. Get all students for the class
+	students, err := s.classRepo.GetStudentsByClassID(ctx, classID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get students for class: %w", err)
+	}
+
+	return students, gradeMap, nil
+}

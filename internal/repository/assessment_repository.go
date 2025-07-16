@@ -98,6 +98,30 @@ func (r *assessmentRepository) EnterGrade(ctx context.Context, grade *models.Gra
 	return nil
 }
 
+func (r *assessmentRepository) GetGradesByAssessmentID(ctx context.Context, assessmentID int64) ([]models.Grade, error) {
+	query := `SELECT id, assessment_id, student_id, grade FROM grades WHERE assessment_id = ?`
+	rows, err := r.db.QueryContext(ctx, query, assessmentID)
+	if err != nil {
+		return nil, fmt.Errorf("assessmentRepository.GetGradesByAssessmentID: query failed: %w", err)
+	}
+	defer rows.Close()
+
+	var grades []models.Grade
+	for rows.Next() {
+		var g models.Grade
+		if err := rows.Scan(&g.ID, &g.AssessmentID, &g.StudentID, &g.Grade); err != nil {
+			return nil, fmt.Errorf("assessmentRepository.GetGradesByAssessmentID: scan failed: %w", err)
+		}
+		grades = append(grades, g)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("assessmentRepository.GetGradesByAssessmentID: rows error: %w", err)
+	}
+
+	return grades, nil
+}
+
 func (r *assessmentRepository) FindAssessmentByNameAndClass(ctx context.Context, name string, classID int64) (*models.Assessment, error) {
 	query := `SELECT id, class_id, name, term, weight, assessment_date
               FROM assessments WHERE name = ? AND class_id = ?`

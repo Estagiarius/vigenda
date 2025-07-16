@@ -374,6 +374,19 @@ func (s *stubAssessmentService) EnterFinalGrades(ctx context.Context, classID in
 	return nil
 }
 
+func (s *stubAssessmentService) GetFinalGradesByClassID(ctx context.Context, classID int64) ([]models.Student, map[int64]float64, error) {
+	fmt.Printf("[StubAssessmentService] GetFinalGradesByClassID called for ClassID %d\n", classID)
+	students := []models.Student{
+		{ID: 101, ClassID: classID, FullName: "Alice Stub", Status: "ativo"},
+		{ID: 102, ClassID: classID, FullName: "Bob Stub", Status: "ativo"},
+	}
+	grades := map[int64]float64{
+		101: 9.5,
+		102: 8.0,
+	}
+	return students, grades, nil
+}
+
 // StubQuestionService
 type stubQuestionService struct {
 	questionRepo repository.QuestionRepository

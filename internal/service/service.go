@@ -88,6 +88,8 @@ type AssessmentService interface {
 	GetStudentsForGrading(ctx context.Context, assessmentID int64) ([]models.Student, *models.Assessment, error)
 	// EnterFinalGrades registra as notas finais para uma turma.
 	EnterFinalGrades(ctx context.Context, classID int64, finalGrades map[int64]float64) error
+	// GetFinalGradesByClassID busca as notas finais de uma turma.
+	GetFinalGradesByClassID(ctx context.Context, classID int64) ([]models.Student, map[int64]float64, error)
 }
 
 // QuestionService define a interface para a lógica de negócios relacionada ao banco de questões.
