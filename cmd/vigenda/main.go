@@ -32,6 +32,7 @@ var classService service.ClassService
 var assessmentService service.AssessmentService
 var questionService service.QuestionService
 var proofService service.ProofService
+var subjectService service.SubjectService
 
 var rootCmd = &cobra.Command{
 	Use:   "vigenda",
@@ -52,7 +53,7 @@ Use "vigenda [comando] --help" para mais informações sobre um comando específ
 		// Launch the BubbleTea application
 		// PersistentPreRunE ensures all necessary services are initialized.
 		// Pass the initialized services to the TUI application.
-		app.StartApp(taskService, classService, assessmentService, questionService, proofService, lessonService)
+		app.StartApp(taskService, classService, assessmentService, questionService, proofService, lessonService, subjectService)
 	},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Setup logging to file first
@@ -336,6 +337,7 @@ func initializeServices(db *sql.DB) {
 
 	// Initialize services with real repository implementations
 	taskService = service.NewTaskService(taskRepo)
+	subjectService = service.NewSubjectService(subjectRepo)
 	// Assuming NewClassService, NewAssessmentService exist or will be created.
 	// If they use stubs for now or are basic passthroughs, that's fine.
 	// For now, let's assume they can take the real repos.

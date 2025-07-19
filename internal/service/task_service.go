@@ -152,7 +152,7 @@ func (s *taskServiceImpl) GetUpcomingActiveTasks(ctx context.Context, userID int
 // TODO: Adicionar verificação de propriedade da tarefa (UserID).
 func (s *taskServiceImpl) UpdateTask(ctx context.Context, task *models.Task) error {
 	if strings.TrimSpace(task.Title) == "" {
-		err := errors.New("título da tarefa não pode ser vazio para atualização")
+		err := errors.New("task title cannot be empty")
 		logError("UpdateTask: falha de validação para Tarefa ID %d: %v", task.ID, err)
 		return err
 	}
@@ -167,7 +167,7 @@ func (s *taskServiceImpl) UpdateTask(ctx context.Context, task *models.Task) err
 		if strings.Contains(err.Error(), "no task found") || strings.Contains(err.Error(), "no values changed") {
 			logError("UpdateTask: falha ao atualizar Tarefa ID %d: %v", task.ID, err)
 		} else {
-			s.handleErrorAndCreateBugTask(ctx, err, "Falha na Atualização de Tarefa", "Tentativa de atualizar Tarefa ID %d, Título '%s'. UserID: %d", task.ID, task.Title, task.UserID)
+			s.handleErrorAndCreateBugTask(ctx, err, "Task Update Failure", "Tentativa de atualizar Tarefa ID %d, Título '%s'. UserID: %d", task.ID, task.Title, task.UserID)
 		}
 		return fmt.Errorf("UpdateTask: falha ao atualizar tarefa: %w", err)
 	}
@@ -185,7 +185,7 @@ func (s *taskServiceImpl) DeleteTask(ctx context.Context, taskID int64) error {
 		if strings.Contains(err.Error(), "no task found") {
 			logError("DeleteTask: falha ao deletar Tarefa ID %d: %v", taskID, err)
 		} else {
-			s.handleErrorAndCreateBugTask(ctx, err, "Falha na Deleção de Tarefa", "Tentativa de deletar Tarefa ID %d", taskID)
+			s.handleErrorAndCreateBugTask(ctx, err, "Task Deletion Failure", "Tentativa de deletar Tarefa ID %d", taskID)
 		}
 		return fmt.Errorf("DeleteTask: falha ao deletar tarefa: %w", err)
 	}
@@ -255,7 +255,7 @@ func (s *taskServiceImpl) MarkTaskAsCompleted(ctx context.Context, taskID int64)
 	// TODO: Adicionar verificação de propriedade da tarefa (UserID).
 	err := s.repo.MarkTaskCompleted(ctx, taskID)
 	if err != nil {
-		s.handleErrorAndCreateBugTask(ctx, err, "Falha na Conclusão de Tarefa", "Tentativa de completar Tarefa ID %d", taskID)
+		s.handleErrorAndCreateBugTask(ctx, err, "Task Completion Failure", "Tentativa de completar Tarefa ID %d", taskID)
 		return fmt.Errorf("MarkTaskAsCompleted: falha ao marcar tarefa como concluída: %w", err)
 	}
 	return nil
@@ -271,10 +271,10 @@ func (s *taskServiceImpl) GetTaskByID(ctx context.Context, taskID int64) (*model
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) || strings.Contains(err.Error(), "no task found") {
 			logError("GetTaskByID: Tarefa não encontrada com ID %d: %v", taskID, err)
-			return nil, fmt.Errorf("tarefa com ID %d não encontrada", taskID) // Retorna erro amigável.
+			return nil, fmt.Errorf("tarefa com ID %d não encontrada", taskID)
 		}
 		// Para outros erros inesperados do banco de dados:
-		s.handleErrorAndCreateBugTask(ctx, err, "Falha na Recuperação de Tarefa", "Tentativa de recuperar Tarefa ID %d", taskID)
+		s.handleErrorAndCreateBugTask(ctx, err, "Task Retrieval Failure", "Tentativa de recuperar Tarefa ID %d", taskID)
 		return nil, fmt.Errorf("GetTaskByID: falha ao buscar tarefa: %w", err)
 	}
 	return task, nil

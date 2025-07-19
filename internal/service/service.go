@@ -148,12 +148,17 @@ type LessonService interface {
 	DeleteLesson(ctx context.Context, lessonID int64) error
 }
 
-// TODO: Adicionar SubjectService interface para gerenciar CRUD de Disciplinas.
-// Exemplo:
-// type SubjectService interface {
-//    CreateSubject(ctx context.Context, userID int64, name string) (models.Subject, error)
-//    GetSubjectByID(ctx context.Context, subjectID int64) (models.Subject, error)
-//    ListSubjectsByUser(ctx context.Context, userID int64) ([]models.Subject, error)
-//    UpdateSubject(ctx context.Context, subjectID int64, name string) (models.Subject, error)
-//    DeleteSubject(ctx context.Context, subjectID int64) error
-// }
+// SubjectService define a interface para a lógica de negócios relacionada a disciplinas (subjects).
+type SubjectService interface {
+	// CreateSubject cria uma nova disciplina para um usuário.
+	CreateSubject(ctx context.Context, userID int64, name string) (models.Subject, error)
+	// GetSubjectByID recupera os detalhes de uma disciplina específica.
+	GetSubjectByID(ctx context.Context, subjectID int64) (models.Subject, error)
+	// ListSubjectsByUser retorna uma lista de todas as disciplinas de um usuário específico.
+	ListSubjectsByUser(ctx context.Context, userID int64) ([]models.Subject, error)
+	// UpdateSubject atualiza o nome de uma disciplina existente.
+	UpdateSubject(ctx context.Context, subjectID int64, name string) (models.Subject, error)
+	// DeleteSubject remove uma disciplina do sistema.
+	// A lógica de negócios deve decidir como lidar com turmas e outros dados associados.
+	DeleteSubject(ctx context.Context, subjectID int64) error
+}

@@ -19,6 +19,7 @@ import (
 	"vigenda/internal/app/dashboard"
 	"vigenda/internal/app/proofs"
 	"vigenda/internal/app/questions"
+	"vigenda/internal/app/subjects"
 	"vigenda/internal/app/tasks"
 	"vigenda/internal/service" // Importa as interfaces de serviço.
 )
@@ -45,6 +46,7 @@ type Model struct {
 	questionsModel   *questions.Model
 	proofsModel      *proofs.Model
 	dashboardModel   *dashboard.Model // Modelo para o painel de controle.
+	subjectsModel    *subjects.Model
 
 	width    int  // width da janela do terminal.
 	height   int  // height da janela do terminal.
@@ -58,6 +60,7 @@ type Model struct {
 	questionService   service.QuestionService
 	proofService      service.ProofService
 	lessonService     service.LessonService
+	subjectService    service.SubjectService
 }
 
 // Init é o método de inicialização para o Model principal da aplicação.
@@ -79,13 +82,14 @@ func (m *Model) Init() tea.Cmd {
 func New(
 	ts service.TaskService, cs service.ClassService,
 	as service.AssessmentService, qs service.QuestionService,
-	ps service.ProofService, ls service.LessonService,
+	ps service.ProofService, ls service.LessonService, ss service.SubjectService,
 ) *Model {
 	// Define os itens do menu principal. Cada item tem um título e uma View associada.
 	menuItems := []list.Item{
 		menuItem{title: ConcreteDashboardView.String(), view: ConcreteDashboardView},
 		menuItem{title: TaskManagementView.String(), view: TaskManagementView},
 		menuItem{title: ClassManagementView.String(), view: ClassManagementView},
+		menuItem{title: SubjectManagementView.String(), view: SubjectManagementView},
 		menuItem{title: AssessmentManagementView.String(), view: AssessmentManagementView},
 		menuItem{title: QuestionBankView.String(), view: QuestionBankView},
 		menuItem{title: ProofGenerationView.String(), view: ProofGenerationView},
@@ -112,6 +116,7 @@ func New(
 	am := assessments.New(as, cs) // Passa ClassService aqui
 	qm := questions.New(qs)
 	pm := proofs.New(ps)
+	sm := subjects.New(ss)
 	dshModel := dashboard.New(ts, cs, as, ls)
 
 	// Retorna a instância do Model principal.
@@ -129,6 +134,8 @@ func New(
 		proofsModel:       pm,
 		proofService:      ps,
 		lessonService:     ls,
+		subjectsModel:     sm,
+		subjectService:    ss,
 		dashboardModel:    dshModel,
 	}
 }
@@ -182,6 +189,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.classesModel = tempModel.(*classes.Model)
 		cmds = append(cmds, subCmd)
 
+		tempModel, subCmd = m.subjectsModel.Update(msg)
+		m.subjectsModel = tempModel.(*subjects.Model)
+		cmds = append(cmds, subCmd)
+
 		tempModel, subCmd = m.assessmentsModel.Update(msg)
 		m.assessmentsModel = tempModel.(*assessments.Model)
 		cmds = append(cmds, subCmd)
@@ -229,6 +240,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cmds = append(cmds, m.questionsModel.Init())
 					case ProofGenerationView:
 						cmds = append(cmds, m.proofsModel.Init())
+					case SubjectManagementView:
+						cmds = append(cmds, m.subjectsModel.Init())
 					}
 				}
 			} else if key.Matches(msg, key.NewBinding(key.WithKeys("q"))) { // Sair do menu principal.
@@ -306,6 +319,14 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentView = DashboardView
 			}
 		}
+	case SubjectManagementView:
+		updatedSubModel, submodelCmd = m.subjectsModel.Update(msg)
+		m.subjectsModel = updatedSubModel.(*subjects.Model)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if m.subjectsModel.CanGoBack() {
+				m.currentView = DashboardView
+			}
+		}
 	}
 	cmds = append(cmds, submodelCmd) // Adiciona comando do sub-modelo.
 
@@ -350,6 +371,9 @@ func (m *Model) View() string {
 	case ProofGenerationView:
 		viewContent = m.proofsModel.View()
 		help = "\nPressione 'esc' para voltar ao menu principal."
+	case SubjectManagementView:
+		viewContent = m.subjectsModel.View()
+		help = "\nPressione 'esc' para voltar ao menu principal."
 	default: // Caso uma view desconhecida seja definida.
 		viewContent = fmt.Sprintf("Visão desconhecida: %s (%d)", m.currentView.String(), m.currentView)
 		help = "\nPressione 'esc' ou 'q' para tentar voltar ao menu principal."
@@ -370,9 +394,9 @@ func (m *Model) View() string {
 func StartApp(
 	ts service.TaskService, cs service.ClassService,
 	as service.AssessmentService, qs service.QuestionService,
-	ps service.ProofService, ls service.LessonService,
+	ps service.ProofService, ls service.LessonService, ss service.SubjectService,
 ) {
-	model := New(ts, cs, as, qs, ps, ls)
+	model := New(ts, cs, as, qs, ps, ls, ss)
 	// tea.WithAltScreen() usa o buffer alternativo do terminal, preservando o histórico do shell.
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {

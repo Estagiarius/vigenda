@@ -264,7 +264,6 @@ func TestTasksModel_UpdateTask_SubmitForm(t *testing.T) {
 	updateMsg := cmd()
 	assert.IsType(t, taskUpdatedMsg{}, updateMsg)
 
-	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{*taskWithUpdates}, nil)
 	updatedModelAfterUpdate, refreshCmd := m.Update(updateMsg)
 	m = updatedModelAfterUpdate.(*Model)
 
@@ -281,7 +280,7 @@ func TestTasksModel_KeyBindings_CRUD_OnFocusedTable(t *testing.T) {
 	task1Pending := models.Task{ID: 1, Title: "Pending Task 1", UserID: 1, Description: "Desc P1"}
 	task2Completed := models.Task{ID: 2, Title: "Completed Task 1", UserID: 1, Description: "Desc C1", IsCompleted: true}
 
-	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
+	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil)
 	model := New(mockService)
 	model.SetSize(80, 30)
 	model.Update(model.Init()())
@@ -304,7 +303,6 @@ func TestTasksModel_KeyBindings_CRUD_OnFocusedTable(t *testing.T) {
 
 	// Reset model for next test part
 	model = New(mockService)
-	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
 	model.SetSize(80,30)
 	modelInterface, _ := model.Update(model.Init()())
 	model = modelInterface.(*Model)
@@ -317,7 +315,6 @@ func TestTasksModel_KeyBindings_CRUD_OnFocusedTable(t *testing.T) {
 
 	// Reset model for next test part
 	model = New(mockService)
-	mockService.On("ListAllTasks", mock.Anything).Return([]models.Task{task1Pending, task2Completed}, nil).Once()
 	model.SetSize(80,30)
 	modelInterface, _ = model.Update(model.Init()())
 	model = modelInterface.(*Model)

@@ -32,6 +32,9 @@ const (
 	// Distingue-se de DashboardView (menu principal) para permitir uma navegação clara.
 	ConcreteDashboardView
 
+	// SubjectManagementView representa a tela para gerenciamento de disciplinas.
+	SubjectManagementView
+
 	// StudentView é um exemplo de uma sub-visualização, possivelmente para listar ou editar alunos.
 	// O seu uso e contexto exato podem depender de como o ClassManagementView é implementado.
 	// NOTA: Este valor (99) está fora da sequência iota e foi usado em tui.go;
@@ -52,6 +55,8 @@ func (v View) String() string {
 		return "Gerenciar Tarefas"
 	case ClassManagementView:
 		return "Gerenciar Turmas e Alunos"
+	case SubjectManagementView:
+		return "Gerenciar Disciplinas"
 	case AssessmentManagementView:
 		return "Gerenciar Avaliações e Notas"
 	case QuestionBankView:

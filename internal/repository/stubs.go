@@ -38,20 +38,6 @@ func (r *StubQuestionRepository) GetQuestionsByCriteriaProofGeneration(ctx conte
 	return []models.Question{}, nil
 }
 
-// StubSubjectRepository
-type StubSubjectRepository struct {
-	DB *sql.DB
-}
-
-func NewStubSubjectRepository(db *sql.DB) SubjectRepository {
-	return &StubSubjectRepository{DB: db}
-}
-
-func (r *StubSubjectRepository) GetOrCreateByNameAndUser(ctx context.Context, name string, userID int64) (models.Subject, error) {
-	fmt.Printf("[StubSubjectRepository] GetOrCreateByNameAndUser called for: %s, UserID: %d\n", name, userID)
-	// Simulate finding or creating
-	return models.Subject{ID: 1, Name: name, UserID: userID}, nil
-}
 
 // StubTaskRepository
 type StubTaskRepository struct {

@@ -31,40 +31,6 @@ type ProofCriteria struct {
 	HardCount   int     // HardCount é o número desejado de questões difíceis.
 }
 
-// QuestionRepository define a interface para operações de acesso a dados relacionadas a 'questions'.
-// Implementações desta interface lidarão com a persistência e recuperação de questões do banco de dados.
-type QuestionRepository interface {
-	// GetQuestionsByCriteria busca questões com base nos critérios fornecidos.
-	GetQuestionsByCriteria(ctx context.Context, criteria QuestionQueryCriteria) ([]models.Question, error)
-	// AddQuestion adiciona uma nova questão ao banco de dados e retorna seu ID.
-	AddQuestion(ctx context.Context, question *models.Question) (int64, error)
-	// GetQuestionsByCriteriaProofGeneration busca questões otimizadas para geração de provas,
-	// tentando satisfazer as contagens de dificuldade especificadas.
-	GetQuestionsByCriteriaProofGeneration(ctx context.Context, criteria ProofCriteria) ([]models.Question, error)
-	// GetQuestionByID (Comentado) recuperaria uma questão específica por seu ID.
-	// GetQuestionByID(ctx context.Context, id int64) (models.Question, error)
-	// UpdateQuestion (Comentado) atualizaria uma questão existente.
-	// UpdateQuestion(ctx context.Context, question *models.Question) error
-	// DeleteQuestion (Comentado) removeria uma questão por seu ID.
-	// DeleteQuestion(ctx context.Context, id int64) error
-	// AddManyQuestions (Comentado) adicionaria múltiplas questões em lote, útil para importação.
-	// AddManyQuestions(ctx context.Context, questions []models.Question) (int, error)
-}
-
-// SubjectRepository define a interface para operações de acesso a dados relacionadas a 'subjects' (disciplinas).
-// É crucial para funcionalidades como associar questões a disciplinas ou validar a existência de disciplinas.
-type SubjectRepository interface {
-	// GetSubjectByID (Comentado) recuperaria uma disciplina específica por seu ID.
-	// GetSubjectByID(ctx context.Context, id int64) (models.Subject, error)
-	// GetSubjectByName (Comentado) recuperaria uma disciplina pelo nome (e possivelmente UserID para unicidade).
-	// GetSubjectByName(ctx context.Context, name string) (models.Subject, error)
-	// GetOrCreateByNameAndUser busca uma disciplina pelo nome e ID do usuário.
-	// Se não existir, cria uma nova disciplina para esse usuário e a retorna.
-	GetOrCreateByNameAndUser(ctx context.Context, name string, userID int64) (models.Subject, error)
-	// Outros métodos CRUD para Subject poderiam ser adicionados aqui, como:
-	// CreateSubject(ctx context.Context, subject *models.Subject) (int64, error)
-	// ListSubjectsByUser(ctx context.Context, userID int64) ([]models.Subject, error)
-}
 
 // TaskRepository define a interface para operações de acesso a dados relacionadas a 'tasks' (tarefas).
 type TaskRepository interface {
@@ -85,36 +51,6 @@ type TaskRepository interface {
 	// GetUpcomingActiveTasks recupera tarefas ativas (não concluídas) de um usuário específico
 	// com data de vencimento a partir de 'fromDate', limitadas por 'limit'.
 	GetUpcomingActiveTasks(ctx context.Context, userID int64, fromDate time.Time, limit int) ([]models.Task, error)
-}
-
-//go:generate mockgen -source=repository.go -destination=stubs/class_repository_mock.go -package=stubs ClassRepository
-
-// ClassRepository define a interface para operações de acesso a dados relacionadas a 'classes' (turmas) e 'students' (alunos).
-// A gestão de alunos está frequentemente ligada à de turmas.
-type ClassRepository interface {
-	// CreateClass adiciona uma nova turma ao banco de dados e retorna seu ID.
-	CreateClass(ctx context.Context, class *models.Class) (int64, error)
-	// GetClassByID recupera uma turma específica por seu ID. Retorna nil se não encontrada.
-	GetClassByID(ctx context.Context, id int64) (*models.Class, error)
-	// AddStudent adiciona um novo aluno a uma turma e retorna o ID do aluno.
-	AddStudent(ctx context.Context, student *models.Student) (int64, error)
-	// UpdateStudentStatus atualiza o status de um aluno (ex: 'ativo', 'inativo').
-	UpdateStudentStatus(ctx context.Context, studentID int64, status string) error
-	// ListAllClasses recupera todas as turmas (pode precisar de filtragem por usuário ou disciplina).
-	ListAllClasses(ctx context.Context) ([]models.Class, error)
-	// GetStudentsByClassID recupera todos os alunos de uma turma específica.
-	GetStudentsByClassID(ctx context.Context, classID int64) ([]models.Student, error)
-	// UpdateClass atualiza os detalhes de uma turma existente.
-	UpdateClass(ctx context.Context, class *models.Class) error
-	// DeleteClass remove uma turma e, devido ao ON DELETE CASCADE, seus alunos, aulas, avaliações e tarefas associadas.
-	// Requer userID para autorização.
-	DeleteClass(ctx context.Context, classID int64, userID int64) error
-	// GetStudentByID recupera um aluno específico por seu ID.
-	GetStudentByID(ctx context.Context, studentID int64) (*models.Student, error)
-	// UpdateStudent atualiza os detalhes de um aluno existente.
-	UpdateStudent(ctx context.Context, student *models.Student) error
-	// DeleteStudent remove um aluno de uma turma. Requer classID para escopo.
-	DeleteStudent(ctx context.Context, studentID int64, classID int64) error
 }
 
 // LessonRepository define a interface para operações de persistência relacionadas a 'lessons' (aulas/lições).

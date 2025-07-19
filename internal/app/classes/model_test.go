@@ -174,15 +174,7 @@ func TestClassesModel_Update_KeyN_SwitchesToCreatingView(t *testing.T) {
 	assert.Equal(t, "", m.formInputs.inputs[1].Value(), "Campo de SubjectID (inputs[1]) deve estar vazio")
 	assert.Nil(t, m.err, "Erro deve ser nil ao mudar para CreatingView")
 
-	// A mensagem textinput.Blink é um comando que o componente textinput retorna.
-	// O modelo principal (m) não retorna Blink diretamente, mas o comando do textinput
-	// que ele retorna ao ser focado é o Blink.
 	require.NotNil(t, cmd, "Um comando (para textinput.Blink) deve ser retornado")
-	// Verificar se o comando é do tipo tea.Cmd e não tentar executá-lo diretamente aqui
-	// a menos que seja para verificar o tipo de mensagem que ele produziria, o que é mais complexo.
-	// O importante é que um comando é retornado, e a lógica do textinput se encarrega do Blink.
-	// A asserção original `_, isBlinkMsg := blinkResultMsg.(textinput.BlinkMsg)` é válida se `cmd()`
-	// de fato produzisse um BlinkMsg, o que é o caso para o textinput.Focus().
 	assert.NotNil(t, cmd, "Um comando deve ser retornado ao focar o input (textinput.Blink)")
 }
 
@@ -250,16 +242,14 @@ func TestClassesModel_Update_CreateClass_Success(t *testing.T) {
 		},
 	}
 	model := New(mockService)
-	// Simulate entering the CreatingView state, which prepares the form
 	keyN := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}
 	modelInterface, _ := model.Update(keyN)
 	model = modelInterface.(*Model)
 
-	// Now set values on the prepared form
 	require.Len(t, model.formInputs.inputs, 2, "Formulário de criação não inicializado corretamente")
-	model.formInputs.inputs[0].SetValue(createdClassName)       // Name input
-	model.formInputs.inputs[1].SetValue(fmt.Sprintf("%d", createdSubjectID)) // SubjectID input
-	model.formInputs.focusIndex = 1 // Assume o foco está no último campo para submeter com Enter
+	model.formInputs.inputs[0].SetValue(createdClassName)
+	model.formInputs.inputs[1].SetValue(fmt.Sprintf("%d", createdSubjectID))
+	model.formInputs.focusIndex = 1
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
 	updatedModelTea, cmdCreate := model.Update(keyEnter)
@@ -298,7 +288,6 @@ func TestClassesModel_Update_CreateClass_ServiceError(t *testing.T) {
 		},
 	}
 	model := New(mockService)
-	// Simulate entering the CreatingView state
 	keyN := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}
 	modelInterface, _ := model.Update(keyN)
 	model = modelInterface.(*Model)
@@ -306,7 +295,7 @@ func TestClassesModel_Update_CreateClass_ServiceError(t *testing.T) {
 	require.Len(t, model.formInputs.inputs, 2)
 	model.formInputs.inputs[0].SetValue("Turma Errada")
 	model.formInputs.inputs[1].SetValue("1")
-	model.formInputs.focusIndex = 1 // Focus on the last input to trigger submission
+	model.formInputs.focusIndex = 1
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
 	updatedModelTea, cmd := model.Update(keyEnter)
@@ -326,14 +315,13 @@ func TestClassesModel_Update_CreateClass_ServiceError(t *testing.T) {
 func TestClassesModel_Update_CreateClass_InvalidSubjectID(t *testing.T) {
 	mockService := &mockClassService{}
 	model := New(mockService)
-	// Simulate entering the CreatingView state
 	keyN := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}
 	modelInterface, _ := model.Update(keyN)
 	model = modelInterface.(*Model)
 
 	require.Len(t, model.formInputs.inputs, 2)
 	model.formInputs.inputs[0].SetValue("Turma ID Inválido")
-	model.formInputs.inputs[1].SetValue("abc") // Invalid SubjectID
+	model.formInputs.inputs[1].SetValue("abc")
 	model.formInputs.focusIndex = 1
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
@@ -356,23 +344,22 @@ func TestClassesModel_Update_CreateClass_InvalidSubjectID(t *testing.T) {
 	assert.False(t, m2.isLoading, "isLoading deve ser false após erro de ID inválido")
 	assert.Equal(t, CreatingView, m2.state, "Estado deve permanecer CreatingView")
 	require.NotNil(t, m2.err, "Erro deve ser definido para ID inválido")
-	assert.Contains(t, m2.err.Error(), "ID disciplina inválido", "Mensagem de erro deve indicar ID inválido") // Removido "da"
+	assert.Contains(t, m2.err.Error(), "ID disciplina inválido", "Mensagem de erro deve indicar ID inválido")
 }
 
 
 func TestClassesModel_Update_CreateClass_EmptyFields(t *testing.T) {
 	mockService := &mockClassService{}
 	model := New(mockService)
-	// Simulate entering the CreatingView state
 	keyN := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}
 	modelInterface, _ := model.Update(keyN)
 	model = modelInterface.(*Model)
 
 	require.Len(t, model.formInputs.inputs, 2)
-	model.formInputs.inputs[0].SetValue("") // Empty name
+	model.formInputs.inputs[0].SetValue("")
 	model.formInputs.inputs[1].SetValue("123")
 	model.formInputs.focusIndex = 1
-	model.isLoading = false // Definir isLoading como false antes da tentativa de submissão
+	model.isLoading = false
 
 	keyEnter := tea.KeyMsg{Type: tea.KeyEnter}
 	updatedModelTea, cmd := model.Update(keyEnter)
@@ -382,24 +369,23 @@ func TestClassesModel_Update_CreateClass_EmptyFields(t *testing.T) {
 	assert.False(t, m.isLoading, "isLoading deve permanecer false se a validação local falhar")
 	assert.Equal(t, CreatingView, m.state, "Estado deve permanecer CreatingView")
 	require.NotNil(t, m.err, "Erro deve ser definido para campos vazios")
-	assert.Contains(t, m.err.Error(), "nome e ID da disciplina obrigatórios") // Ajustada a mensagem de erro
+	assert.Contains(t, m.err.Error(), "nome e ID da disciplina obrigatórios")
 }
 
-func TestClassesModel_IsFocused(t *testing.T) {
+func TestClassesModel_CanGoBack(t *testing.T) {
 	mockService := &mockClassService{}
 	model := New(mockService)
 
 	model.state = ListView
-	assert.False(t, model.IsFocused(), "Não deve estar focado na ListView")
+	assert.True(t, model.CanGoBack(), "Deve poder voltar da ListView")
 
 	model.state = CreatingView
-	assert.True(t, model.IsFocused(), "Deve estar focado na CreatingView")
+	assert.False(t, model.CanGoBack(), "Não deve poder voltar da CreatingView")
 }
 
 func TestClassesModel_FormNavigation(t *testing.T) {
 	mockService := &mockClassService{}
 	model := New(mockService)
-	// Simulate entering the CreatingView state, which prepares the form and focuses the first input
 	keyN := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}}
 	modelInterface, _ := model.Update(keyN)
 	model = modelInterface.(*Model)
@@ -408,7 +394,6 @@ func TestClassesModel_FormNavigation(t *testing.T) {
 	assert.Equal(t, 0, model.formInputs.focusIndex, "Foco inicial deve ser no input de nome (índice 0)")
 	assert.True(t, model.formInputs.inputs[0].Focused(), "Input de nome (inputs[0]) deve estar focado inicialmente")
 
-	// Pressionar Tab
 	keyTab := tea.KeyMsg{Type: tea.KeyTab}
 	updatedModelTea, _ := model.Update(keyTab)
 	m := updatedModelTea.(*Model)
@@ -416,23 +401,20 @@ func TestClassesModel_FormNavigation(t *testing.T) {
 	assert.True(t, m.formInputs.inputs[1].Focused(), "subjectIDInput (inputs[1]) deve estar focado")
 	assert.False(t, m.formInputs.inputs[0].Focused(), "nameInput (inputs[0]) não deve estar focado")
 
-	// Pressionar Tab novamente (volta ao primeiro campo)
 	updatedModelTea, _ = m.Update(keyTab)
 	m = updatedModelTea.(*Model)
 	assert.Equal(t, 0, m.formInputs.focusIndex, "Foco deve voltar para nameInput (índice 0)")
 	assert.True(t, m.formInputs.inputs[0].Focused(), "nameInput (inputs[0]) deve estar focado novamente")
 	assert.False(t, m.formInputs.inputs[1].Focused(), "subjectIDInput (inputs[1]) não deve estar focado")
 
-	// Pressionar Shift+Tab (do primeiro campo, vai para o último)
-	keyShiftTab := tea.KeyMsg{Type: tea.KeyShiftTab} // Usar tea.KeyShiftTab
+	keyShiftTab := tea.KeyMsg{Type: tea.KeyShiftTab}
 	updatedModelTea, _ = m.Update(keyShiftTab)
 	m = updatedModelTea.(*Model)
 	assert.Equal(t, 1, m.formInputs.focusIndex, "Foco deve ir para subjectIDInput (índice 1) com Shift+Tab a partir do índice 0")
 	assert.True(t, m.formInputs.inputs[1].Focused(), "subjectIDInput (inputs[1]) deve estar focado após Shift+Tab")
 	assert.False(t, m.formInputs.inputs[0].Focused(), "nameInput (inputs[0]) não deve estar focado após Shift+Tab")
 
-	// Pressionar Shift+Tab novamente (do último campo, vai para o primeiro)
-	updatedModelTea, _ = m.Update(keyShiftTab) // Reutiliza keyShiftTab
+	updatedModelTea, _ = m.Update(keyShiftTab)
 	m = updatedModelTea.(*Model)
 	assert.Equal(t, 0, m.formInputs.focusIndex, "Foco deve voltar para nameInput (índice 0) com Shift+Tab a partir do índice 1")
 	assert.True(t, m.formInputs.inputs[0].Focused(), "nameInput (inputs[0]) deve estar focado após Shift+Tab")
@@ -448,8 +430,8 @@ func TestClassesModel_StudentsTable_Initialization(t *testing.T) {
 		studentColumnTitleEnrollment,
 		studentColumnTitleFullName,
 		studentColumnTitleStatus,
-		studentColumnTitleCreatedAt, // Adicionada
-		studentColumnTitleUpdatedAt, // Adicionada
+		studentColumnTitleCreatedAt,
+		studentColumnTitleUpdatedAt,
 	}
 	actualColumns := model.studentsTable.Columns()
 	require.Len(t, actualColumns, len(expectedColumns), "Número incorreto de colunas na studentsTable")
@@ -475,7 +457,6 @@ func TestClassesModel_Update_ListView_EnterSelectsClassAndFetchesStudents(t *tes
 	}
 
 	model := New(mockSvc)
-	// Simulate receiving fetchedClassesMsg
 	modelInterface, _ := model.Update(fetchedClassesMsg{classes: initialClasses, err: nil})
 	model = modelInterface.(*Model)
 	model.isLoading = false
@@ -594,13 +575,4 @@ func TestClassesModel_Update_DetailsView_EscReturnsToListView(t *testing.T) {
 	assert.True(t, m.table.Focused(), "Tabela de turmas deve estar focada")
 }
 
-func TestClassesModel_IsFocused_ForDetailsView(t *testing.T) {
-	mockService := &mockClassService{}
-	model := New(mockService)
-
-	model.state = DetailsView
-	assert.False(t, model.IsFocused(), "Não deve estar focado (para fins de 'esc' global) na DetailsView, a menos que um input interno esteja ativo")
-}
-
-// Ensure mockClassService implements service.ClassService
 var _ service.ClassService = (*mockClassService)(nil)
