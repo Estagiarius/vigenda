@@ -18,6 +18,7 @@ require (
 require (
 	github.com/lib/pq v1.10.9
 	github.com/mattn/go-isatty v0.0.20
+	github.com/sashabaranov/go-openai v1.40.5
 	go.uber.org/mock v0.5.2
 )
 

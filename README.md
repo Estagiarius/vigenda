@@ -55,6 +55,21 @@ Para instruções detalhadas sobre como instalar e configurar o ambiente de dese
 
 Estamos abertos a contribuições! Se você deseja contribuir, por favor, leia nosso [**Guia de Contribuição**](./CONTRIBUTING.md). Ele contém informações detalhadas sobre nosso processo de desenvolvimento, padrões de codificação e fluxo de Pull Requests.
 
+## Chat com IA
+
+O Vigenda inclui um recurso de chat que utiliza a API da OpenAI. Para usar este recurso, você precisa configurar sua chave de API e, opcionalmente, uma URL base da API.
+
+1.  **Inicie o Vigenda:**
+    ```bash
+    go run ./cmd/vigenda/main.go
+    ```
+2.  **Acesse as Configurações:** No menu principal, selecione a opção "Configurações".
+3.  **Insira suas credenciais:**
+    *   No campo "Sua chave de API da OpenAI", insira sua chave de API.
+    *   Se você estiver usando um proxy ou um endpoint personalizado, insira a URL no campo "URL base da API (opcional)".
+4.  **Salve as configurações:** Pressione `enter` para salvar as configurações.
+5.  **Use o Chat:** Agora você pode acessar a tela "Chat com IA" e interagir com o modelo de linguagem.
+
 ## Documentação Adicional
 
 - **[Documentação do Usuário](./docs/USER_DOCUMENTATION.md):** Um guia completo para todas as funcionalidades.

@@ -16,9 +16,11 @@ import (
 	// Importações dos submódulos de visualização da TUI.
 	"vigenda/internal/app/assessments"
 	"vigenda/internal/app/classes"
+	"vigenda/internal/app/chat"
 	"vigenda/internal/app/dashboard"
 	"vigenda/internal/app/proofs"
 	"vigenda/internal/app/questions"
+	"vigenda/internal/app/settings"
 	"vigenda/internal/app/tasks"
 	"vigenda/internal/service" // Importa as interfaces de serviço.
 )
@@ -45,6 +47,8 @@ type Model struct {
 	questionsModel   *questions.Model
 	proofsModel      *proofs.Model
 	dashboardModel   *dashboard.Model // Modelo para o painel de controle.
+	chatModel        *chat.Model
+	settingsModel    *settings.Model
 
 	width    int  // width da janela do terminal.
 	height   int  // height da janela do terminal.
@@ -89,6 +93,8 @@ func New(
 		menuItem{title: AssessmentManagementView.String(), view: AssessmentManagementView},
 		menuItem{title: QuestionBankView.String(), view: QuestionBankView},
 		menuItem{title: ProofGenerationView.String(), view: ProofGenerationView},
+		menuItem{title: ChatView.String(), view: ChatView},
+		menuItem{title: SettingsView.String(), view: SettingsView},
 	}
 
 	// Cria o componente de lista para o menu principal.
@@ -113,6 +119,8 @@ func New(
 	qm := questions.New(qs)
 	pm := proofs.New(ps)
 	dshModel := dashboard.New(ts, cs, as, ls)
+	settingsModel := settings.New()
+	chatModel := chat.New(settingsModel)
 
 	// Retorna a instância do Model principal.
 	return &Model{
@@ -130,6 +138,8 @@ func New(
 		proofService:      ps,
 		lessonService:     ls,
 		dashboardModel:    dshModel,
+		chatModel:         chatModel,
+		settingsModel:     settingsModel,
 	}
 }
 
@@ -229,6 +239,10 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						cmds = append(cmds, m.questionsModel.Init())
 					case ProofGenerationView:
 						cmds = append(cmds, m.proofsModel.Init())
+					case ChatView:
+						cmds = append(cmds, m.chatModel.Init())
+					case SettingsView:
+						cmds = append(cmds, m.settingsModel.Init())
 					}
 				}
 			} else if key.Matches(msg, key.NewBinding(key.WithKeys("q"))) { // Sair do menu principal.
@@ -306,6 +320,22 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.currentView = DashboardView
 			}
 		}
+	case ChatView:
+		updatedSubModel, submodelCmd = m.chatModel.Update(msg)
+		m.chatModel = updatedSubModel.(*chat.Model)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if m.chatModel.CanGoBack() {
+				m.currentView = DashboardView
+			}
+		}
+	case SettingsView:
+		updatedSubModel, submodelCmd = m.settingsModel.Update(msg)
+		m.settingsModel = updatedSubModel.(*settings.Model)
+		if km, ok := msg.(tea.KeyMsg); ok && key.Matches(km, key.NewBinding(key.WithKeys("esc"))) {
+			if m.settingsModel.CanGoBack() {
+				m.currentView = DashboardView
+			}
+		}
 	}
 	cmds = append(cmds, submodelCmd) // Adiciona comando do sub-modelo.
 
@@ -349,6 +379,12 @@ func (m *Model) View() string {
 		help = "\nPressione 'esc' para voltar ao menu principal."
 	case ProofGenerationView:
 		viewContent = m.proofsModel.View()
+		help = "\nPressione 'esc' para voltar ao menu principal."
+	case ChatView:
+		viewContent = m.chatModel.View()
+		help = "\nPressione 'esc' para voltar ao menu principal."
+	case SettingsView:
+		viewContent = m.settingsModel.View()
 		help = "\nPressione 'esc' para voltar ao menu principal."
 	default: // Caso uma view desconhecida seja definida.
 		viewContent = fmt.Sprintf("Visão desconhecida: %s (%d)", m.currentView.String(), m.currentView)

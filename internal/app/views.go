@@ -32,6 +32,12 @@ const (
 	// Distingue-se de DashboardView (menu principal) para permitir uma navegação clara.
 	ConcreteDashboardView
 
+	// ChatView representa a tela para o chat com o modelo de linguagem.
+	ChatView
+
+	// SettingsView representa a tela de configurações.
+	SettingsView
+
 	// StudentView é um exemplo de uma sub-visualização, possivelmente para listar ou editar alunos.
 	// O seu uso e contexto exato podem depender de como o ClassManagementView é implementado.
 	// NOTA: Este valor (99) está fora da sequência iota e foi usado em tui.go;
@@ -60,6 +66,10 @@ func (v View) String() string {
 		return "Gerar Provas"
 	case ConcreteDashboardView:
 		return "Painel de Controle"
+	case ChatView:
+		return "Chat com IA"
+	case SettingsView:
+		return "Configurações"
 	case StudentView: // Caso para o valor explícito
 		return "Visualizar Alunos" // Ou um nome mais apropriado
 	default:
